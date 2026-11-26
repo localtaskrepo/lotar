@@ -1,14 +1,15 @@
 title: Tests leave lotar agent workers and wait loops running after the test run ends
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: claude
+assignee: '@review-claude'
 created: 2026-11-25T02:10:53.247813+00:00
-modified: 2026-11-26T16:51:15.801540+00:00
+modified: 2026-11-26T23:15:57.221320+00:00
 relationships:
   related:
   - DEV-767
+  - DEV-897
 comments:
 - date: 2026-11-25T13:39:50.915818+00:00
   author: automation
@@ -230,3 +231,22 @@ history:
     new: InProgress
   - field: assignee
     new: claude
+- at: 2026-11-26T23:10:34.424714+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-767"]}'
+    new: '{"related":["DEV-767","DEV-897"]}'
+- at: 2026-11-26T23:15:57.017165+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+- at: 2026-11-26T23:15:57.221320+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    new: '@review-claude'

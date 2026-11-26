@@ -1,11 +1,11 @@
 title: 'A merge agent that lands a ticket in InProgress sends it to Reviewing: DEV-832 went back to review after it was on main'
-status: InProgress
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T07:28:02.692146+00:00
-modified: 2026-11-26T21:27:42.599908+00:00
+modified: 2026-11-26T23:15:08.879322+00:00
 relationships:
   related:
   - DEV-832
@@ -60,6 +60,37 @@ comments:
 - date: 2026-11-26T21:27:42.599908+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T212734.716Z-70 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T212734.716Z-70 why.'
+- date: 2026-11-26T23:11:15.142356+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A62e6c6a30da835027e75d59a109fde65035449f33aff308ba9aef1a3a6a12815 of the job job-20261126T212734.716Z-70 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261126T231115.122Z-96: DEV-896 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-26T23:14:58.507477+00:00
+  author: claude
+  text: |-
+    Reworked: main's DEV-886 already fixed the cause, so the code change is gone and only a test remains, rebased onto main.
+
+    - **Overlap with main:** agreed. With `d2b22c8b1` a fix job on a `Merging` ticket runs its agent, so DEV-832's path can't land the branch. I dropped `apply_job_event_as` and the `@merge` matching from `ee70967d6`: it only covered a merge-profile job on a ticket someone else holds, which the ticket doesn't ask for.
+    - **Test failing on main:** replaced by `only_the_merge_job_lands_a_merging_tickets_branch_and_ends_it_done` in `crates/lotar-lib/tests/dev605_merge_without_agent_test.rs`. It uses `Repo::new`'s `fix` profile, so there's no duplicate key. The fix job leaves the branch off main and the ticket goes to Reviewing. Then the merge job lands the branch and the ticket goes Done from Reviewing, which is the "whatever status" part of Done when. With DEV-886's merge-candidate check reverted, it fails at the fix job's `prompt.is_some()`.
+    - **Docs conflict:** gone. `docs/help/agent.md` is unchanged, and DEV-886's text describes it.
+    - Branch rebased onto main `3d82aa877`. The old commit `ee70967d6` is still in the reflog.
+  report:
+    commits:
+    - hash: e58f0b9aa
+      what: test for DEV-832's path on main, no code change
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(/dev605/)'
+      result: passed
+      reason: 23 of 23
+    - command: new test with DEV-886's fix reverted
+      result: failed
+      reason: as expected, the fix job lands the branch
+    - command: cargo clippy -p lotar-lib --tests -- -D warnings
+      result: passed
+    - command: rustfmt --check on the test file
+      result: passed
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: test-only change, the merge runs the full suites
+    next: Review again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aee60cd425c0debdbe8c46bc2bb61a03ccb37da31edf6b06fc428e0b4a3de5ee7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A62e6c6a30da835027e75d59a109fde65035449f33aff308ba9aef1a3a6a12815
@@ -172,3 +203,20 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:11:15.142356+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:14:58.507477+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:15:08.879322+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

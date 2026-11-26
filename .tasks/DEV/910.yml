@@ -1,11 +1,11 @@
 title: lotar agent queue says idle (nothing queued) while it counts jobs queued in lotar serve's memory
-status: InProgress
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T19:40:17.216351+00:00
-modified: 2026-11-26T21:08:03.491384+00:00
+modified: 2026-11-26T23:15:43.475911+00:00
 relationships:
   related:
   - DEV-871
@@ -13,6 +13,38 @@ comments:
 - date: 2026-11-26T21:08:03.491384+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T210757.533Z-60 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T210757.533Z-60 why.'
+- date: 2026-11-26T23:11:22.558255+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afc0d53bae55baf591510f51ca1605d4de7c5708d320028e2cb712e47bd6136ce of the job job-20261126T210757.533Z-60 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261126T231122.540Z-99: DEV-910 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-26T23:15:33.484236+00:00
+  author: claude
+  text: |-
+    `lotar agent queue` no longer leaves `idle` unexplained when jobs wait in another process's memory.
+
+    - Branch fast-forwarded to main first: it lacked DEV-871's `queued_elsewhere`
+    - `worker_state` (`crates/lotar-agent/src/services/agent_queue_service.rs`): with an empty queue file, the reason lists the tickets queued in a lotar process's memory and its pid, e.g. `Queue: nothing in the queue file; queued in a lotar process's memory (such as `lotar serve`'s), which starts them: DEV-4 in lotar process 1234`. Covers this process's queue too (`AgentJobService::queued_tickets`), so `GET /api/jobs` from `lotar serve` says the same
+    - State values stay `active`/`stopped`/`idle` (no REST enum change); `docs/help/agent.md` now says `idle` covers only the queue file and explains the reason
+    - Test: extended `queued_counts_the_jobs_other_processes_queue`; it fails without the fix
+  report:
+    commits:
+    - hash: 15d212009
+      what: queue state names jobs held in a lotar process's memory
+    checks:
+    - command: cargo nextest run -p lotar-agent -E 'test(queued_counts_the_jobs_other_processes_queue)'
+      result: passed
+      reason: fails without the fix
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(/dev592|dev771|dev623|dev871/)'
+      result: passed
+      reason: 11 tests
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afc0d53bae55baf591510f51ca1605d4de7c5708d320028e2cb712e47bd6136ce
 description: |-
@@ -61,3 +93,20 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:11:22.558255+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:15:33.484236+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:15:43.475911+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

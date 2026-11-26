@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T18:53:10.893672+00:00
-modified: 2026-11-26T20:59:19.065937+00:00
+modified: 2026-11-26T21:49:24.435378+00:00
 relationships:
   related:
   - DEV-778
@@ -57,6 +57,59 @@ comments:
     - `cargo nextest run --cargo-profile dev --workspace --no-fail-fast -E 'test(/config|worktree|precedence|source_label|dev265/)'`: 388 passed, 2 failed. The 2 are `dev61_reference_kinds_test` (path escapes the repository through the `target` link to the build root), already filed as DEV-906, as the fix agent said.
     - The `config show` YAML problem the fix agent saw is filed as DEV-907.
     - Worktree left clean.
+- date: 2026-11-26T21:49:22.774379+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s test:agent` failed, and again when rerun on its own:
+    ```
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1683 filtered out; finished in 0.08s
+
+      stderr ───
+
+        thread 'dev61_reference_kinds_test::file_reference_rejects_custom_configured_store_location' (389549854) panicked at crates/lotar-lib/tests/dev61_reference_kinds_test.rs:266:5:
+        custom store rejection: Validation error: Reference path escapes repository
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+            FAIL [   0.176s] (1724/2604) lotar-lib::integration dev61_reference_kinds_test::code_references_reject_store_paths_and_stale_detach_still_works
+      stdout ───
+
+        running 1 test
+        test dev61_reference_kinds_test::code_references_reject_store_paths_and_stale_detach_still_works ... FAILED
+
+        failures:
+
+        failures:
+            dev61_reference_kinds_test::code_references_reject_store_paths_and_stale_detach_still_works
+
+        test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1683 filtered out; finished in 0.16s
+
+      stderr ───
+
+        thread 'dev61_reference_kinds_test::code_references_reject_store_paths_and_stale_detach_still_works' (389549853) panicked at crates/lotar-lib/tests/dev61_reference_kinds_test.rs:743:9:
+        code attach must reject store paths: Validation error: Reference path escapes repository
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    warning: 869/2604 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+    error: test run failed
+    rust-test-runner: error: tests left 1 entries in the temp folder; remove them where they are created: .lotar-test-scratch
+    ```.
+
+    - Rebased `agent/DEV-905` onto `main` (`a18d5ff8e97e`): `c34aa1f828cf`
+    - The check `npm run -s lint:agent` passed
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: failed
+      reason: first run
+    - command: npm run -s test:agent
+      result: failed
+      reason: rerun
+    next: The merge agent takes over in a new session
+- date: 2026-11-26T21:49:24.435378+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T213542.163Z-80 (merge) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T213542.163Z-80 why.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A85f25e5a8f110969372450105671b218f10d8b75b5b58d56574d63c4cf888d5b
 description: |-
@@ -67,6 +120,8 @@ description: |-
   ## Done when
   - A project's `agent.worktree.*` keys override the home config key by key (or lotar warns when a project key is dropped), with a test.
   - docs/help/config-reference.md says which wins.
+tags:
+- job-paused
 history:
 - at: 2026-11-26T18:53:17.560878+00:00
   actor: claude
@@ -129,3 +184,17 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T21:49:22.774379+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:49:24.405023+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-26T21:49:24.435378+00:00
+  actor: automation
+  changes:
+  - field: comment_added

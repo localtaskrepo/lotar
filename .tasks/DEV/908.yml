@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@review-light'
 created: 2026-11-26T19:27:41.962615+00:00
-modified: 2026-11-26T21:04:12.432430+00:00
+modified: 2026-11-26T21:46:51.019603+00:00
 relationships:
   related:
   - DEV-858
@@ -34,12 +34,16 @@ comments:
       result: not_run
       reason: config-only change, no code
     next: Review, then merge; rebase over DEV-801 if it lands first (no file overlap)
+- date: 2026-11-26T21:46:51.019603+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T214648.553Z-82 (review-light) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T214648.553Z-82 why.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abdbc73e5c042eb609474382b70ddcaca9f0f02c95c0b38424a98ca70a7a7c532
 description: 'Found in the DEV-858 review on main 0cf94860d plus the DEV-858 test: `cargo nextest run --workspace --test integration dev503` failed `a_continued_merge_in_the_reviews_process_runs_with_the_merge_profiles_env` and `a_continued_merge_without_a_session_of_its_own_takes_the_reviews_thread` after about 60 s each, right after a cold `cargo build --workspace`; the rerun passed 59/59 in 14 s. Check: rerun dev503 under load. Done: both join the serial wall-clock filter in `.config/nextest.toml` (AGENTS.md), or their wait is fixed.'
 tags:
 - health
 - small-diff
+- job-paused
 custom_fields:
   finding: nextest:dev503-continued-merge-flake
 history:
@@ -90,3 +94,13 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review-light'
+- at: 2026-11-26T21:46:50.983929+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, small-diff
+    new: health, small-diff, job-paused
+- at: 2026-11-26T21:46:51.019603+00:00
+  actor: automation
+  changes:
+  - field: comment_added

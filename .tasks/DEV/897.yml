@@ -1,11 +1,10 @@
 title: 'lotar''s own .tasks/DEV/automation.yml doesn''t load in the installed lotar 0.15.6: the rule ''Login expired'' (DEV-835) uses job.pause'
-status: Merging
+status: Done
 priority: High
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-26T11:05:28.365161+00:00
-modified: 2026-11-26T21:27:13.911067+00:00
+modified: 2026-11-26T23:11:10.109673+00:00
 relationships:
   related:
   - DEV-835
@@ -17,6 +16,7 @@ relationships:
   - DEV-808
   - DEV-863
   - DEV-884
+  - DEV-861
 comments:
 - date: 2026-11-26T14:32:15.747008+00:00
   author: claude
@@ -65,8 +65,56 @@ comments:
 - date: 2026-11-26T21:27:13.911067+00:00
   author: automation
   text: The merge agent's job job-20261126T212711.331Z-67 failed (lotar agent logs job-20261126T212711.331Z-67); the fix agent retries it on branch agent/DEV-897.
+- date: 2026-11-26T21:46:57.015236+00:00
+  author: automation
+  text: |
+    Nothing to merge: `agent/DEV-897` is in `main` already.
+- date: 2026-11-26T21:46:58.611241+00:00
+  author: automation
+  text: The fix agent's job job-20261126T214655.458Z-83 failed (lotar agent logs job-20261126T214655.458Z-83); @fix-retry retries it on branch agent/DEV-897.
+- date: 2026-11-26T21:47:31.844308+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T214726.288Z-86 (fix-retry) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T214726.288Z-86 why.'
+- date: 2026-11-26T23:10:31.859366+00:00
+  author: claude
+  text: |-
+    Already fixed on main by `17cd3a49f` (DEV-884): the rules load with 0.15.6, nothing to commit.
+
+    - `lotar automation simulate --ticket DEV-866` prints a matched rule, no serialization error; no `job: { pause: ... }` rule left in `.tasks/DEV/automation.yml`.
+    - `git log main..HEAD` is empty and the worktree is clean.
+    - `repos.ts --live` still lists DEV-855, DEV-808, DEV-863 and DEV-861 as stalled, for other reasons; each has its own finding (LOCA-651, LOCA-655, LOCA-645, LOCA-652).
+- date: 2026-11-26T23:11:06.464530+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261126T231002.862Z-89 failed again (lotar agent logs job-20261126T231002.862Z-89). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad504f2a05e61530d0cfa6130b6be02a1b4202fcc595ab383581b96fbb2b7623f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A240d9a72b5080df2676e8f0cb506bf843185c896710fa7f8d7f7a8799c95b53d
 description: |-
   ## Found
 
@@ -82,7 +130,6 @@ description: |-
   - [ ] Then `lotar trust` in this repo (its run commands changed) and the stalled DEV tickets restart: `node ~/Development/standards/scripts/repos.ts --live` lists no stalled DEV ticket.
 tags:
 - health
-- merge-retried
 custom_fields:
   finding: automation-file:DEV-835
 history:
@@ -173,3 +220,69 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T21:46:56.477401+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: InProgress
+- at: 2026-11-26T21:46:57.015236+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:46:58.034600+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: health, merge-retried
+    new: health, merge-retried, fix-retried
+- at: 2026-11-26T21:46:58.611241+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:47:29.483676+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A240d9a72b5080df2676e8f0cb506bf843185c896710fa7f8d7f7a8799c95b53d
+- at: 2026-11-26T21:47:31.809174+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, merge-retried, fix-retried
+    new: health, merge-retried, fix-retried, job-paused
+- at: 2026-11-26T21:47:31.844308+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:10:31.859366+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:10:34.427153+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-835","DEV-855","DEV-866","DEV-886","DEV-890","DEV-887","DEV-808","DEV-863","DEV-884"]}'
+    new: '{"related":["DEV-835","DEV-855","DEV-866","DEV-886","DEV-890","DEV-887","DEV-808","DEV-863","DEV-884","DEV-861"]}'
+- at: 2026-11-26T23:11:06.464530+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:11:08.756014+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix-retry'
+- at: 2026-11-26T23:11:10.109673+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, merge-retried, fix-retried, job-paused
+    new: health

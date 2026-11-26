@@ -1,11 +1,11 @@
 title: config validate prints 'Global configuration is valid' right after the invalid home config error
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T07:06:01.774631+00:00
-modified: 2026-11-26T21:28:00.559024+00:00
+modified: 2026-11-26T23:14:45.874110+00:00
 relationships:
   depends_on:
   - DEV-883
@@ -29,6 +29,38 @@ comments:
 - date: 2026-11-26T21:28:00.559024+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T212755.519Z-72 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T212755.519Z-72 why.'
+- date: 2026-11-26T23:11:13.014656+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3425182e8f3db8400d2baffa866734d4802b9b8d2c0b7747a749ef64b9ecb341 of the job job-20261126T212755.519Z-72 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261126T231112.989Z-95: DEV-893 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-26T23:14:38.859291+00:00
+  author: claude
+  text: |-
+    Fixed: config validate no longer says the global config is valid after a home config error.
+
+    - Rebased `agent/DEV-893` onto main, which has DEV-883 (`ea4d2aec0`)
+    - `validate.rs`: the success line now shows only when no error came before it (home config parse or resolution failure)
+    - Test: `test_config_validate_fails_on_unparsable_home_agent_profile` also asserts there is no `Global configuration is valid` line. Before the fix it printed `✅ Global configuration is valid`, now it doesn't
+    - Commit `24c07dd7a`, signed
+  report:
+    commits:
+    - hash: 24c07dd7a
+      what: no 'Global configuration is valid' line after the home config error
+    checks:
+    - command: cargo nextest run --cargo-profile dev -E 'test(/^config_validate_integration_test::/)'
+      result: passed
+      reason: 10 tests, the new assertion failed before the fix
+    - command: cargo clippy --workspace --all-targets --profile dev
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: the merge runs it
+    - command: npm test
+      result: not_run
+      reason: the merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: Merge agent lands agent/DEV-893
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ac7687ed3b49ddb0c5fbe6482ac41b79bcec3ccb030425967d34b829990ff1b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3425182e8f3db8400d2baffa866734d4802b9b8d2c0b7747a749ef64b9ecb341
@@ -106,3 +138,20 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:11:13.014656+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:14:38.859291+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:14:45.874110+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

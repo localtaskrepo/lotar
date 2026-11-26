@@ -1,11 +1,11 @@
 title: 'Proposal: a built-in agent template from our working rules (second-provider review, one retry, comments reach the agent, prerequisites)'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T18:50:35.107598+00:00
-modified: 2026-11-26T21:34:52.211045+00:00
+modified: 2026-11-26T23:12:42.246301+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -555,6 +555,36 @@ comments:
     choice:
     - claude
     note: (answered in INBOX-807)
+- date: 2026-11-26T23:11:04.327732+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A40ca7fcb4af355e63474a183d866ce2589b142cc19ed57fee0fe752758649bd8 of the job job-20261126T213442.105Z-75 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261126T231104.308Z-92: DEV-796 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-26T23:12:33.803388+00:00
+  author: claude
+  text: |-
+    Review runner settled: `@review` stays on claude, as built. No code change this round.
+
+    - Your answer (INBOX-807) matches HEAD `2b01c8b1c`, so finding 2 needs no edit.
+    - The template already tells people to switch: `agent-team.yml:57-59` says to give `@review` a second runner (codex while `@implement` runs claude). `docs/help/templates.md:108` says the same.
+    - Finding 1 was fixed in `2b01c8b1c` in the last round.
+    - Reran the agent-team and template tests on HEAD: 12 passed.
+  report:
+    commits:
+    - hash: 2b01c8b1c
+      what: agent-team template, comment rule fix (unchanged this round)
+    checks:
+    - command: cargo nextest run --workspace -E 'test(agent_team) | test(templates)'
+      result: passed
+      reason: 12 tests
+    - command: npm run lint
+      result: not_run
+      reason: no change this round; the merge runs it
+    - command: npm test
+      result: not_run
+      reason: the merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: 'Review again: both findings are answered'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A39f524ab3cd966ca8af6dbcc9c5570f7120455eb2f0df416f7b9a499eda91a1a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad27a37dc9405b27f5dca8688f67529ee199539ce210aa1c8871abbf2bfa6f681
@@ -1174,3 +1204,20 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A40ca7fcb4af355e63474a183d866ce2589b142cc19ed57fee0fe752758649bd8
+- at: 2026-11-26T23:11:04.327732+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:12:33.803388+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:12:42.246301+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

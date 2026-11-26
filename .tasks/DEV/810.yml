@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T21:19:09.010490+00:00
-modified: 2026-11-26T21:04:30.940009+00:00
+modified: 2026-11-26T23:11:07.597213+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -518,6 +518,9 @@ comments:
     **Not run**
     - `npm run lint`, `npm test`, `npm run smoke`: the merge runs them.
     - The count after the release still needs the owner's OK. For reference, lotar's T3 project shows 0 unsettled `completed` threads today, out of 1550.
+- date: 2026-11-26T23:11:07.597213+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A203e8c6c32d413b7f02fbd4bd166d640c726e4be39315dedd938736acc6b3a79 of the job job-20261126T210414.187Z-52 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261126T231107.551Z-93: DEV-810 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5dfa5bb04fb5c4ca2b8a8a0eee8e470c889eb5d9c328cc3c4c9e036bfddf5ad7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abb164102892b3f03b3326e4202fca268d1a5f85ada93acdc3de07959a92a3f46
@@ -1113,3 +1116,7 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A203e8c6c32d413b7f02fbd4bd166d640c726e4be39315dedd938736acc6b3a79
+- at: 2026-11-26T23:11:07.597213+00:00
+  actor: automation
+  changes:
+  - field: comment_added

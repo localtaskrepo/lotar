@@ -47,6 +47,8 @@ Tasks directory discovery follows these steps:
 4. Parent directory search for an initialized tasks folder (matching the configured name and containing `config.yml`). The resolver returns the parent path so status output can explain where it was found. The search stops at the root of the git repository the command runs in (a directory with `.git`), so a new or nested repository gets its own workspace, and a tasks folder directly in your home directory is only used when the command runs in the home directory itself.
 5. Current directory + configured folder name (created on demand). Commands that only read (`list`, `show`, `stats`, `config show`, ...) never create it.
 
+A relative path from `--tasks-dir` or `LOTAR_TASKS_DIR` counts from the folder the command runs in and is used as an absolute path, so `--tasks-dir .tasks` reaches the same agent queue and runs the same `run` rules as the full path.
+
 These rules apply everywhere (CLI, REST server, MCP). To see which folder was picked, run `lotar config show`: its first line is the tasks directory.
 
 ## Project resolution (short guide)

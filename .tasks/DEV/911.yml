@@ -1,0 +1,42 @@
+title: Run review and triage jobs on dyson over ssh (claude/codex runners)
+status: Todo
+priority: Medium
+type: Feature
+reporter: claude
+assignee: '@fix'
+created: 2026-11-26T23:14:46.615229+00:00
+modified: 2026-11-26T23:15:04.121835+00:00
+relationships:
+  depends_on:
+  - DEV-901
+  related:
+  - DEV-901
+description: |-
+  Part of the owner's route B on DEV-901 (2026-11-26, INBOX-805): besides fix and research jobs in dyson's T3 Code, the profiles lotar runs through harnessmux (`review`, `review-claude`, `review-light`, `triage`, `triage-codex`) run on dyson over ssh. `merge` stays on the Mac. Builds on DEV-901's `agent.hosts`, placement, wake, worktree push/fetch/re-sign and ticket socket.
+
+  A profile's `command`/`args` already replace the adapter command (`crates/lotar-agent/src/services/agent_runner.rs` `with_profile_command`).
+
+  ## Done when
+  - [ ] `host` on a `claude`/`codex` profile runs its agent as `ssh -T -o ControlMaster=no -o ControlPath=none <target> -- cd <worktree> && <agent command>`; the profile's own `command`/`args` win over the agent's default and still go through ssh.
+  - [ ] The job's lotar MCP server reaches the agent as a stdio bridge on dyson to DEV-901's forwarded socket, not `lotar mcp` on dyson.
+  - [ ] Disconnect or stop: the remote agent's process group gets SIGTERM, then SIGKILL after 10 s.
+  - [ ] codex is signed in on dyson (LOCA-631; it wasn't on 2026-11-26) before `triage-codex` gets a host.
+  - [ ] Tests with a fake ssh cover the launch line and the cleanup; docs/help names the runners `host` works for.
+history:
+- at: 2026-11-26T23:14:47.409995+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-901"]}'
+- at: 2026-11-26T23:14:47.764707+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-26T23:15:04.121835+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-901"]}'
+    new: '{"depends_on":["DEV-901"],"related":["DEV-901"]}'

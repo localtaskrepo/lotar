@@ -4,7 +4,7 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-26T03:32:05.108189+00:00
-modified: 2026-11-26T21:28:10.229060+00:00
+modified: 2026-11-26T23:10:23.227016+00:00
 relationships:
   related:
   - DEV-860
@@ -71,6 +71,14 @@ comments:
 - date: 2026-11-26T21:28:10.229060+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T212804.665Z-73 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T212804.665Z-73 why.'
+- date: 2026-11-26T23:10:23.227016+00:00
+  author: claude
+  text: |-
+    Still waiting for a lotar release with DEV-887; nothing to requeue yet.
+
+    - `lotar --version`: `0.15.7`; newest tag `v0.15.7`; `git tag --contains 0cf94860d`: none.
+    - `queue-b06823c0….json`: 8 pending, last written 12:00 local, so no new leaks since the last round.
+    - Next: once a release with `0cf94860d` is installed, requeue the 8 under each repo's absolute tasks dir, delete the file, Done.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1c1b94732806b9b77a50613c04a1a582524ec503076e19e24843db18e4f19fa5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A348c8be0d6af88553ec0fc486e860caa6d139c788491aa5c658ec157106d8578
@@ -224,5 +232,9 @@ history:
     new: health, owner, waits, job-paused
 - at: 2026-11-26T21:28:10.229060+00:00
   actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:10:23.227016+00:00
+  actor: claude
   changes:
   - field: comment_added

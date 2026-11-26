@@ -1,11 +1,11 @@
 title: After a reload, the pill of a job in another process that waits on a question says Working, not Asks
-status: Blocked
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T02:36:00.735704+00:00
-modified: 2026-11-26T21:34:40.608304+00:00
+modified: 2026-11-26T23:13:35.258719+00:00
 relationships:
   depends_on:
   - DEV-765
@@ -21,6 +21,7 @@ relationships:
   - DEV-774
   - DEV-840
   - DEV-778
+  - DEV-909
 comments:
 - date: 2026-11-22T06:37:21.509101+00:00
   author: claude
@@ -353,6 +354,34 @@ comments:
 - date: 2026-11-24T22:59:58.611670+00:00
   author: automation
   text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-782 yet. DEV-782 waits for DEV-840.'
+- date: 2026-11-26T21:47:06.169389+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T214659.246Z-84 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T214659.246Z-84 why.'
+- date: 2026-11-26T23:11:01.399588+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae9c6e246361c7416ada0074fa86a4a34bef80a95bce28d895b6a5f9654be1fa3 of the job job-20261126T214659.246Z-84 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261126T231101.382Z-91: DEV-782 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-26T23:12:30.646095+00:00
+  author: claude
+  text: |-
+    Ready to merge again: DEV-840 landed on main (`a18d5ff8e`), which fixes the temp-folder leak that blocked the last merge.
+
+    - No code changes in this round: the branch is still `3a9eef64a`, which passed review
+    - Targeted tests rerun on the branch: `cargo nextest run -p lotar-agent dev782` passed (1 test), and vitest `AgentActivityIndicator.spec.ts` + `AgentJobs.spec.ts` passed (35 tests)
+    - The branch is behind main by DEV-840 and later commits; the merge agent rebases
+  report:
+    commits:
+    - hash: 3a9eef64a
+      what: saved_job_dto reports a logged job's pending question
+    checks:
+    - command: cargo nextest run -p lotar-agent dev782
+      result: passed
+    - command: vitest AgentActivityIndicator.spec.ts AgentJobs.spec.ts
+      result: passed
+      reason: 35 tests
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: 'Merge: rebase onto main (has DEV-840 a18d5ff8e) and run the merge checks'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1a9fe5ab501c624ca185ae91163eb6fa7887ac67e73bf1101117f32b9b4be6a7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A213f6f4501a6f08135284814b3c429c20077b295d8c5df00ce09be201fb88dad
@@ -395,6 +424,7 @@ references:
 - attachment: dev782-before-list-light-1440.f39685712beed818af5a51b10814905d.webp
 - attachment: dev782-before-list-light-1920.e9fe30143a7f0a8a21bd86d84b212c67.webp
 - attachment: dev782-before-list-light-390.002ddb72dd969a55b57065d266eefadf.webp
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae9c6e246361c7416ada0074fa86a4a34bef80a95bce28d895b6a5f9654be1fa3
 description: |-
   Found while reviewing DEV-765.
 
@@ -410,6 +440,7 @@ description: |-
 tags:
 - ui
 - agent
+- job-paused
 history:
 - at: 2026-11-22T02:36:08.788363+00:00
   actor: claude
@@ -932,3 +963,47 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T21:47:02.466587+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-26T21:47:03.804413+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae9c6e246361c7416ada0074fa86a4a34bef80a95bce28d895b6a5f9654be1fa3
+- at: 2026-11-26T21:47:06.136464+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui, agent
+    new: ui, agent, job-paused
+- at: 2026-11-26T21:47:06.169389+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:11:01.399588+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:12:30.646095+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:12:37.145843+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-26T23:13:35.258719+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-765","DEV-840"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840","DEV-778"]}'
+    new: '{"depends_on":["DEV-765","DEV-840"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840","DEV-778","DEV-909"]}'

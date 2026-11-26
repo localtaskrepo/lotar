@@ -5,15 +5,30 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T19:31:53.927572+00:00
-modified: 2026-11-26T21:07:08.577168+00:00
+modified: 2026-11-26T23:13:35.266446+00:00
 relationships:
   related:
   - DEV-849
   - DEV-850
+  - DEV-782
+  - DEV-867
+  - DEV-901
 comments:
 - date: 2026-11-26T21:07:08.577168+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T210626.099Z-53 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T210626.099Z-53 why.'
+- date: 2026-11-26T23:11:20.479007+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7143b46bbd3ddfe5ad20074d6ebde47c173ed5b407d1270ea3e88107f01c75f3 of the job job-20261126T210626.099Z-53 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261126T231120.465Z-98: DEV-909 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-26T23:13:34.958897+00:00
+  author: claude
+  text: |-
+    Plan: typed reference in the job log, a paged reader by job id, a Conversation section loaded on open.
+
+    - Job log: new event `agent_job_transcript` with `transcript {source, session, agent, agent_session, turn, format: 1, link}`, after `Session::send` (`drive_session`) and for each later turn of the job (`drive_turns`, `TurnStarted`).
+    - `GET /api/jobs/transcript?id=&after=&limit=`: finds the session from the reference, else from the job log's `harnessmux attach <name>` line plus the job's time window; reads only `<harnessmux state>/sessions/<name>.events.jsonl` (and its kept `<name>.<stamp>` copies), names checked with harnessmux's `validate_name`. Tool calls and thoughts are merged server-side, `raw` is dropped. Unknown job: 404.
+    - UI: Show conversation under Show thread, request only on open; states loading, expired, error + retry, unsupported with the attach command; t3: Open in T3 and "Tool calls are in T3" when the turn has no tool events.
+    - Told DEV-901, DEV-867 and DEV-782 threads about the shared files.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7143b46bbd3ddfe5ad20074d6ebde47c173ed5b407d1270ea3e88107f01c75f3
 description: |-
@@ -73,3 +88,17 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:11:20.479007+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:13:34.958897+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:13:35.266446+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-849","DEV-850"]}'
+    new: '{"related":["DEV-849","DEV-850","DEV-782","DEV-867","DEV-901"]}'

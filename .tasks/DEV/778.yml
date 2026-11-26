@@ -1,11 +1,11 @@
 title: A job's build root folder outlives its worktree when the removal or cleanup is cut off
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-22T00:05:08.801449+00:00
-modified: 2026-11-26T21:34:41.429270+00:00
+modified: 2026-11-26T23:15:31.815145+00:00
 relationships:
   depends_on:
   - DEV-762
@@ -387,6 +387,35 @@ comments:
     - [DEV-840](https://lotar.pyxzl.net/task/DEV-840) is still Reviewing (fix `53c39bfc2` isn't on main yet)
     - Added `depends-on DEV-840` and the `waits` tag. This job's end sets DEV-778 to Blocked. Once DEV-840 is Done, the "Prerequisites done" rule restarts the agent, and the merge follows
     - No code changed: branch `agent/DEV-778` stays at `ffda525cd`
+- date: 2026-11-26T21:47:20.198571+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T214710.289Z-85 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T214710.289Z-85 why.'
+- date: 2026-11-26T23:10:52.342713+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7c90e0f762920911041befbda1b113271b1b1b744c81714c1d23e3b6f67d9a91 of the job job-20261126T214710.289Z-85 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261126T231052.319Z-90: DEV-778 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
+- date: 2026-11-26T23:15:25.415875+00:00
+  author: claude
+  text: |-
+    Ready to merge: [DEV-840](https://lotar.pyxzl.net/task/DEV-840) is on main, nothing needed to change here.
+
+    - DEV-840's fix is on main as `a18d5ff8e`. Main is now `3d82aa877`, so the branch is behind it, but `git merge-tree` shows no conflicts
+    - The 44 `agent_safety_test` tests, DEV-778's 2 new ones included, pass on `ffda525cd` (`cargo build --workspace`, then `cargo nextest run --test integration agent_safety_test`). A first run with `-p lotar-lib` failed only because the `lotar` binary wasn't built yet, not because of this change
+    - No code changed. Branch `agent/DEV-778` is still at `ffda525cd`; the merge rebases it and runs the full suites
+  report:
+    commits:
+    - hash: ffda525cd
+      what: sweep orphaned build root and parked cleanup folders (unchanged)
+    checks:
+    - command: cargo nextest run --test integration agent_safety_test
+      result: passed
+      reason: 44/44
+    - command: git merge-tree --write-tree main HEAD
+      result: passed
+      reason: no conflicts with main 3d82aa877
+    - command: npm run -s test:agent
+      result: not_run
+      reason: the merge job runs the full suites
+    next: 'Merge job: rebase onto main and rerun test:agent, now that DEV-840 is on main'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A282711a46030edc51d136dceb5c1716c2f6ab065a6408c803b5f8995e2d5510c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A53f6b26caf08444d74b3031a53e4eaeb9201accb87a0965c458d756de69ad3f8
@@ -402,6 +431,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9c79f134fafe147bd09d2a534462f6e52d9632123a4cf1002bf8006cd6d22b85
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A77b22e5750b413bdfd4e513d16df8cfde9cd0e03a337bf58d318be42634c22a3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aab5851e8f0c77fca90658e4c6ea9819a74ebf85ddf1b2bf85d7f62a343f1d29b
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7c90e0f762920911041befbda1b113271b1b1b744c81714c1d23e3b6f67d9a91
 description: |-
   Found in the DEV-762 review. `remove_worktree_dir` (crates/lotar-agent/src/services/agent_job_service.rs ~2816) finds the build root folder before the rename, but deletes it only after the trash folder is gone. A removal cut off in between, or a failed delete of that folder, leaves `<build_root>/<repo>/<ticket>` with no link pointing at it. The next removal sweeps leftover `.<name>.lotar-removed` folders but not the build root. `remove_build_output` (~3243) has the same gap for its parked `.<ticket>.lotar-cleanup-<job>` folders in the build root. Those builds then take quota on /Volumes/Builds until someone deletes them by hand.
 
@@ -421,6 +451,8 @@ description: |-
   - [ ] Unset build root: nothing changes
   - [ ] Test: a removal cut off after the rename (or a build folder that can't be deleted) leaves the folder; the next removal or cleanup deletes it, and a live worktree's build stays
   - [ ] Docs (`docs/help/agent.md`) say leftovers are swept
+tags:
+- job-paused
 history:
 - at: 2026-11-22T00:05:10.705262+00:00
   actor: claude
@@ -929,3 +961,41 @@ history:
   - field: tags
     old: waits
     new: ''
+- at: 2026-11-26T21:47:16.283847+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-26T21:47:17.779433+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7c90e0f762920911041befbda1b113271b1b1b744c81714c1d23e3b6f67d9a91
+- at: 2026-11-26T21:47:20.158860+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-26T21:47:20.198571+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:10:52.342713+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:15:25.415875+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:15:31.815145+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

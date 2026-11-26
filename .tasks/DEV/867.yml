@@ -1,11 +1,11 @@
 title: A merge job taken over after lotar's exit resumes its merge agent without the checks lock
-status: InProgress
+status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T07:45:41.052287+00:00
-modified: 2026-11-26T21:35:18.957068+00:00
+modified: 2026-11-26T23:13:35.260055+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -13,6 +13,7 @@ relationships:
   - DEV-797
   - DEV-626
   - DEV-801
+  - DEV-909
 comments:
 - date: 2026-11-25T18:00:31.503924+00:00
   author: automation
@@ -110,6 +111,35 @@ comments:
 - date: 2026-11-26T21:35:18.957068+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T213510.936Z-77 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T213510.936Z-77 why.'
+- date: 2026-11-26T23:10:28.436712+00:00
+  author: claude
+  text: |-
+    Resumed after the usage-limit pause: the fix was already committed, nothing left to change.
+
+    - `616b3bc38` on `agent/DEV-867` is unchanged since the last hand-off; no new edits.
+    - Checked the DEV-801 note (`925bc14df`, not on `main` yet): the new test already sets its own `LOTAR_CHECK_LOCK_PORT` and clears `LOTAR_CHECK_LOCK_HELD`; its takeover runs in a thread, not a queue worker, so `LOTAR_AGENT_QUEUE_DISABLE_WORKER` doesn't affect it.
+    - Diff is 96 lines, so no `small-diff` tag. No guidance correction.
+  report:
+    commits:
+    - hash: 616b3bc38
+      what: a taken-over merge job takes the check lock before its session goes on
+    checks:
+    - command: npm run lint
+      result: passed
+      reason: in the previous run, no change since
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(/a_taken_over_|resumed|dev797/)'
+      result: passed
+      reason: 22 tests, in the previous run, no change since
+    - command: npm run test:agent
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it; no UI change
+    next: Review, then merge
+- date: 2026-11-26T23:11:11.417584+00:00
+  author: automation
+  text: 'T3 Code runs the thread https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ce7499cac79969a6af3e6141c7a9ed4b3f29d7ae6c82fb8ac4a332a79245b97 of the job job-20261126T213510.936Z-77 again, with no lotar job (it resumed a turn a restart or a usage limit cut off, or someone wrote in the thread). lotar takes it over as the job job-20261126T231111.397Z-94: DEV-867 goes back to @fix, and the job''s end rules run when the thread''s run ends.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adb0a7e19c4da46432e915e480cfbd0fde092aff11314dfcb741be1bdda65d119
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A28118acf01dea3aac80b4fc195bac1b28817edc83e4f78d9cbce250ea5431ce1
@@ -322,3 +352,23 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T23:10:28.436712+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:11:11.417584+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T23:11:15.697341+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked
+- at: 2026-11-26T23:13:35.260055+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626","DEV-801"]}'
+    new: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626","DEV-801","DEV-909"]}'

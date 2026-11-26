@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T21:39:09.103486+00:00
-modified: 2026-11-26T11:05:28.671314+00:00
+modified: 2026-11-26T23:16:07.406813+00:00
 relationships:
   depends_on:
   - harnessmux:HARN-31
@@ -207,3 +207,13 @@ history:
   - field: relationships
     old: '{"depends_on":["harnessmux:HARN-31"],"related":["DEV-711","DEV-811","DEV-832","DEV-833"]}'
     new: '{"depends_on":["harnessmux:HARN-31"],"related":["DEV-711","DEV-811","DEV-832","DEV-833","DEV-897"]}'
+- at: 2026-11-26T23:16:07.287519+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@merge'
+- at: 2026-11-26T23:16:07.406813+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@merge'

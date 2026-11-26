@@ -1,11 +1,11 @@
 title: Job prompt's Comments section points agents at the full lotar show for all comments, beside the block's --brief
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T07:11:26.742561+00:00
-modified: 2026-11-26T20:27:57.291458+00:00
+modified: 2026-11-26T21:46:38.434203+00:00
 relationships:
   related:
   - DEV-884
@@ -44,6 +44,36 @@ comments:
     - Both prompt tests assert the new text (line with and without excerpts).
     - Reran `cargo nextest run -p lotar-agent comment` with `RUSTC_WRAPPER=`: 12 passed.
     - No other old "All of them: `lotar show`" in code or docs. No tickets filed.
+- date: 2026-11-26T21:46:38.140378+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-895` is in `main`.
+
+    - Rebased `agent/DEV-895` onto `main` (`d1061401edfe`): `126f38792a13`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-895` onto `main` (`a18d5ff8e97e`): `bc90c569214b`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `bc90c569214b`
+    - Amended the pending `.tasks` changes into the merged commit: `3d82aa877238`
+    - Pushed 2 commits to `origin/main`
+  report:
+    commits:
+    - hash: a18d5ff8e
+      what: 'DEV-840 Flaky: a Rust test sometimes leaves a .tmpXXXXXX entry in the test runner''s temp folder, failing a passing run'
+    - hash: 3d82aa877
+      what: DEV-895 Job prompt's Comments section points agents at the full lotar show for all comments, beside the block's --brief
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1d5a203926b86a2ec80fe3f18002efc723142d9db0b434b8eb989bab16e71a29
 description: |-
@@ -112,3 +142,13 @@ history:
   - field: assignee
     old: '@review-light'
     new: '@merge'
+- at: 2026-11-26T21:46:38.140378+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:46:38.434203+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
