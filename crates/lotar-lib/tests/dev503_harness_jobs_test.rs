@@ -2313,3 +2313,83 @@ fn the_t3_thread_route_answers_each_jobs_thread_and_refuses_other_jobs() {
     assert_eq!(status, 404, "{body}");
     assert!(body.to_string().contains("Job 'job-unknown-1' not found"), "{body}");
 }
+
+/// DEV-867: lotar dies during a merge agent's turn, which freed the machine's check lock. The process that takes the
+/// job over takes the lock again before it resumes the session: while another merge holds it, the takeover waits and
+/// the session isn't resumed; once it's free, the session goes on in the lock and the job frees it when it ends.
+#[test]
+fn a_taken_over_merge_job_waits_for_the_check_lock_before_it_resumes_its_session() {
+    use std::io::Write;
+    use std::net::{Ipv4Addr, TcpListener};
+    let harness = harness("", &[]);
+    harness.run(&[]).success();
+    let sessions = harness.root().join("harnessmux/state/sessions");
+    let session = std::fs::read_dir(&sessions)
+        .unwrap()
+        .filter_map(|entry| entry.unwrap().file_name().to_string_lossy().strip_suffix(".events.jsonl").map(str::to_string))
+        .find(|name| name.contains("-TEST-1-fixer"))
+        .unwrap_or_else(|| panic!("the first job's session"));
+    let port = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap().local_addr().unwrap().port();
+    let _lock_env = (EnvVarGuard::set("LOTAR_CHECK_LOCK_PORT", &port.to_string()), EnvVarGuard::clear("LOTAR_CHECK_LOCK_HELD"));
+    // Another merge's checks hold the lock.
+    let holder = TcpListener::bind((Ipv4Addr::LOCALHOST, port)).unwrap();
+    holder.set_nonblocking(true).unwrap();
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let stopped = std::sync::Arc::clone(&stop);
+    let server = std::thread::spawn(move || {
+        while !stopped.load(std::sync::atomic::Ordering::Relaxed) {
+            match holder.accept() {
+                Ok((mut stream, _)) => {
+                    let _ = stream.set_nonblocking(false);
+                    let _ = writeln!(stream, "OTHER-9's merge checks (pid 1), since 10:00 UTC");
+                }
+                Err(_) => std::thread::sleep(Duration::from_millis(20)),
+            }
+        }
+    });
+    let tasks_dir = harness.fixtures.tasks_root.clone();
+    // The merge job of a lotar process that exited (pid 0 never runs).
+    lotar::services::agent_active_jobs::register(
+        &tasks_dir,
+        &lotar::services::agent_active_jobs::ActiveJob {
+            job_id: "job-dev867-merge".into(),
+            ticket_id: "TEST-1".into(),
+            runner: "claude".into(),
+            agent: Some("fixer".into()),
+            owner_pid: 0,
+            child_pid: 0,
+            started_at: time::now_rfc3339(),
+            session_id: Some(session.clone()),
+            merge: true,
+            assignee_at_start: None,
+            in_setup: false,
+            request: None,
+        },
+    );
+    AgentJobService::recover_orphaned_jobs(&tasks_dir);
+    let job = "job-dev867-merge";
+    let progress = || -> Vec<String> {
+        AgentJobService::events_for(job).into_iter().filter(|event| event.kind == "agent_job_progress").filter_map(|event| event.message).collect()
+    };
+    wait_for("the takeover's wait for the lock", || progress().iter().any(|line| line.starts_with("Waiting for the machine's check lock")));
+    let waiting = progress().into_iter().find(|line| line.starts_with("Waiting for the machine's check lock")).unwrap();
+    assert!(waiting.ends_with("held by OTHER-9's merge checks (pid 1), since 10:00 UTC"), "{waiting}");
+    std::thread::sleep(Duration::from_millis(1200));
+    assert_eq!(status(job), "running", "a waiting takeover runs");
+    assert!(!harness.log().contains("\"method\":\"session/resume\""), "it resumed the session while another merge held the lock: {}", harness.log());
+
+    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    server.join().unwrap();
+    wait_for("the job's end", || AgentJobService::job_settled(job) && status(job) != "running");
+    assert_eq!(status(job), "completed", "{:?}", progress());
+    assert!(harness.log().contains("\"method\":\"session/resume\""), "the session went on once the lock was free: {}", harness.log());
+    let comments = TaskService::get(&harness.fixtures.create_storage(), "TEST-1", None).unwrap().comments;
+    assert!(
+        comments
+            .iter()
+            .any(|comment| comment.text.contains("held by OTHER-9's merge checks (pid 1), since 10:00 UTC; the taken-over merge agent goes on now.")),
+        "the takeover comments its wait: {:?}",
+        comments.iter().map(|comment| &comment.text).collect::<Vec<_>>()
+    );
+    wait_for("the lock's release", || TcpListener::bind((Ipv4Addr::LOCALHOST, port)).is_ok());
+}

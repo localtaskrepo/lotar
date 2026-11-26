@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T04:02:53.831434+00:00
-modified: 2026-11-27T09:11:37.328776+00:00
+modified: 2026-11-27T09:42:12.099999+00:00
 relationships:
   depends_on:
   - DEV-843
@@ -28,7 +28,6 @@ description: |-
   - [ ] A test hard-deletes a queued ticket without re-creating it: the worker drops the entry, starts no job, spends no attempts and comments nowhere.
 tags:
 - agent
-- waits
 history:
 - at: 2026-11-27T04:02:54.561755+00:00
   actor: claude
@@ -74,3 +73,9 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-27T09:42:12.099999+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, waits
+    new: agent

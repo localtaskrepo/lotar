@@ -1,0 +1,19 @@
+title: DEV's Prerequisites rule keeps the ticket Blocked, so the daily automation run tells it again
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+created: 2026-11-27T09:45:21.828627+00:00
+relationships:
+  related:
+  - DEV-902
+description: |-
+  Found in the DEV-902 review (2026-11-27). The rule "Prerequisites done: continue the waiting ticket" in `.tasks/DEV/automation.yml` (line 1048) has no `set` that moves the ticket out of Blocked. docs/help/automation.md (When prerequisites are done) says such a rule needs one: `lotar automation run` fires `unblocked` on every run while the ticket still matches. The comment above the rule says the daily `repos.ts --fix` runs it, so while the @fix job waits for a slot, each daily run tells the agent again. DEV-902 fixed the same gap in the agent-team template (`set: status: InProgress`).
+
+  Tagged owner: this is the owner's own DEV config.
+
+  ## Done when
+
+  - [ ] The DEV rule's `unblocked` action sets `status: InProgress` (or the owner picks another way out of Blocked); its `remove tags [waits]`, `agent` and `tell_agent` stay.
+tags:
+- owner

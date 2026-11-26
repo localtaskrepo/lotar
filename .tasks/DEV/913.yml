@@ -1,11 +1,11 @@
 title: Smoke comment says the loaded log closes an Instructions panel opened while loading, which DEV-888 fixes
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T23:36:28.876091+00:00
-modified: 2026-11-27T09:33:30.797930+00:00
+modified: 2026-11-27T09:41:38.404525+00:00
 relationships:
   related:
   - DEV-875
@@ -63,6 +63,29 @@ comments:
 - date: 2026-11-27T09:33:30.797930+00:00
   author: automation
   text: Waited 17 min for the machine's check lock, held by lotar's merge checks of DEV-843 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-843 (pid 61697), since 09:11 UTC; the merge agent starts now.
+- date: 2026-11-27T09:41:30.581045+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `706b1dfb7` is on `main` and `origin/main`.
+
+    - `main` had moved on (`8efc6c8aa`, `03663babd`, `1ee3ef1f4`), so I rebased onto `1ee3ef1f4` with no conflicts, then ran `npm ci`
+    - Checks on the rebased commit, in the worktree: `npm run -s lint:agent`, `npm run -s test:agent` (nextest 2657 passed, vitest 1636 passed) and `npm run -s smoke` (415 passed) all passed
+    - `git merge --ff-only agent/DEV-913` in the main checkout, then amended the pending `.tasks` changes (DEV-867, 909, 913, 918) into it: `706b1dfb7`
+    - No rule or agent-profile files changed, so no `lotar trust` needed
+    - Pushed `1ee3ef1f4..706b1dfb7`. The main checkout was clean and no other work was unpushed
+    - Health check: `smoke/tests/ui.agent-jobs.smoke.spec.ts:361` on `main` no longer says "closing a panel opened there"
+  report:
+    commits:
+    - hash: 706b1dfb7
+      what: smoke comment says why the test waits for the log header, without claiming the panel closes
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: none
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9bdfff5233fa41857cf5b0bbce4be80150b72e5a1be11133a3ef7cb291b3a540
 description: 'Found: reviewing DEV-888. smoke/tests/ui.agent-jobs.smoke.spec.ts:307-308 on main (cb61901d7, DEV-875) says the loaded log replaces the loading-state Instructions button ''closing a panel opened there''. Once DEV-888 lands, the panel stays open, so the comment describes a bug that no longer exists. Check: read the comment after DEV-888 is on main. Done: the comment says why the test waits for the log header (it checks the header button), without claiming the panel closes.'
@@ -164,3 +187,13 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T09:41:30.581045+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T09:41:38.404525+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

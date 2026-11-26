@@ -1,17 +1,18 @@
 title: combined_stats lost its doc comment to held_in_memory in agent_queue_service.rs
-status: Blocked
+status: Reviewing
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-27T00:04:01.449016+00:00
-modified: 2026-11-27T04:10:31.335009+00:00
+modified: 2026-11-27T09:43:27.780583+00:00
 relationships:
   depends_on:
   - DEV-910
   related:
   - DEV-910
   - DEV-865
+  - DEV-871
 comments:
 - date: 2026-11-27T02:39:23.118727+00:00
   author: claude
@@ -21,8 +22,33 @@ comments:
     - `held_in_memory` comes from `15d212009`, which is only on `agent/DEV-910` (status Merging); main (`5738fa5b2`) still has `combined_stats` with its doc comment at `crates/lotar-agent/src/services/agent_queue_service.rs:1229`
     - A fix made now on this branch would conflict with DEV-910's merge, so DEV-915 now depends on DEV-910 and is tagged `waits`
     - Once DEV-910 is done: rebase onto main, move the four DEV-865 doc lines back above `combined_stats`, leaving `held_in_memory` its own three
+- date: 2026-11-27T09:43:19.130208+00:00
+  author: claude
+  text: |-
+    Done: `combined_stats` has its doc comment back.
+
+    - DEV-910 landed, so the branch was rebased onto main (`706b1dfb7`)
+    - `crates/lotar-agent/src/services/agent_queue_service.rs`: the four DEV-865 lines now sit above `combined_stats`; `held_in_memory` keeps only its own three (DEV-871/DEV-910)
+    - Only comments moved, so no code or behavior changed
+  report:
+    commits:
+    - hash: d0cb52721
+      what: move the four DEV-865 doc lines back above combined_stats
+    checks:
+    - command: rustfmt --edition 2024 --check crates/lotar-agent/src/services/agent_queue_service.rs
+      result: passed
+    - command: cargo check -p lotar-agent
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: doc-comment-only change, merge runs it
+    - command: tests
+      result: not_run
+      reason: no behavior change
+    next: merge agent lands d0cb52721
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A680674b4bb9f3226a0545c290f9674bbc58c2d66158ba18bc621157fff9695be
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae11ac081715db83175eedd84fb9269b452365c2a14da9719298192f6e059691e
 description: |-
   Found in the review of DEV-910.
 
@@ -83,3 +109,33 @@ history:
   - field: tags
     old: waits
     new: ''
+- at: 2026-11-27T09:42:13.864454+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-27T09:42:15.352434+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae11ac081715db83175eedd84fb9269b452365c2a14da9719298192f6e059691e
+- at: 2026-11-27T09:43:19.130208+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T09:43:19.569605+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-910"],"related":["DEV-910","DEV-865"]}'
+    new: '{"depends_on":["DEV-910"],"related":["DEV-910","DEV-865","DEV-871"]}'
+- at: 2026-11-27T09:43:27.780583+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

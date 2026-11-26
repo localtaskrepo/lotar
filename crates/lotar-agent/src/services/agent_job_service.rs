@@ -2528,6 +2528,15 @@ fn resume_session_to_end(
     config: &ResolvedConfig,
     why: &str,
 ) {
+    // A merge agent holds the machine's check lock until its job ends; the
+    // OS freed it with the process that held it, so the takeover takes it
+    // again before the session goes on (DEV-867).
+    let is_merge_job = JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).map(|state| state.record.is_merge_job)).unwrap_or(false);
+    let _held_lock = match is_merge_job.then(|| merge_agent_check_lock(job_id, tasks_dir, ticket_id, "taken-over merge agent goes on")).flatten() {
+        Some(Ok(lock)) => Some(lock),
+        Some(Err(())) => return,
+        None => None,
+    };
     let session = (|| {
         let table = crate::services::agent_runner::job_agent_table(agent, profile)?;
         // The turn it finishes keeps the environment the job gave it.
@@ -4026,7 +4035,7 @@ fn run_job(
     // (DEV-797). A job that only commits runs no agent.
     let in_check_lock = is_merge_job && commit_retry.is_none() && {
         if held_lock.is_none() {
-            match merge_agent_check_lock(&job_id, &tasks_dir, &ticket_id) {
+            match merge_agent_check_lock(&job_id, &tasks_dir, &ticket_id, "merge agent starts") {
                 Some(Ok(lock)) => held_lock = Some(lock),
                 Some(Err(())) => return,
                 None => {}
@@ -4226,8 +4235,9 @@ fn start_job(
 /// Take the machine's check lock for a merge agent; `None` when the job
 /// goes on without it (the lotar run above holds it, or the port can't be
 /// opened), `Err` when the job was cancelled while it waited. A wait, or a
-/// start without the lock, is in the job log and on the ticket (DEV-797).
-fn merge_agent_check_lock(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str) -> Option<Result<check_lock::CheckLock, ()>> {
+/// start without the lock, is in the job log and on the ticket (DEV-797);
+/// `goes_on` says what follows it (`merge agent starts`).
+fn merge_agent_check_lock(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str, goes_on: &str) -> Option<Result<check_lock::CheckLock, ()>> {
     let holder = format!("the merge agent of {ticket_id} (job {job_id}, pid {}), since {}", std::process::id(), jiff::Timestamp::now().strftime("%H:%M UTC"));
     let progress = |line: &str| {
         update_job(job_id, |state| {
@@ -4240,13 +4250,13 @@ fn merge_agent_check_lock(job_id: &str, tasks_dir: &std::path::Path, ticket_id: 
             comment_check_lock(
                 tasks_dir,
                 ticket_id,
-                &format!("Waited {} for the machine's check lock, held by {held_by}; the merge agent starts now.", check_lock::duration_text(waited)),
+                &format!("Waited {} for the machine's check lock, held by {held_by}; the {goes_on} now.", check_lock::duration_text(waited)),
                 progress,
             );
             return Some(Ok(lock));
         }
         check_lock::ForJob::HeldAbove => return None,
-        check_lock::ForJob::Unavailable(why) => format!("The merge agent starts without the machine's check lock: {why}"),
+        check_lock::ForJob::Unavailable(why) => format!("The {goes_on} without the machine's check lock: {why}"),
         check_lock::ForJob::Cancelled => return Some(Err(())),
     };
     progress(&note);

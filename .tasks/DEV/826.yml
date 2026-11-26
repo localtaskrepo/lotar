@@ -3,9 +3,9 @@ status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-23T04:27:39.844205+00:00
-modified: 2026-11-27T04:12:47.074699+00:00
+modified: 2026-11-27T09:48:51.045808+00:00
 relationships:
   depends_on:
   - DEV-782
@@ -47,6 +47,17 @@ comments:
       result: not_run
       reason: the merge runs it
     next: Merge agent lands agent/DEV-826
+- date: 2026-11-27T09:48:41.846333+00:00
+  author: claude
+  text: |-
+    Review: blocking. The code is right, but the screenshots that tag `ui` requires (STD-97) are missing.
+
+    - **Reviewed:** `b99923f6c` (one commit on `main..HEAD`, only `crates/lotar-agent/src/services/agent_job_service/follow.rs`), the ticket, DEV-782's `logged_question`/`saved_job_dto` (`agent_job_service.rs:1043-1075`), `view/pages/AgentJobs.vue:794` and `docs/help/agent.md:234`
+    - **Code:** `api_event` (`follow.rs:149-163`) passes the current line as the last log entry. A question gets the title-only `question` a reload gives, the next line sends `null`, and an end status still clears it. The payload's `message`/`started_at` don't change. Nothing outside the ticket, no stray files.
+    - **Reran:** `npm ci` ok. `cargo nextest run -p lotar-agent follow:: dev782`: 9 passed. The new test fails with the old `events: Vec::new()` and passes with the fix (file restored, worktree clean)
+    - **Browser (own):** I ran this worktree's build of `lotar serve` on a scratch workspace and appended a job log as another process would. Live, the card shows "The agent asks: …" with no buttons, and the next line removes it. Light and dark, at 1920, 1440 and 390, no visual problems. Shots: `/tmp/dev826-review/shots/q-*.png`, `cleared-*.png`. I couldn't check the reload half with a fake log: no live process holds the job, so the reload marks it Failed.
+    - **Blocking:** the ticket has tag `ui`, but it has no screenshot attachments (only two T3 links), and the fix comment says the page wasn't checked in a browser. Fix: take before and after shots of the Agents card with a live question (light and dark, 1920/1440/390), attach them with `lotar task reference add upload DEV-826 <file>`, and link them in the hand-off comment. No code change needed.
+    - Tickets filed: none
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A407a18347417b166c014fede135d875b0cb8589e4b34f67cb90e149629e91c1d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70dc96c449dc460249eeff37f9c1ba6ca9f3f54735e771c93bcdfde19aaa3cce
@@ -63,6 +74,7 @@ description: |-
 tags:
 - ui
 - agent
+- review-returned
 history:
 - at: 2026-11-23T04:27:51.331691+00:00
   actor: claude
@@ -144,3 +156,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-27T09:48:41.846333+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T09:48:42.184452+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ui, agent
+    new: ui, agent, review-blocked
+- at: 2026-11-27T09:48:51.045808+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: ui, agent, review-blocked
+    new: ui, agent, review-returned
