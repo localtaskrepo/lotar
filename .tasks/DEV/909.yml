@@ -3,10 +3,12 @@ status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T19:31:53.927572+00:00
-modified: 2026-11-27T01:02:56.494024+00:00
+modified: 2026-11-27T03:47:39.458506+00:00
 relationships:
+  blocks:
+  - DEV-918
   related:
   - DEV-849
   - DEV-850
@@ -105,6 +107,33 @@ comments:
 
     **Minor, filed**
     - [DEV-918](https://lotar.pyxzl.net/task/DEV-918): the transcript reader can take a kept copy of a session whose name merely starts the same.
+- date: 2026-11-27T03:47:33.527988+00:00
+  author: claude
+  text: |-
+    Review fix: the screenshot set is complete, light and dark at 1920, 1440 and 390 px, before and after.
+
+    - Review read `865efba73`, which was HEAD. Only finding: missing screenshots.
+    - `shot` in `smoke/tests/ui.task-timeline-conversation.smoke.spec.ts` now loops over `light`/`dark` (`page.emulateMedia`) and 1920/1440/390 px (`page.setViewportSize`): 30 images per run, named `<state>-<mode>-<width>.png`.
+    - Attached with `lotar task reference add upload`. 1920 and 1440 px come out byte-identical (the task panel has a fixed width), and light 390 px matches the earlier `dev909-*` shots, so lotar kept one copy of each: 21 attachments cover all 30.
+    - Looked at dark 1440 and dark 390 (expired): readable, no clipping.
+    - Amended into `543740995`, signed. Code unchanged.
+  report:
+    commits:
+    - hash: '543740995'
+      what: smoke test takes the full screenshot set (light and dark, 1920/1440/390 px)
+    checks:
+    - command: npm run test:smoke:quick -- smoke/tests/ui.task-timeline-conversation.smoke.spec.ts
+      result: passed
+    - command: npm run lint:frontend
+      result: passed
+    - command: npx prettier --check (changed file)
+      result: passed
+    - command: npx oxlint (changed file)
+      result: passed
+    - command: Rust and UI unit tests
+      result: not_run
+      reason: only the smoke spec changed; the merge runs the full suites
+    next: Review again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7143b46bbd3ddfe5ad20074d6ebde47c173ed5b407d1270ea3e88107f01c75f3
 - attachment: dev909-before-thread.fd9f40c2dae2d70b7b0c5e2368ddefcf.png
@@ -112,6 +141,23 @@ references:
 - attachment: dev909-after-reused.4a320b1a036d3c2bd3dcd9e5588b2db0.png
 - attachment: dev909-after-t3-without-tools.da6aa91325d8cbd6194730883e83e38c.png
 - attachment: dev909-after-expired.7d39dd080addb79ce12fed29c644cfd5.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7530da8622d52ff413ec61a4b4ef11f72179ed75113e4ee908ff3d6db392d64a
+- attachment: after-claude-dark-1440.91e08b15818b332ec79e8917e0b9b66a.png
+- attachment: after-claude-dark-390.08666fd2621e52cc8dc927d6436baae5.png
+- attachment: after-claude-light-1440.8cf61c0a84ede98406b5d782289ddc8b.png
+- attachment: after-expired-dark-1440.663507d6291de748a45f7621c76bcfea.png
+- attachment: after-expired-dark-390.684e74f7e1feb8106bd8b68801638606.png
+- attachment: after-expired-light-1440.4e926d23c0be6f4e03bff7156fe95e96.png
+- attachment: after-reused-dark-1440.1eaa78a6d6b7e5fbee4e89b41623359e.png
+- attachment: after-reused-dark-390.4ed945b35b0ddc51c1914b6f15d404b9.png
+- attachment: after-reused-light-1440.ef2110f59540796e175ae00d7d1504d2.png
+- attachment: after-t3-without-tools-dark-1440.22ae0b57f1c905973b828584e075b2ab.png
+- attachment: after-t3-without-tools-dark-390.60a3efaef3724ba2de929cb10b51a435.png
+- attachment: after-t3-without-tools-light-1440.21bc5ea71340cc22f5cea6fe4aae89c0.png
+- attachment: before-thread-dark-1440.33c185269ad4909c5fc20c62659da5ea.png
+- attachment: before-thread-dark-390.69155400910e68de443f3c3e929f1bef.png
+- attachment: before-thread-light-1440.13643bec48170f1b4741427cfa0df153.png
+- attachment: before-thread-light-390.c8944686b53d8d2b052973384d4966d5.png
 description: |-
   Ravi asked on 2026-11-24 to review the full chain of agent work in the ticket timeline. The approach is agreed in DEV-850: [docs/research/inline-transcript-review.md](https://github.com/localtaskrepo/lotar/blob/main/docs/research/inline-transcript-review.md). Ravi chose on 2026-11-26: "expand (Load on open only)".
 
@@ -247,3 +293,113 @@ history:
   - field: tags
     old: agent, ui, job-paused, review-blocked
     new: agent, ui, job-paused, review-returned
+- at: 2026-11-27T03:46:09.148287+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-849","DEV-850","DEV-782","DEV-867","DEV-901","DEV-918"]}'
+    new: '{"blocks":["DEV-918"],"related":["DEV-849","DEV-850","DEV-782","DEV-867","DEV-901","DEV-918"]}'
+- at: 2026-11-27T03:46:17.733342+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-27T03:46:19.101760+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7530da8622d52ff413ec61a4b4ef11f72179ed75113e4ee908ff3d6db392d64a
+- at: 2026-11-27T03:47:05.388820+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-claude-dark-1440.91e08b15818b332ec79e8917e0b9b66a.png
+- at: 2026-11-27T03:47:05.467086+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-claude-dark-390.08666fd2621e52cc8dc927d6436baae5.png
+- at: 2026-11-27T03:47:05.514696+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-claude-light-1440.8cf61c0a84ede98406b5d782289ddc8b.png
+- at: 2026-11-27T03:47:05.617976+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-expired-dark-1440.663507d6291de748a45f7621c76bcfea.png
+- at: 2026-11-27T03:47:05.692586+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-expired-dark-390.684e74f7e1feb8106bd8b68801638606.png
+- at: 2026-11-27T03:47:05.739220+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-expired-light-1440.4e926d23c0be6f4e03bff7156fe95e96.png
+- at: 2026-11-27T03:47:05.839268+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-reused-dark-1440.1eaa78a6d6b7e5fbee4e89b41623359e.png
+- at: 2026-11-27T03:47:05.914595+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-reused-dark-390.4ed945b35b0ddc51c1914b6f15d404b9.png
+- at: 2026-11-27T03:47:05.962254+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-reused-light-1440.ef2110f59540796e175ae00d7d1504d2.png
+- at: 2026-11-27T03:47:06.066865+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-t3-without-tools-dark-1440.22ae0b57f1c905973b828584e075b2ab.png
+- at: 2026-11-27T03:47:06.146836+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-t3-without-tools-dark-390.60a3efaef3724ba2de929cb10b51a435.png
+- at: 2026-11-27T03:47:06.196896+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:after-t3-without-tools-light-1440.21bc5ea71340cc22f5cea6fe4aae89c0.png
+- at: 2026-11-27T03:47:06.295946+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-thread-dark-1440.33c185269ad4909c5fc20c62659da5ea.png
+- at: 2026-11-27T03:47:06.371866+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-thread-dark-390.69155400910e68de443f3c3e929f1bef.png
+- at: 2026-11-27T03:47:06.417613+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-thread-light-1440.13643bec48170f1b4741427cfa0df153.png
+- at: 2026-11-27T03:47:06.490080+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:before-thread-light-390.c8944686b53d8d2b052973384d4966d5.png
+- at: 2026-11-27T03:47:33.527988+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T03:47:39.458506+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

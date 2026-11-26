@@ -5,16 +5,25 @@ type: Chore
 reporter: claude
 assignee: claude
 created: 2026-11-26T17:48:57.525302+00:00
-modified: 2026-11-27T03:18:00.768335+00:00
+modified: 2026-11-27T03:53:28.735503+00:00
 relationships:
   related:
   - DEV-881
   - DEV-905
   - DEV-850
+  - DEV-810
+  - DEV-863
+  - DEV-901
 comments:
 - date: 2026-11-27T03:18:00.478143+00:00
   author: claude
   text: 'Step 1: no ticket depends on this release. The 39 tickets with commits on main since v0.15.7 are in release 0.16.0 (record #13, renamed from 0.15.8; DEV-850 also stays in 0.15.7, where its first commit shipped); all are Done. Retitled to v0.16.0 for the minor bump the owner approved.'
+- date: 2026-11-27T03:44:20.315871+00:00
+  author: claude
+  text: 'Step 2: bumped to 0.16.0 (Cargo.toml workspace version and the five =0.16.0 crate pins, Cargo.lock) in e1bedb96f, pushed to main. Local checks on the bump over 12c765c9a: npm run lint, npm run test:agent (2633 Rust, 1631 UI, release/hooks/seed tests) and npm run test:smoke:agent (414) all passed. Rebased onto DEV-863 and DEV-810 afterwards (both added to 0.16.0; their merges ran the full suites). harnessmux stays at 0.3.1 (DEV-901 owns that bump).'
+- date: 2026-11-27T03:53:28.735503+00:00
+  author: claude
+  text: 'Step 3: Quality Assurance run 45935893424 for e1bedb96f succeeded. Step 4: signed tag v0.16.0 on e1bedb96f pushed (owner''s OK 2026-11-26: "Yes go ahead"); release record 0.16.0 marked released.'
 releases:
 - 13
 description: |-
@@ -68,3 +77,17 @@ history:
   - field: relationships
     old: '{"related":["DEV-881","DEV-905"]}'
     new: '{"related":["DEV-881","DEV-905","DEV-850"]}'
+- at: 2026-11-27T03:44:20.315871+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T03:44:20.627535+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-881","DEV-905","DEV-850"]}'
+    new: '{"related":["DEV-881","DEV-905","DEV-850","DEV-810","DEV-863","DEV-901"]}'
+- at: 2026-11-27T03:53:28.735503+00:00
+  actor: claude
+  changes:
+  - field: comment_added

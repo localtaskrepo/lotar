@@ -1,6 +1,7 @@
 version: 0.16.0
+released_at: 2026-11-27T03:53:25.274376+00:00
 created: 2026-11-26T17:48:58.506820+00:00
-modified: 2026-11-27T03:17:29.882201+00:00
+modified: 2026-11-27T03:53:25.274461+00:00
 history:
 - at: 2026-11-27T03:17:29.882201+00:00
   actor: claude
@@ -8,3 +9,8 @@ history:
   - field: version
     old: 0.15.8
     new: 0.16.0
+- at: 2026-11-27T03:53:25.274461+00:00
+  actor: claude
+  changes:
+  - field: released_at
+    new: 2026-11-27T03:53:25.274376+00:00

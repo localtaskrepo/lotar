@@ -178,8 +178,13 @@ fn enabled_worktree_without_repository_fails_closed() {
 
 #[test]
 fn terminal_cancellation_preserves_history_and_other_running_slot() {
-    let (fixture, ticket) =
-        setup("if [ -f \"$LOTAR_TASKS_DIR/../block\" ]; then while [ ! -f \"$LOTAR_TASKS_DIR/../release\" ]; do sleep 0.05; done; fi", false);
+    let (fixture, ticket) = setup(
+        &format!(
+            "if [ -f \"$LOTAR_TASKS_DIR/../block\" ]; then while [ ! -f \"$LOTAR_TASKS_DIR/../release\" ] && {}; do sleep 0.05; done; fi",
+            common::while_this_test_runs()
+        ),
+        false,
+    );
     let terminal = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
     wait_idle();
     let terminal = AgentJobService::get_job(&terminal.id).unwrap();
@@ -317,7 +322,13 @@ fn inherited_output_streams_do_not_hold_job_open_after_parent_exit() {
 fn dispatched_cancellation_hands_off_once_after_teardown() {
     use lotar::services::agent_job_service::AgentOrchestratorMode;
     AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Server);
-    let (fixture, ticket) = setup("printf '%s' \"$$\" > \"$LOTAR_TASKS_DIR/../old-pid\"\nprintf 'old-context\\n' >&2\nwhile :; do sleep 1; done", false);
+    let (fixture, ticket) = setup(
+        &format!(
+            "printf '%s' \"$$\" > \"$LOTAR_TASKS_DIR/../old-pid\"\nprintf 'old-context\\n' >&2\nwhile {}; do sleep 1; done",
+            common::while_this_test_runs()
+        ),
+        false,
+    );
     let replacement = fixture.get_temp_path().join("replacement.sh");
     fs::write(&replacement, "#!/bin/sh\nif kill -0 \"$(cat \"$LOTAR_TASKS_DIR/../old-pid\")\" 2>/dev/null; then exit 9; fi\nprintf replacement >> \"$LOTAR_TASKS_DIR/../replacement-count\"\n").unwrap();
     fs::set_permissions(&replacement, fs::Permissions::from_mode(0o755)).unwrap();
@@ -1151,9 +1162,10 @@ mod git_required {
         fs::write(
             bin.join("git"),
             format!(
-                "#!/bin/sh\nif [ \"$1 $2\" = 'branch -D' ]; then touch '{0}/removing'; while [ ! -f '{0}/release' ]; do sleep 0.05; done; fi\nexec '{1}' \"$@\"\n",
+                "#!/bin/sh\nif [ \"$1 $2\" = 'branch -D' ]; then touch '{0}/removing'; while [ ! -f '{0}/release' ] && {2}; do sleep 0.05; done; fi\nexec '{1}' \"$@\"\n",
                 root.display(),
-                real_git.trim()
+                real_git.trim(),
+                common::while_this_test_runs()
             ),
         )
         .unwrap();
@@ -1275,7 +1287,13 @@ mod git_required {
     #[test]
     fn done_during_a_job_leaves_the_worktree_to_the_jobs_end() {
         common::require_git();
-        let (fixture, ticket) = setup("touch \"$LOTAR_TASKS_DIR/../started\"; while [ ! -f \"$LOTAR_TASKS_DIR/../release\" ]; do sleep 0.05; done", true);
+        let (fixture, ticket) = setup(
+            &format!(
+                "touch \"$LOTAR_TASKS_DIR/../started\"; while [ ! -f \"$LOTAR_TASKS_DIR/../release\" ] && {}; do sleep 0.05; done",
+                common::while_this_test_runs()
+            ),
+            true,
+        );
         let root = fixture.get_temp_path();
         let job = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
         wait_until(|| root.join("started").exists());
@@ -1486,7 +1504,7 @@ fn build_output_stays_while_another_job_runs_in_the_worktree() {
     let go = fixture.get_temp_path().join("GO");
     let script = fixture.get_temp_path().join("runner.sh");
     let body = fs::read_to_string(&script).unwrap();
-    fs::write(&script, format!("{body}while [ ! -f '{}' ]; do sleep 0.05; done\n", go.display())).unwrap();
+    fs::write(&script, format!("{body}while [ ! -f '{}' ] && {}; do sleep 0.05; done\n", go.display(), common::while_this_test_runs())).unwrap();
     let job = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
     // A job another (live) process runs for the ticket.
     let elsewhere = ActiveJob {

@@ -34,8 +34,9 @@ fn status_and_assignee_set_during_a_job_win_over_the_job_completed_rule() {
     std::fs::write(
         fixtures.tasks_root.join("config.yml"),
         format!(
-            "default:\n  project: OUTC\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\nagents:\n  fix:\n    runner: command\n    command: sh\n    args: ['-c', 'while [ ! -f \"{}\" ]; do sleep 0.1; done']\n",
-            go.display()
+            "default:\n  project: OUTC\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\nagents:\n  fix:\n    runner: command\n    command: sh\n    args: ['-c', 'while [ ! -f \"{}\" ] && {}; do sleep 0.1; done']\n",
+            go.display(),
+            crate::common::while_this_test_runs()
         ),
     )
     .unwrap();
@@ -542,9 +543,10 @@ fn the_job_agents_own_changes_wait_while_its_run_commands_apply() {
     std::fs::write(
         fixtures.tasks_root.join("config.yml"),
         format!(
-            "default:\n  project: OUTA\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\nagents:\n  fix:\n    runner: command\n    command: sh\n    args: ['-c', '\"$LOTAR_BIN\" status OUTA-1 HelpNeeded > \"{said}\"; \"$LOTAR_BIN\" assignee OUTA-1 owner >> \"{said}\"; touch \"{said}.done\"; while [ ! -f \"{go}\" ]; do sleep 0.1; done']\n",
+            "default:\n  project: OUTA\nissue:\n  states: [Todo, InProgress, HelpNeeded, Done]\nagents:\n  fix:\n    runner: command\n    command: sh\n    args: ['-c', '\"$LOTAR_BIN\" status OUTA-1 HelpNeeded > \"{said}\"; \"$LOTAR_BIN\" assignee OUTA-1 owner >> \"{said}\"; touch \"{said}.done\"; while [ ! -f \"{go}\" ] && {alive}; do sleep 0.1; done']\n",
             said = said.display(),
-            go = go.display()
+            go = go.display(),
+            alive = crate::common::while_this_test_runs(),
         ),
     )
     .unwrap();

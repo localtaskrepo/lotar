@@ -1,14 +1,27 @@
 title: Transcript reader takes a kept copy of a longer-named session for the job's own
-status: Todo
+status: Blocked
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T01:02:35.316395+00:00
-modified: 2026-11-27T01:02:36.682811+00:00
+modified: 2026-11-27T03:46:15.603266+00:00
 relationships:
+  depends_on:
+  - DEV-909
   related:
   - DEV-909
+comments:
+- date: 2026-11-27T03:46:10.018382+00:00
+  author: claude
+  text: |-
+    Waits for DEV-909: the code to fix isn't on main yet.
+
+    - `crates/lotar-agent/src/services/agent_job_service/transcript.rs` and its `candidates()` exist only on `agent/DEV-909` (`865efba73`), which is in Reviewing.
+    - Fixing it here would conflict with DEV-909's own commit; this branch has no commits.
+    - Next: once DEV-909 is on main, rebase onto it, accept `base != name` only when `base` is 47 chars (the `keep_session` cut), add a test with a kept copy of a prefix-named session.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae1a29fbe4bcea30c3959670eaf07e248ec106b3f020c832392f7dedd633c4061
 description: |-
   Found in the DEV-909 review.
 
@@ -18,9 +31,43 @@ description: |-
   - Fix: accept `base != name` only when `base` is exactly 47 characters, the cut length. Add a test with a kept copy of a prefix-named session.
 tags:
 - agent
+- waits
 history:
 - at: 2026-11-27T01:02:36.682811+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T03:45:46.403362+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T03:45:47.272153+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae1a29fbe4bcea30c3959670eaf07e248ec106b3f020c832392f7dedd633c4061
+- at: 2026-11-27T03:46:09.148952+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-909"]}'
+    new: '{"depends_on":["DEV-909"],"related":["DEV-909"]}'
+- at: 2026-11-27T03:46:09.886537+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent
+    new: agent, waits
+- at: 2026-11-27T03:46:10.018382+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T03:46:15.603266+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

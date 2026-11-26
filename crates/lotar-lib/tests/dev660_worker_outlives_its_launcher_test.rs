@@ -74,9 +74,10 @@ fn a_created_rules_job_starts_after_the_launchers_process_group_is_killed() {
     std::fs::write(
         fixtures.tasks_root.join("config.yml"),
         format!(
-            "default:\n  project: TEST\nagent:\n  worktree:\n    max_parallel_jobs: 1\nagents:\n  slow:\n    runner: command\n    command: sh\n    args: ['-c', 'touch \"$(mktemp \"{s}/job.XXXXXX\")\"; while [ ! -f \"{r}\" ]; do sleep 0.05; done']\n",
+            "default:\n  project: TEST\nagent:\n  worktree:\n    max_parallel_jobs: 1\nagents:\n  slow:\n    runner: command\n    command: sh\n    args: ['-c', 'touch \"$(mktemp \"{s}/job.XXXXXX\")\"; while [ ! -f \"{r}\" ] && {alive}; do sleep 0.05; done']\n",
             s = started_dir.display(),
             r = release.display(),
+            alive = crate::common::while_this_test_runs(),
         ),
     )
     .unwrap();

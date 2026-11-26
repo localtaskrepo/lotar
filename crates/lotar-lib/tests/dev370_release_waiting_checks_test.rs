@@ -59,9 +59,10 @@ fn closing_a_release_ticket_starts_the_checks_that_wait_for_it() {
     std::fs::write(
         fixtures.tasks_root.join("config.yml"),
         format!(
-            "default:\n  project: DEV\nagents:\n  fix: &wait\n    runner: command\n    command: sh\n    args: ['-c', 'while [ ! -f \"{}\" ] && [ -d \"{}\" ]; do sleep 0.1; done']\n  merge: *wait\n",
+            "default:\n  project: DEV\nagents:\n  fix: &wait\n    runner: command\n    command: sh\n    args: ['-c', 'while [ ! -f \"{}\" ] && [ -d \"{}\" ] && {}; do sleep 0.1; done']\n  merge: *wait\n",
             go.display(),
-            root.display()
+            root.display(),
+            crate::common::while_this_test_runs()
         ),
     )
     .unwrap();

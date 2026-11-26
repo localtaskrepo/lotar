@@ -1,11 +1,11 @@
 title: 'T3 runner: read job results through t3_submit_output and milestones through MCP Events'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-25T19:54:54.990569+00:00
-modified: 2026-11-27T01:04:30.892396+00:00
+modified: 2026-11-27T03:50:24.162282+00:00
 relationships:
   related:
   - DEV-849
@@ -141,6 +141,19 @@ comments:
       result: not_run
       reason: the merge runs it; no UI change
     next: Review again
+- date: 2026-11-27T03:50:16.085942+00:00
+  author: claude
+  text: |-
+    Review: passed. HEAD `29daeb041` does what Done when asks, and the last review's DEV-857 finding is fixed.
+
+    - **Read:** `git diff main...29daeb041` (9 files), the ticket and its comments, the owner's decision (INBOX-760, "Summary only"), harnessmux 0.4.0 from crates.io (`src/backend/t3.rs`, `CHANGELOG.md`, `tests/cli.rs`), and the DEV-857 `from_shown` on main.
+    - **Result:** only t3 profiles get `output_schema` `{summary}` (`agent_runner.rs` `t3_result_schema`). A completed turn's summary becomes `last_message`. Without one, the final reply stays and the log says so. Nothing else is read from the result. `context_messages` still carry the reply.
+    - **View:** `with_milestone` (`t3_state.rs`) lets a settled milestone give the state only when T3 Code doesn't answer or `thread show` still lists the milestone's run as active. A question gives it when it came after `updatedAt`. `completed` with `pendingBackgroundTasks` or `blockedOnThreadWait` stays Running, and a test covers it.
+    - **harnessmux 0.4.0:** published, and `Cargo.toml` uses it. Its tests cover a submitted result, a missing result, an event-driven end with a stale `thread show`, needs-input, and the polling fallback. The CHANGELOG and README describe both features.
+    - **Main:** `git merge-tree main HEAD` merges cleanly onto main `e1bedb96f` (13 newer commits, v0.16.0).
+    - **Note, no ticket:** the view line in Done when still says "after `updatedAt`" for settled milestones. The code now uses the narrower rule the last review asked for, and `docs/help/agent.md` describes it.
+    - **Reran:** `npm ci` passed. `cargo nextest run -p lotar-agent` (t3_state, dev520 session events) passed 22 of 22. `cargo nextest run -p lotar-lib --test integration -E 'test(dev510) | test(t3)'` passed 40 of 40. `npm run lint` passed. The full suites and smoke are left to the merge.
+    - No UI pages changed, so no screenshots were needed. No minor tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2e2b32d886df49058f21c8ffec0c11b99179a7ef8827eafbf638f478e01131b3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A21ab9d8a75352d745b41e79794c66c74598112d86f236b011a4aa7af178a5344
@@ -436,3 +449,16 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-27T03:50:16.085942+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T03:50:24.162282+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

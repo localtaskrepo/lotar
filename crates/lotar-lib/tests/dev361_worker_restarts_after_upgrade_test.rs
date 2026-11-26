@@ -69,9 +69,10 @@ fn upgraded_worker_starts_queued_jobs_while_the_old_worker_drains() {
     std::fs::write(
         fixtures.tasks_root.join("config.yml"),
         format!(
-            "default:\n  project: TEST\nagents:\n  slow:\n    runner: command\n    command: sh\n    args: ['-c', 'echo $PPID >> \"{}\"; while [ ! -f \"{}\" ]; do sleep 0.05; done']\n",
+            "default:\n  project: TEST\nagents:\n  slow:\n    runner: command\n    command: sh\n    args: ['-c', 'echo $PPID >> \"{}\"; while [ ! -f \"{}\" ] && {}; do sleep 0.05; done']\n",
             pids.display(),
-            release.display()
+            release.display(),
+            crate::common::while_this_test_runs()
         ),
     )
     .unwrap();

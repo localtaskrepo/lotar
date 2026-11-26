@@ -44,6 +44,23 @@ pub fn lotar_bin() -> PathBuf {
     workspace_bin("lotar")
 }
 
+/// A shell condition that holds while this test process runs (DEV-861).
+///
+/// Test jobs that wait for a release file add it to their loop:
+/// `while [ ! -f "<release>" ] && <this>; do sleep 0.05; done`. A test that
+/// fails, panics in a drop or is killed on a timeout writes no release file;
+/// the loop, and with it the detached `lotar agent worker` waiting on the job,
+/// would otherwise run until reboot. Contains no quotes, so it fits inside
+/// single- and double-quoted shell and YAML strings.
+pub fn while_this_test_runs() -> String {
+    while_process_runs(std::process::id())
+}
+
+/// A shell condition that holds while process `pid` runs.
+pub fn while_process_runs(pid: u32) -> String {
+    format!("kill -0 {pid} 2>/dev/null")
+}
+
 /// Build a `lotar` CLI child command with the test defaults applied
 /// child-scoped (DEV-80): the child always runs with
 /// `LOTAR_IGNORE_HOME_CONFIG=1` and without `RUST_TEST_THREADS`, independent

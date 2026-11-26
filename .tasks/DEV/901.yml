@@ -1,11 +1,11 @@
 title: Run agent jobs on a second machine over ssh (dyson)
-status: Blocked
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T17:08:01.064005+00:00
-modified: 2026-11-27T03:17:10.669053+00:00
+modified: 2026-11-27T03:50:28.374781+00:00
 relationships:
   depends_on:
   - harnessmux:HARN-33
@@ -17,6 +17,7 @@ relationships:
   - DEV-594
   - DEV-876
   - DEV-912
+  - DEV-903
 comments:
 - date: 2026-11-26T20:04:29.483394+00:00
   author: claude
@@ -89,6 +90,7 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acc67bf8b282f21aec9a87cf0dde7958bfe602b82fd437e452b0a7ea25c1de5ac
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abec78b7dede343dabc4a24b01ec89af6c7439e651553efd8262e3b2e4be05e86
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6bdec0e7bbf11d614f5531c0a45b8711e678e15e03baba9e8b31ea82500177a6
 description: |-
   The owner decided on 2026-11-26 (local LOCA-631, INBOX-757) that the home desktop `dyson` (Debian 13, i5-2500K, 32 GB) takes "Lotar jobs with claude/codex signed in on dyson". lotar runs every job on the Mac today.
 
@@ -390,3 +392,20 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-27T03:44:20.626848+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["harnessmux:HARN-33"],"blocks":["DEV-911"],"related":["DEV-909","DEV-911","DEV-594","DEV-876","DEV-912"]}'
+    new: '{"depends_on":["harnessmux:HARN-33"],"blocks":["DEV-911"],"related":["DEV-909","DEV-911","DEV-594","DEV-876","DEV-912","DEV-903"]}'
+- at: 2026-11-27T03:50:26.567355+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-27T03:50:28.374781+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6bdec0e7bbf11d614f5531c0a45b8711e678e15e03baba9e8b31ea82500177a6

@@ -1,11 +1,11 @@
 title: Flaky tests
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix-retry'
+assignee: claude
 created: 2026-11-22T19:22:12.213895+00:00
-modified: 2026-11-27T03:39:44.159315+00:00
+modified: 2026-11-27T03:44:54.884779+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -173,6 +173,9 @@ comments:
     - Not run: `test:agent` and the full smoke suite (the merge runs them). No UI review: the diff changes no pages.
 
     Tickets filed: none.
+- date: 2026-11-27T03:44:54.884779+00:00
+  author: automation
+  text: 'The t3 session waits for an answer: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A30b4d0255c9ae0259ed6230fb5853f0a8c697bf8ecc35349d0db7cc2c2db09fd'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75080ac346701fc3377f56ac792640c8450190058560a4bf13c0ec6cbdc24d02
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A30b4d0255c9ae0259ed6230fb5853f0a8c697bf8ecc35349d0db7cc2c2db09fd
@@ -420,3 +423,16 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906","DEV-908","DEV-840","DEV-890","DEV-921"]}'
     new: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906","DEV-908","DEV-840","DEV-890","DEV-921","DEV-922"]}'
+- at: 2026-11-27T03:44:54.817219+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: claude
+- at: 2026-11-27T03:44:54.884779+00:00
+  actor: automation
+  changes:
+  - field: comment_added

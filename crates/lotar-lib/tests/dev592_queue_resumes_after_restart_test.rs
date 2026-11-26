@@ -48,9 +48,10 @@ fn workspace(extra_config: &str) -> Workspace {
     std::fs::write(
         fixtures.tasks_root.join("config.yml"),
         format!(
-            "default:\n  project: TEST\nagents:\n  quick:\n    runner: command\n    command: sh\n    args: ['-c', 'touch \"{m}\"']\n  slow:\n    runner: command\n    command: sh\n    args: ['-c', 'touch \"{m}\"; while [ ! -f \"{r}\" ]; do sleep 0.05; done']\n{extra_config}",
+            "default:\n  project: TEST\nagents:\n  quick:\n    runner: command\n    command: sh\n    args: ['-c', 'touch \"{m}\"']\n  slow:\n    runner: command\n    command: sh\n    args: ['-c', 'touch \"{m}\"; while [ ! -f \"{r}\" ] && {alive}; do sleep 0.05; done']\n{extra_config}",
             m = marker.display(),
             r = release.display(),
+            alive = crate::common::while_this_test_runs(),
         ),
     )
     .unwrap();

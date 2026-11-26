@@ -85,10 +85,11 @@ fn setup(global: &str, tickets: &[(&str, &str)]) -> Workspace {
     std::fs::write(
         fixtures.tasks_root.join("config.yml"),
         format!(
-            "default:\n  project: {project}\n{global}agents:\n  slow:\n    runner: command\n    command: sh\n    args: ['-c', 'touch \"$(mktemp \"{s}/job.XXXXXX\")\"; while [ ! -f \"{r}\" ]; do sleep 0.05; done']\n",
+            "default:\n  project: {project}\n{global}agents:\n  slow:\n    runner: command\n    command: sh\n    args: ['-c', 'touch \"$(mktemp \"{s}/job.XXXXXX\")\"; while [ ! -f \"{r}\" ] && {alive}; do sleep 0.05; done']\n",
             project = tickets[0].1,
             s = started_dir.display(),
             r = release.display(),
+            alive = crate::common::while_this_test_runs(),
         ),
     )
     .unwrap();
