@@ -1,11 +1,11 @@
 title: 'Agent queue: order by priority, manage the queue (move up/down, keep each entry''s prompt), categories'
-status: Merging
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T03:06:54.457789+00:00
-modified: 2026-11-26T23:42:41.809253+00:00
+modified: 2026-11-27T00:04:32.046395+00:00
 relationships:
   related:
   - DEV-725
@@ -27,6 +27,8 @@ relationships:
   - DEV-837
   - DEV-882
   - DEV-887
+  - DEV-858
+  - DEV-881
 comments:
 - date: 2026-11-22T05:07:00.362925+00:00
   author: claude
@@ -595,6 +597,37 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-786` onto `main` conflicts in `crates/lotar-core/src/api_types.rs`, `crates/lotar-lib/src/cli/args/agent.rs`, `crates/lotar-lib/tests/integration.rs`, `docs/help/agent.md`, `view/api/types.ts`; lotar aborted the rebase, `agent/DEV-786` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-27T00:04:23.657562+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `a86a55cca` is on `main` and `origin/main`.
+
+    - I fixed the rebase conflicts by keeping both sides. Each one was a neighbouring list entry: `api_types.rs` and `view/api/types.ts` (DEV-881's `StatusFeed` types next to this branch's `AgentQueueMove*`), `cli/args/agent.rs` (`Holds` next to `Move`), `tests/integration.rs` (`dev786` next to `dev797`)
+    - `docs/help/agent.md`: kept main's reworded Running/Queued sentence and added this branch's start-order, `kind` and `priority` text
+    - One fix outside the conflicts: `services/status_feed.rs` (DEV-881) read queue entries as `(entry, waits_for)` pairs; it now reads the branch's `QueuedEntry`, still in start order
+    - `main` moved on during the checks (`61a229a1e`, DEV-858, which only adds a REST test). After rebasing again I ran only that test and the queue tests, not every suite
+    - Folded the open `.tasks` changes into the commit; no rule or config changes, so no `lotar trust` needed
+  report:
+    commits:
+    - hash: a86a55cca
+      what: DEV-786 queue order, move, kinds (rebased onto 61a229a1e, pushed)
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2610 Rust, 1629 vitest, on cd78c7323 (before main's last commit)
+    - command: npm run -s smoke
+      result: passed
+      reason: 413 tests, on cd78c7323
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(/dev503|dev786|queue/)'
+      result: passed
+      reason: 89 on the final rebase
+    - command: lotar trust
+      result: not_run
+      reason: no rule or config files changed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afd042500c99a795d93102eafd7d96b77fadad790c7d3ec5a01f1a2ca674be5b5
 - attachment: dev786-after-dark-1440.4b81d270faa893b496e3c88852237f86.png
@@ -663,12 +696,6 @@ description: |-
   - [ ] `lotar agent queue` (text and JSON `kind`, `priority`) and the Agents page show each entry's kind.
 tags:
 - ui
-- fix-retried
-- retry-fix
-- review-returned
-- job-paused
-- review-returned-twice
-- retry-fable
 history:
 - at: 2026-11-22T03:06:54.686868+00:00
   actor: claude
@@ -1392,3 +1419,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T00:04:23.657562+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T00:04:23.946463+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798","DEV-805","DEV-843","DEV-771","DEV-856","DEV-874","DEV-806","DEV-833","DEV-793","DEV-835","DEV-837","DEV-882","DEV-887"]}'
+    new: '{"related":["DEV-725","DEV-748","DEV-755","DEV-783","DEV-794","DEV-600","DEV-798","DEV-805","DEV-843","DEV-771","DEV-856","DEV-874","DEV-806","DEV-833","DEV-793","DEV-835","DEV-837","DEV-882","DEV-887","DEV-858","DEV-881"]}'
+- at: 2026-11-27T00:04:32.046395+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: ui, fix-retried, retry-fix, review-returned, job-paused, review-returned-twice, retry-fable
+    new: ui

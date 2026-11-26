@@ -1,17 +1,19 @@
 title: A t3 job that hits Claude's 5-hour limit fails into retries and an owner question instead of pausing (local LOCA-631, 2026-11-26)
-status: Todo
+status: InProgress
 priority: High
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T23:29:18.207980+00:00
-modified: 2026-11-26T23:29:19.668066+00:00
+modified: 2026-11-27T00:08:35.601137+00:00
 relationships:
   related:
   - DEV-584
   - DEV-833
   - DEV-855
   - DEV-901
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad43913606878248e7587ef76a76c59158e8af6e92648c892a41f3c30e985ef08
 description: |-
   Same usage-limit stop, two outcomes, lotar 0.15.7, both t3 runner, 17 minutes apart:
 
@@ -37,3 +39,14 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T00:08:34.938801+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T00:08:35.601137+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad43913606878248e7587ef76a76c59158e8af6e92648c892a41f3c30e985ef08

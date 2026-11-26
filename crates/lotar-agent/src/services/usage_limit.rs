@@ -279,6 +279,21 @@ mod tests {
         assert_eq!(limit, UsageLimit { line: "You're out of extra usage".into(), resets_at: Some("2026-11-18T15:00:00Z".parse().expect("timestamp")) });
     }
 
+    /// DEV-855: a t3 run paused on Claude's weekly limit, as harnessmux 0.3.1
+    /// reports it: T3's error items, which name no time, and `resets_at`
+    /// from T3's own usage-limit notice. The job waits for that reset, not
+    /// the default hour.
+    #[test]
+    fn a_t3_limit_waits_for_the_reset_t3s_notice_names() {
+        let mut failure = Failure::from_text(
+            "the T3 Code thread's run ended with status 'failed': Usage limit reached: Claude API rate limit reached. Try again later. (https://app.t3.codes/threads/env/t1)",
+        );
+        assert_eq!(failure.kind, FailureKind::RateLimited, "harnessmux sets resets_at only on a rate limit");
+        failure.resets_at = Some("2026-11-19T16:00:00.000Z".into());
+        let limit = of_failures_in(&[failure], now(), &berlin()).expect("limit");
+        assert_eq!(limit.resume_at(now()), "2026-11-19T16:00:00Z".parse().expect("timestamp"));
+    }
+
     #[test]
     fn a_typed_limit_without_resets_at_reads_its_texts_time() {
         let text = "You've hit your usage limit. Upgrade to Pro or try again at Nov 20th, 2026 7:43 PM.";

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T18:50:35.107598+00:00
-modified: 2026-11-26T23:54:05.144123+00:00
+modified: 2026-11-27T00:08:19.085022+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -27,6 +27,8 @@ relationships:
   - DEV-854
   - DEV-902
   - DEV-886
+  - DEV-916
+  - DEV-861
 comments:
 - date: 2026-11-22T18:51:51.656944+00:00
   author: claude
@@ -1261,3 +1263,15 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T00:07:44.232624+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-852","DEV-853"],"blocks":["DEV-902"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854","DEV-902","DEV-886"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-852","DEV-853"],"blocks":["DEV-902"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854","DEV-902","DEV-886","DEV-916"]}'
+- at: 2026-11-27T00:08:19.085022+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-852","DEV-853"],"blocks":["DEV-902"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854","DEV-902","DEV-886","DEV-916"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-852","DEV-853"],"blocks":["DEV-902"],"related":["DEV-201","standards:STD-219","standards:STD-297","DEV-830","DEV-832","DEV-834","DEV-833","DEV-851","DEV-852","DEV-853","DEV-854","DEV-902","DEV-886","DEV-916","DEV-861"]}'

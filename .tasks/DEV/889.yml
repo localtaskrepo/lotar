@@ -4,7 +4,7 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-26T03:32:05.108189+00:00
-modified: 2026-11-26T23:10:23.227016+00:00
+modified: 2026-11-27T00:10:45.980379+00:00
 relationships:
   related:
   - DEV-860
@@ -91,7 +91,6 @@ description: |-
   Done: the owner decides per entry: requeue under the absolute tasks dir or drop; then the file is removed. Moving it as-is would start 7 jobs at once.
 tags:
 - health
-- owner
 - waits
 - job-paused
 custom_fields:
@@ -238,3 +237,9 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-27T00:10:45.980379+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: health, owner, waits, job-paused
+    new: health, waits, job-paused

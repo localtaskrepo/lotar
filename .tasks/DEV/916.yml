@@ -1,0 +1,33 @@
+title: Test stub template-team-agent.sh waits for its go file with no bound (DEV-796 branch)
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-27T00:07:42.828735+00:00
+modified: 2026-11-27T00:07:44.811717+00:00
+relationships:
+  related:
+  - DEV-796
+  - DEV-861
+description: |-
+  Found 2026-11-26 in the DEV-861 review: the DEV-796 branch adds `while [ ! -f "{go}" ]; do sleep 0.1; done` in the stub script `template-team-agent.sh` (`crates/lotar-lib/tests/agent_automation_integration_test.rs`, about line 2966 on that branch). Two of these scripts from test runs started at 12:37 and 12:38 were still running at 16:07 (ppid 1), under `$TMPDIR/.lotar-test-scratch/`.
+
+  DEV-796 is in Merging. DEV-861 adds `common::while_this_test_runs()` for exactly this. Whichever of the two lands second leaves this loop without it.
+
+  ## Done when
+
+  - [ ] The loop is `while [ ! -f "{go}" ] && {alive}; do ...` with `crate::common::while_this_test_runs()`, once both DEV-796 and DEV-861 are on main.
+  - [ ] A `git grep` for `while [ ! -f` in `crates/lotar-lib/tests` shows no unbounded loop without the helper.
+history:
+- at: 2026-11-27T00:07:44.234959+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-796","DEV-861"]}'
+- at: 2026-11-27T00:07:44.811717+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

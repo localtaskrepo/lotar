@@ -1,15 +1,18 @@
 title: Tests leave lotar agent workers and wait loops running after the test run ends
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review-claude'
+assignee: '@merge'
 created: 2026-11-25T02:10:53.247813+00:00
-modified: 2026-11-26T23:15:57.221320+00:00
+modified: 2026-11-27T00:09:14.417581+00:00
 relationships:
   related:
   - DEV-767
   - DEV-897
+  - DEV-916
+  - DEV-796
+  - DEV-579
 comments:
 - date: 2026-11-25T13:39:50.915818+00:00
   author: automation
@@ -89,6 +92,17 @@ comments:
       result: not_run
       reason: the merge runs the full suites
     next: Review 9917a7c17 again
+- date: 2026-11-27T00:08:18.764759+00:00
+  author: claude
+  text: |-
+    Review: passed. Every unbounded release-file wait loop in the tests now also ends once the test process is gone.
+
+    - **Reviewed:** `9917a7c17`, the only commit on `agent/DEV-861` past `main`. No newer commits on the branch. Tests only: the helper `while_this_test_runs()` (`kill -0 <test pid>`) in `crates/lotar-lib/tests/common/mod.rs`, used in 8 test files, plus the new test `dev861_test_loops_end_with_the_test_test.rs`.
+    - **Done when:** items 1 to 5 hold. `git grep 'while \[ ! -f'` on `main` finds no unbounded loop the branch misses (including `dev370`, last review's finding). The other loops stop after a fixed count. No new wait loops have landed on `main` since the branch base (60 commits).
+    - **New test:** the loop keeps running while its owner process lives, and ends without a release file once the owner is killed. Without the helper, that loop would never end, so the test covers the fix.
+    - **Merge note:** `crates/lotar-lib/tests/integration.rs` conflicts with `main`. Only the `mod` list differs: keep both sides, and keep `mod dev861_...` after `mod dev860_...`.
+    - **Reran:** `npm ci` passed. `cargo nextest run --workspace -E 'binary(integration) & package(lotar-lib) & test(/dev861|dev320|dev361|dev370|dev592|dev630|dev646|dev660|agent_safety/)'`: 65 of 65 passed. `rustfmt --edition 2024 --check` on the changed files passed. After the run, `ps` showed no loops or workers left from it.
+    - **Filed [DEV-916](https://lotar.pyxzl.net/task/DEV-916) (minor):** the DEV-796 branch, now in Merging, adds a new unbounded `while [ ! -f "{go}" ]` loop to the stub `template-team-agent.sh`. Two of these from test runs at 12:37 were still running at 16:07 (ppid 1). I left them running because they aren't from my run. Whichever of the two tickets lands second has to add the helper there.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A94ea07def20418c9793ca25d560c20faad7ae65fad4e857094a2004dddaa36b9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A16b4af229751557f78791d905466d6edb5963f8e5da82fe9bf603438c56fd0ef
@@ -250,3 +264,34 @@ history:
     new: Reviewing
   - field: assignee
     new: '@review-claude'
+- at: 2026-11-27T00:07:44.234488+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-767","DEV-897"]}'
+    new: '{"related":["DEV-767","DEV-897","DEV-916"]}'
+- at: 2026-11-27T00:08:18.764759+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T00:08:19.086779+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-767","DEV-897","DEV-916"]}'
+    new: '{"related":["DEV-767","DEV-897","DEV-916","DEV-796"]}'
+- at: 2026-11-27T00:08:29.149387+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review-claude'
+    new: '@merge'
+- at: 2026-11-27T00:09:14.417581+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-767","DEV-897","DEV-916","DEV-796"]}'
+    new: '{"related":["DEV-767","DEV-897","DEV-916","DEV-796","DEV-579"]}'

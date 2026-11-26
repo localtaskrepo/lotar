@@ -1,0 +1,33 @@
+title: combined_stats lost its doc comment to held_in_memory in agent_queue_service.rs
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-27T00:04:01.449016+00:00
+modified: 2026-11-27T00:04:03.209462+00:00
+relationships:
+  related:
+  - DEV-910
+  - DEV-865
+description: |-
+  Found in the review of DEV-910.
+
+  - `crates/lotar-agent/src/services/agent_queue_service.rs:1054`: DEV-910 put `held_in_memory` and its doc lines between `combined_stats`'s doc comment and `combined_stats`
+  - So `held_in_memory`'s doc starts with "This process's counts with the job records…" (DEV-865), and `combined_stats` (line 1079) has no doc
+
+  ## Done when
+
+  - [ ] The first four doc lines sit above `combined_stats` again; `held_in_memory` keeps only its own three
+history:
+- at: 2026-11-27T00:04:02.861555+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-910"]}'
+    new: '{"related":["DEV-910","DEV-865"]}'
+- at: 2026-11-27T00:04:03.209462+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

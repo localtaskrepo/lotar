@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T07:45:41.052287+00:00
-modified: 2026-11-26T23:13:35.260055+00:00
+modified: 2026-11-27T00:09:14.418077+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -14,6 +14,7 @@ relationships:
   - DEV-626
   - DEV-801
   - DEV-909
+  - DEV-579
 comments:
 - date: 2026-11-25T18:00:31.503924+00:00
   author: automation
@@ -372,3 +373,9 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626","DEV-801"]}'
     new: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626","DEV-801","DEV-909"]}'
+- at: 2026-11-27T00:09:14.418077+00:00
+  actor: codex
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626","DEV-801","DEV-909"]}'
+    new: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626","DEV-801","DEV-909","DEV-579"]}'
