@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-22T18:50:35.107598+00:00
-modified: 2026-11-26T20:39:30.974843+00:00
+modified: 2026-11-26T20:42:08.243381+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -544,6 +544,17 @@ comments:
     - key: codex
       label: Codex, as the ticket asks (a second provider). A project without Codex then fails its first review until someone changes it
     recommended: claude
+- date: 2026-11-26T20:42:05.545593+00:00
+  author: mallox
+  text: |-
+    Answer: claude (Claude (as built). A new project works with only one provider installed. The config comment and docs/help/templates.md say to switch @review to a second runner)
+
+    (answered in INBOX-807)
+  answer:
+    to: 2026-11-26T20:39:20.015668+00:00
+    choice:
+    - claude
+    note: (answered in INBOX-807)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A39f524ab3cd966ca8af6dbcc9c5570f7120455eb2f0df416f7b9a499eda91a1a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad27a37dc9405b27f5dca8688f67529ee199539ce210aa1c8871abbf2bfa6f681
@@ -1141,3 +1152,13 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-26T20:42:05.545593+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:42:08.243381+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'

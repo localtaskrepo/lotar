@@ -3078,10 +3078,6 @@ fn apply_sprint_action(storage: &mut Storage, task_id: &str, sprint_ref: &str, a
     Ok(())
 }
 
-/// Append a comment to a task through the shared comment pipeline (used
-/// by the automation comment action). The comment is recorded under the
-/// `automation` actor and never re-dispatches `on.commented` rules, so
-/// comment actions cannot recurse.
 /// A comment action's text and question with their `${{...}}` templates
 /// filled in: the text and each option's label (DEV-852).
 fn expand_comment(comment: &AutomationComment, mut expand: impl FnMut(&str) -> String) -> (String, Option<crate::types::CommentQuestion>) {
@@ -3095,6 +3091,10 @@ fn expand_comment(comment: &AutomationComment, mut expand: impl FnMut(&str) -> S
     (text, question)
 }
 
+/// Append a comment to a task through the shared comment pipeline (used
+/// by the automation comment action). The comment is recorded under the
+/// `automation` actor and never re-dispatches `on.commented` rules, so
+/// comment actions cannot recurse.
 fn append_automation_comment(storage: &mut Storage, task_id: &str, text: &str) -> LoTaRResult<()> {
     TaskService::add_comment_with_context(storage, task_id, text, CommentContext::automation()).map(|_| ())
 }

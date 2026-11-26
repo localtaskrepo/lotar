@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T23:49:30.471883+00:00
-modified: 2026-11-26T19:20:53.735396+00:00
+modified: 2026-11-26T20:46:21.796644+00:00
 relationships:
   related:
   - DEV-576
@@ -111,6 +111,12 @@ comments:
     - **Reran on main + this commit (scratch worktree, removed):** `cargo nextest run -p lotar-lib --test integration dev860 relative_path` passed (12/12), with DEV-887's queue keying in place. `rustfmt --check` and `prettier --check` on the changed files passed. `npm ci` passed.
     - **Not rerun:** clippy, `npm run lint`/`test`/`smoke` (the merge runs them, DEV-797). That the test failed before DEV-822 is the fix agent's claim (#2); I didn't rebuild the older code to check it. No UI change.
     - **Filed:** nothing new. DEV-889 already covers the stranded queue entries.
+- date: 2026-11-26T20:46:21.796644+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-860` onto `main` conflicts in `crates/lotar-lib/tests/integration.rs`; lotar aborted the rebase, `agent/DEV-860` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae97157ffb604bb7fcfc52baba1b3bbc0834c21f614f80ba1935c9098e6ebea9f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5e4bb562ec08602a2f08f993f1d7a10ae175be4be5f116a4db5cf48d2e23d257
@@ -290,3 +296,7 @@ history:
   - field: assignee
     old: '@review-claude'
     new: '@merge'
+- at: 2026-11-26T20:46:21.796644+00:00
+  actor: automation
+  changes:
+  - field: comment_added

@@ -1,15 +1,26 @@
 title: 'Repo health 2026-11-26: Commits only on this Mac: branches and 2 more'
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix-light'
 created: 2026-11-26T18:06:40.598615+00:00
-modified: 2026-11-26T18:06:43.788239+00:00
+modified: 2026-11-26T20:46:18.514006+00:00
 relationships:
   related:
   - DEV-869
   - DEV-889
+  - DEV-887
+comments:
+- date: 2026-11-26T20:46:13.319725+00:00
+  author: claude
+  text: |-
+    All three findings are gone or handled; no file change.
+
+    - `[unpushed:branches]`: no longer listed by `repos.ts localtaskrepo/lotar`; `git log main --not --remotes` is empty.
+    - DEV-869: now Reviewing (@review), no longer HelpNeeded; its check line is gone.
+    - DEV-889: the owner answered "requeue later" (INBOX-804), which waits on a release with DEV-887. Set Blocked, tag `waits`, comment says what it waits for.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6aecf401edf96ea10533cee109458e3209e67295ab69aaec711585a1a2c79f11
 description: |-
   3 findings of the daily repo-health run on 2026-11-26 (`repos.ts --report`), in one ticket (owner 2026-11-22, STD-299). Fix each the way its section says; the ticket is done when no check command below lists its finding any more.
 
@@ -53,3 +64,32 @@ history:
   changes:
   - field: assignee
     new: '@fix-light'
+- at: 2026-11-26T20:45:31.314778+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T20:45:31.952550+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6aecf401edf96ea10533cee109458e3209e67295ab69aaec711585a1a2c79f11
+- at: 2026-11-26T20:46:13.319725+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:46:13.595255+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-869","DEV-889"]}'
+    new: '{"related":["DEV-869","DEV-889","DEV-887"]}'
+- at: 2026-11-26T20:46:18.514006+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix-light'

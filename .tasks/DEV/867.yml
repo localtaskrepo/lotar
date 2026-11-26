@@ -1,16 +1,18 @@
 title: A merge job taken over after lotar's exit resumes its merge agent without the checks lock
-status: InProgress
+status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix-retry'
+assignee: '@fix'
 created: 2026-11-25T07:45:41.052287+00:00
-modified: 2026-11-26T20:41:29.455259+00:00
+modified: 2026-11-26T20:48:05.046648+00:00
 relationships:
   depends_on:
   - DEV-797
   related:
   - DEV-797
+  - DEV-626
+  - DEV-801
 comments:
 - date: 2026-11-25T18:00:31.503924+00:00
   author: automation
@@ -26,6 +28,77 @@ comments:
 - date: 2026-11-26T01:04:41.825078+00:00
   author: automation
   text: 'The @fix-retry job waits for its open prerequisites: DEV-797. It starts once they are done.'
+- date: 2026-11-26T20:45:00.390949+00:00
+  author: automation
+  text: |-
+    The fix agent's job job-20261126T203931.502Z-41 failed again (lotar agent logs job-20261126T203931.502Z-41). Retry with which agent, or WontDo?
+
+    Options:
+    - fix: Retry with @fix
+    - fix-fable: Retry with @fix-fable
+    - fix-retry: Retry with @fix-retry
+    - wontdo: WontDo
+  question:
+    options:
+    - key: fix
+      label: Retry with @fix
+      set:
+        assignee: '@fix'
+    - key: fix-fable
+      label: Retry with @fix-fable
+      set:
+        assignee: '@fix-fable'
+    - key: fix-retry
+      label: Retry with @fix-retry
+      set:
+        assignee: '@fix-retry'
+    - key: wontdo
+      label: WontDo
+      set:
+        status: WontDo
+        assignee: ''
+- date: 2026-11-26T20:46:54.670162+00:00
+  author: triage
+  text: |-
+    Answer: fix (Retry with @fix)
+
+    Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the t3 runner exited 1 because `t3 thread show` couldn't read the thread (T3 Code server not answering); the worktree's work was passing its tests.
+  answer:
+    to: 2026-11-26T20:45:00.390949+00:00
+    choice:
+    - fix
+    note: 'Retry rule, owner 2026-11-15 (docs/decisions/2026-11-15-inbox-triage.md): the t3 runner exited 1 because `t3 thread show` couldn''t read the thread (T3 Code server not answering); the worktree''s work was passing its tests.'
+- date: 2026-11-26T20:48:04.586312+00:00
+  author: claude
+  text: |-
+    A taken-over merge job now takes the machine's check lock before it resumes its session, and waits for it like a merge agent's start does.
+
+    - DEV-797 landed (`5c3ef018b`), so I fast-forwarded the branch to `main` (`6d77a20df`) and built on it. The lock lives in `agent_job_service/check_lock.rs`.
+    - The lock is taken in `resume_session_to_end` (`crates/lotar-agent/src/services/agent_job_service.rs`), so it covers both takeovers: an orphaned job (`finish_orphaned_job`) and an ended `t3` thread that T3 Code runs again (DEV-626, `resumed.rs`). It's keyed on the job record's `is_merge_job`.
+    - It reuses `merge_agent_check_lock`. The wait comment reads `…; the taken-over merge agent goes on now.` Cancelling during the wait ends the job cancelled and the session isn't resumed. If the port can't be opened, the job goes on without the lock and says so. A takeover that fails before any session takes no lock.
+    - Limit: a `t3` thread may already be running again in T3 Code while lotar waits; lotar can't hold it back. This is in `docs/help/agent.md`.
+    - Test `a_taken_over_merge_job_waits_for_the_check_lock_before_it_resumes_its_session` (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs`): with the lock held, the job waits, stays running and doesn't resume; once the lock is free, it resumes, completes and comments, and the lock is free again. Without the fix it fails (`timed out waiting for the takeover's wait for the lock`).
+    - I told the DEV-801 thread which files I touched. No guidance correction (no durable finding).
+  report:
+    commits:
+    - hash: 616b3bc38
+      what: a taken-over merge job takes the check lock before its session goes on
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(/a_taken_over_|resumed|dev797/)'
+      result: passed
+      reason: 22 tests
+    - command: cargo nextest run -p lotar-agent check_lock
+      result: passed
+      reason: 4 tests
+    - command: npm run test:agent
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it; no UI change
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adb0a7e19c4da46432e915e480cfbd0fde092aff11314dfcb741be1bdda65d119
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A28118acf01dea3aac80b4fc195bac1b28817edc83e4f78d9cbce250ea5431ce1
@@ -35,7 +108,7 @@ description: |-
   Check: a test that registers an orphaned merge job, holds the lock from outside, and sees the takeover wait.
 
   ## Done when
-  - [ ] A taken-over merge job (record `merge: true` or a merge profile) whose session is resumed takes the check lock before it resumes the session, and holds it until the job ends.
+  - [ ] A taken-over merge job (record `merge: true` or a merge profile) whose session is resumed takes the check lock before it resumes the session, and holds it until the job ends. The same for a merge job's ended `t3` thread that T3 Code runs again and lotar takes over (DEV-626): it shares the resume step.
   - [ ] While another run holds the lock, the takeover waits as in DEV-797: a job-log line "Waiting for the machine's check lock (port …), held by …", the job stays `running`, and the session isn't resumed yet. Once it gets the lock after a wait, the ticket gets a comment "Waited … for the machine's check lock, held by …; the taken-over merge agent goes on now."
   - [ ] Cancelling the job while it waits (also `lotar agent cancel` from another process) ends it cancelled; the session isn't resumed.
   - [ ] The port can't be opened: the takeover goes on without the lock and says so in the job log and on the ticket (same as a merge agent's start). The process that takes over runs with `LOTAR_CHECK_LOCK_HELD=1` (a lotar run above holds it): it goes on without taking it again.
@@ -46,6 +119,7 @@ tags:
 - agent
 - fix-retried
 - waits
+- retry-fix
 history:
 - at: 2026-11-25T07:45:42.255522+00:00
   actor: claude
@@ -135,3 +209,78 @@ history:
       - [ ] Unchanged: takeovers of jobs that aren't merge jobs, and merge jobs that fail at takeover before any session (killed in setup, `command` runner, no session yet) take no lock.
       - [ ] `docs/help/agent.md` says a taken-over merge job takes the lock too.
       - [ ] Test: orphaned merge job + lock held from outside → waits, no resume; lock freed → resumes and ends; the lock is free after.
+- at: 2026-11-26T20:44:59.801103+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix-retry'
+    new: mallox
+- at: 2026-11-26T20:45:00.390949+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:46:31.924670+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-797 review: `adopt_orphaned_job` → `finish_orphaned_job` (`crates/lotar-agent/src/services/agent_job_service.rs`) resumes a merge job's agent session (a t3 thread may still run its full suites) but never takes the machine's check lock (`agent_job_service/check_lock.rs`, port 47586). The OS freed the lock when the old lotar exited, so a second merge can run its suites beside the adopted one, which DEV-797 forbids (a merge agent "holds it until the job ends").
+
+      Check: a test that registers an orphaned merge job, holds the lock from outside, and sees the takeover wait.
+
+      ## Done when
+      - [ ] A taken-over merge job (record `merge: true` or a merge profile) whose session is resumed takes the check lock before it resumes the session, and holds it until the job ends.
+      - [ ] While another run holds the lock, the takeover waits as in DEV-797: a job-log line "Waiting for the machine's check lock (port …), held by …", the job stays `running`, and the session isn't resumed yet. Once it gets the lock after a wait, the ticket gets a comment "Waited … for the machine's check lock, held by …; the taken-over merge agent goes on now."
+      - [ ] Cancelling the job while it waits (also `lotar agent cancel` from another process) ends it cancelled; the session isn't resumed.
+      - [ ] The port can't be opened: the takeover goes on without the lock and says so in the job log and on the ticket (same as a merge agent's start). The process that takes over runs with `LOTAR_CHECK_LOCK_HELD=1` (a lotar run above holds it): it goes on without taking it again.
+      - [ ] Unchanged: takeovers of jobs that aren't merge jobs, and merge jobs that fail at takeover before any session (killed in setup, `command` runner, no session yet) take no lock.
+      - [ ] `docs/help/agent.md` says a taken-over merge job takes the lock too.
+      - [ ] Test: orphaned merge job + lock held from outside → waits, no resume; lock freed → resumes and ends; the lock is free after.
+    new: |-
+      Found in the DEV-797 review: `adopt_orphaned_job` → `finish_orphaned_job` (`crates/lotar-agent/src/services/agent_job_service.rs`) resumes a merge job's agent session (a t3 thread may still run its full suites) but never takes the machine's check lock (`agent_job_service/check_lock.rs`, port 47586). The OS freed the lock when the old lotar exited, so a second merge can run its suites beside the adopted one, which DEV-797 forbids (a merge agent "holds it until the job ends").
+
+      Check: a test that registers an orphaned merge job, holds the lock from outside, and sees the takeover wait.
+
+      ## Done when
+      - [ ] A taken-over merge job (record `merge: true` or a merge profile) whose session is resumed takes the check lock before it resumes the session, and holds it until the job ends. The same for a merge job's ended `t3` thread that T3 Code runs again and lotar takes over (DEV-626): it shares the resume step.
+      - [ ] While another run holds the lock, the takeover waits as in DEV-797: a job-log line "Waiting for the machine's check lock (port …), held by …", the job stays `running`, and the session isn't resumed yet. Once it gets the lock after a wait, the ticket gets a comment "Waited … for the machine's check lock, held by …; the taken-over merge agent goes on now."
+      - [ ] Cancelling the job while it waits (also `lotar agent cancel` from another process) ends it cancelled; the session isn't resumed.
+      - [ ] The port can't be opened: the takeover goes on without the lock and says so in the job log and on the ticket (same as a merge agent's start). The process that takes over runs with `LOTAR_CHECK_LOCK_HELD=1` (a lotar run above holds it): it goes on without taking it again.
+      - [ ] Unchanged: takeovers of jobs that aren't merge jobs, and merge jobs that fail at takeover before any session (killed in setup, `command` runner, no session yet) take no lock.
+      - [ ] `docs/help/agent.md` says a taken-over merge job takes the lock too.
+      - [ ] Test: orphaned merge job + lock held from outside → waits, no resume; lock freed → resumes and ends; the lock is free after.
+- at: 2026-11-26T20:46:32.365659+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["DEV-797"]}'
+    new: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626"]}'
+- at: 2026-11-26T20:46:54.670162+00:00
+  actor: triage
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:46:54.670398+00:00
+  actor: triage
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-26T20:47:51.573984+00:00
+  actor: triage
+  changes:
+  - field: tags
+    old: agent, fix-retried, waits
+    new: agent, fix-retried, waits, retry-fix
+- at: 2026-11-26T20:48:04.586312+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:48:05.046648+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626"]}'
+    new: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626","DEV-801"]}'

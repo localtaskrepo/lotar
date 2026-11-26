@@ -1,14 +1,16 @@
 title: config show leaves out agent.worktree and labels every default (home) when a home config exists
-status: Todo
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T19:25:32.394470+00:00
-modified: 2026-11-26T19:25:33.174476+00:00
+modified: 2026-11-26T20:52:20.413291+00:00
 relationships:
   related:
   - DEV-905
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab16f27083c5f528df245bcfb6b6173afb0e70c46ca82ae243eb6648699b9929a
 description: |-
   Found by the DEV-905 job (2026-11-26), also with the installed build: in a workspace whose `.tasks/config.yml` sets `agent.worktree.enabled` and `build_root`, and a home config that sets only `agent.worktree.max_parallel_jobs`, `lotar config show --explain --full` prints no `agent.worktree` keys, and every key the home config doesn't set is labelled `(home)`. JSON (`--format json`) has the values and labels the repo's keys `global` after DEV-905.
 
@@ -31,3 +33,14 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T20:52:19.826779+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T20:52:20.413291+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab16f27083c5f528df245bcfb6b6173afb0e70c46ca82ae243eb6648699b9929a

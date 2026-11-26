@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T01:18:52.353749+00:00
-modified: 2026-11-26T18:40:50.181883+00:00
+modified: 2026-11-26T20:48:18.683153+00:00
 relationships:
   related:
   - DEV-875
@@ -51,10 +51,56 @@ comments:
     - **Note, not blocking:** the open state now lasts while the page is open. Hide logs, then Show logs, reopens the panel. Before, it always started closed. This seems fine.
     - **Main since `aa504a2ed`:** `589f23c7d` (DEV-880), `eb9b383f7` (DEV-865) and `279d3423c` (DEV-875) touch these files but do not affect the fix. No stray files, no second branch.
     - **Not run:** full `npm run lint`, `npm test`, `npm run smoke` (the merge runs them, DEV-797).
+- date: 2026-11-26T20:48:09.688338+00:00
+  author: claude
+  text: |-
+    Screenshots added: before and after in light and dark at 1920, 1440 and 390 px. Code unchanged.
+
+    - **Review read HEAD:** its comment names `aa504a2ed`, the branch's HEAD.
+    - **Missing screenshots (the one blocking finding):** 12 images uploaded to the ticket:
+      - Before (fix reverted): `DEV-888-before-light-1920.png`, `-1440`, `-390`, `DEV-888-before-dark-1920.png`, `-1440`, `-390`: the button reads Instructions, panel closed after the log arrives.
+      - After (`aa504a2ed`): `DEV-888-after-light-1920.png`, `-1440`, `-390`, `DEV-888-after-dark-1920.png`, `-1440`, `-390`: button reads Hide instructions, panel open.
+    - **How:** HEAD's `target/debug/lotar serve --web-ui-path` with a `vite build` of `aa504a2ed~1` (before) and of HEAD (after), scratch workspace with one mock job. Playwright held `/api/jobs/logs` with `page.route`, clicked Instructions while "Loading logs…" showed, then released the log. `aria-expanded` read false (before) and true (after) in all 6 combinations.
+    - **Commit:** none needed; only ticket attachments changed, so `aa504a2ed` stays as is.
+    - **Tag:** the ticket has no `small-diff` tag; diff is 105 changed lines with a `ui` tag, so it gets the full review.
+  report:
+    commits:
+    - hash: aa504a2ed
+      what: unchanged, the fix the review approved
+    checks:
+    - command: npm run test:ui:agent -- __tests__/AgentJobs.spec.ts
+      result: passed
+      reason: 41 passed
+    - command: screenshots before/after, light/dark, 1920/1440/390
+      result: passed
+      reason: before Instructions expanded=false, after Hide instructions expanded=true in all 6
+    - command: npm run lint
+      result: not_run
+      reason: no code changed this round, merge runs it
+    - command: npm test
+      result: not_run
+      reason: no code changed this round, merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: no code changed this round, merge runs it
+    next: Review again
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A038063cbc62a9008d25ebe42791e04e1b9b8bb44d87c11815642b1e7f481e2cf
 - attachment: DEV-888-before.53340ace512ce77337a1963f3be62ff4.png
 - attachment: DEV-888-after.dd820e010551501c6196551098057cfc.png
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae51d90c06cf46b26468981003818b7b0a9175a198ddca2046c347e2e1069fa8b
+- attachment: DEV-888-after-light-1440.3c2d7a22a56791fe9118529e786ccdfe.png
+- attachment: DEV-888-after-light-1920.2a41c0f0fbf713d0c390d7ca80431e8a.png
+- attachment: DEV-888-after-light-390.73987808b8c3d222b7bca4ee8ba938ef.png
+- attachment: DEV-888-before-dark-1440.cef3c98a982fcb29dd1bab59e98cdcba.png
+- attachment: DEV-888-before-dark-1920.ce9bccf98833ace0f1f7d9ec19efc5ca.png
+- attachment: DEV-888-before-dark-390.04f18b98ebde501f059f19212898bd82.png
+- attachment: DEV-888-before-light-1440.5104858bfb9bfc5cec08020e0dbe8ef8.png
+- attachment: DEV-888-before-light-1920.7867829874544f83b27bc5c986bdd7c2.png
+- attachment: DEV-888-before-light-390.bc2dbd643302611c20047b4a6aa85465.png
+- attachment: DEV-888-after-dark-1440.60b249817649aa2d11b10f1ff570f175.png
+- attachment: DEV-888-after-dark-1920.3b7cbe94832cf298975ca5017d503fc6.png
+- attachment: DEV-888-after-dark-390.345c0a0b1fcc19bc650c1f1b0a564982.png
 description: 'Found: in DEV-875, while a job card''s logs load, `view/pages/AgentJobs.vue` shows a standalone `AgentRunInputs` with its own Instructions button; once the logs arrive it unmounts and `AgentJobLog` mounts with its panel closed, so a panel the user opened is gone. Check: delay `/api/jobs/logs` (page.route), click Instructions before the log shows, and the panel should stay open. Done: the open state carries over to the log''s header button (or the placeholder button is not offered while loading).'
 tags:
 - health
@@ -158,3 +204,87 @@ history:
   - field: tags
     old: health, ui, review-blocked
     new: health, ui, review-returned
+- at: 2026-11-26T20:45:29.923762+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-26T20:45:31.534529+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae51d90c06cf46b26468981003818b7b0a9175a198ddca2046c347e2e1069fa8b
+- at: 2026-11-26T20:47:44.559957+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-888-after-light-1440.3c2d7a22a56791fe9118529e786ccdfe.png
+- at: 2026-11-26T20:47:44.618692+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-888-after-light-1920.2a41c0f0fbf713d0c390d7ca80431e8a.png
+- at: 2026-11-26T20:47:44.675148+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-888-after-light-390.73987808b8c3d222b7bca4ee8ba938ef.png
+- at: 2026-11-26T20:47:44.725441+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-888-before-dark-1440.cef3c98a982fcb29dd1bab59e98cdcba.png
+- at: 2026-11-26T20:47:44.777886+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-888-before-dark-1920.ce9bccf98833ace0f1f7d9ec19efc5ca.png
+- at: 2026-11-26T20:47:44.831938+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-888-before-dark-390.04f18b98ebde501f059f19212898bd82.png
+- at: 2026-11-26T20:47:44.886264+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-888-before-light-1440.5104858bfb9bfc5cec08020e0dbe8ef8.png
+- at: 2026-11-26T20:47:44.938333+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-888-before-light-1920.7867829874544f83b27bc5c986bdd7c2.png
+- at: 2026-11-26T20:47:44.991226+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-888-before-light-390.bc2dbd643302611c20047b4a6aa85465.png
+- at: 2026-11-26T20:47:53.181845+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-888-after-dark-1440.60b249817649aa2d11b10f1ff570f175.png
+- at: 2026-11-26T20:47:53.236470+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-888-after-dark-1920.3b7cbe94832cf298975ca5017d503fc6.png
+- at: 2026-11-26T20:47:53.294251+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:DEV-888-after-dark-390.345c0a0b1fcc19bc650c1f1b0a564982.png
+- at: 2026-11-26T20:48:09.688338+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:48:18.683153+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

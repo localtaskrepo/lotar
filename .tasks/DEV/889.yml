@@ -1,11 +1,10 @@
 title: 'Agent queue: 7 jobs sit in a queue file keyed by the relative path .tasks, which no worker reads'
-status: HelpNeeded
+status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-26T03:32:05.108189+00:00
-modified: 2026-11-26T20:27:39.143062+00:00
+modified: 2026-11-26T20:46:09.265801+00:00
 relationships:
   related:
   - DEV-860
@@ -60,6 +59,15 @@ comments:
 - date: 2026-11-26T20:27:38.406887+00:00
   author: mallox
   text: 'Answer: requeue-later (Requeue them once a release with DEV-887 is installed, then delete the file) (answered in INBOX-804)'
+- date: 2026-11-26T20:46:09.265801+00:00
+  author: claude
+  text: |-
+    Waiting for the next lotar release: the owner's answer (requeue later) can't be carried out before it.
+
+    - Owner 2026-11-26 (INBOX-804): requeue the 8 entries once a release with DEV-887 is installed, then delete the file.
+    - Installed lotar is `0.15.7`; `0cf94860d` (DEV-887) is in no tag yet.
+    - Next: after the release is installed, requeue the entries under each repo's absolute tasks dir, delete `queue-b06823c0….json`, then Done.
+    - Status Blocked, tag `waits`, so no health question is open.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1c1b94732806b9b77a50613c04a1a582524ec503076e19e24843db18e4f19fa5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A348c8be0d6af88553ec0fc486e860caa6d139c788491aa5c658ec157106d8578
@@ -72,6 +80,7 @@ description: |-
 tags:
 - health
 - owner
+- waits
 custom_fields:
   finding: bug:stranded-relative-queue
 history:
@@ -176,3 +185,24 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-26T20:46:06.574728+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, owner
+    new: health, owner, waits
+- at: 2026-11-26T20:46:06.994244+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: Blocked
+- at: 2026-11-26T20:46:09.213301+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-26T20:46:09.265801+00:00
+  actor: claude
+  changes:
+  - field: comment_added

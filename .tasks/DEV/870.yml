@@ -1,11 +1,11 @@
 title: 'A job held in the in-process pending queue starts with the prompt built at create: an old title and ticket context'
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T11:03:31.428115+00:00
-modified: 2026-11-26T17:35:57.589509+00:00
+modified: 2026-11-26T20:42:30.757253+00:00
 relationships:
   related:
   - DEV-845
@@ -100,6 +100,36 @@ comments:
     - Done when holds: `PendingJob` keeps the raw `request`. `PromptInputs::build` fills `${{ticket.title}}` and rebuilds the context. `process_pending_queue` is the only way a job leaves that queue, so memory holds, slot waits, a paused queue and a busy merge slot are all covered. Runner, profile and config come from create. A job that starts at once builds its prompt once. A missing ticket or instructions file falls back to the prompt from create.
     - Docs: one sentence added in `docs/help/agent.md`. No stray files.
     - Tickets filed: none.
+- date: 2026-11-26T20:42:30.489422+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-870` is in `main`.
+
+    - Rebased `agent/DEV-870` onto `main` (`97611a47da78`): `970112c2d781`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-870` onto `main` (`6d77a20df911`): `f8b189bb1a12`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `f8b189bb1a12`
+    - Amended the pending `.tasks` changes into the merged commit: `e4214c47d2c8`
+    - Pushed 2 commits to `origin/main`
+  report:
+    commits:
+    - hash: 6d77a20df
+      what: 'DEV-879 Rule builder: a comment map without a question is called ''comments with a question'''
+    - hash: e4214c47d
+      what: 'DEV-870 A job held in the in-process pending queue starts with the prompt built at create: an old title and ticket context'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A45021289cd79c488d60288becfc5eda4ec7b52ab4dbb85e9b913bbd7438a6255
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abed1e95d9797f676018a0044af5a06f3f9362e18bf65da817c118b352cadead9
@@ -114,8 +144,6 @@ description: |-
   - [ ] A job that starts at once is unchanged: one prompt, built at create.
   - [ ] Rebuilding fails at the start (ticket unreadable, instructions file gone): the job starts with the prompt built at create, not lost.
   - [ ] A test renames the ticket while its job waits in the pending queue and sees the new title in the started prompt.
-tags:
-- review-returned
 history:
 - at: 2026-11-25T11:03:32.324643+00:00
   actor: claude
@@ -252,3 +280,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T20:42:30.489422+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:42:30.757253+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: review-returned
+    new: ''

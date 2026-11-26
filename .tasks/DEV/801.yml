@@ -3,9 +3,9 @@ status: InProgress
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@fix-retry'
 created: 2026-11-22T19:22:12.213895+00:00
-modified: 2026-11-26T20:29:01.595735+00:00
+modified: 2026-11-26T20:48:05.046052+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -28,6 +28,7 @@ relationships:
   - DEV-832
   - DEV-883
   - DEV-896
+  - DEV-867
 comments:
 - date: 2026-11-22T22:40:05.875209+00:00
   author: claude
@@ -99,6 +100,9 @@ comments:
     Reported again by claude on 2026-11-26.
 
     dev605_merge_without_agent_test (a_check_that_fails_once_then_passes_lands_without_an_agent, a_refused_push_hands_off and others with agent.merge checks): timed out at 60 s in 'Waiting for the machine's check lock', held by another worktree's Rust suite (DEV-883); pass on retry. The tests take the machine's real check lock. DEV-896 job.
+- date: 2026-11-26T20:45:00.096704+00:00
+  author: automation
+  text: The fix agent's job job-20261126T202853.768Z-40 failed (lotar agent logs job-20261126T202853.768Z-40); @fix-retry retries it on branch agent/DEV-801.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75080ac346701fc3377f56ac792640c8450190058560a4bf13c0ec6cbdc24d02
 description: |-
@@ -113,6 +117,7 @@ description: |-
   - Every test reported in the comments passes in the full suites under load (DEV-797's lock in place), or is fixed as a bug, each named in the outcome.
 tags:
 - flaky
+- fix-retried
 custom_fields:
   finding: flaky:tests
 history:
@@ -240,3 +245,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75080ac346701fc3377f56ac792640c8450190058560a4bf13c0ec6cbdc24d02
+- at: 2026-11-26T20:44:59.203979+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+    new: '@fix-retry'
+  - field: tags
+    old: flaky
+    new: flaky, fix-retried
+- at: 2026-11-26T20:45:00.096704+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:48:05.046052+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896"]}'
+    new: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867"]}'

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T17:08:01.064005+00:00
-modified: 2026-11-26T20:27:23.293638+00:00
+modified: 2026-11-26T20:50:45.607758+00:00
 comments:
 - date: 2026-11-26T20:04:29.483394+00:00
   author: claude
@@ -22,6 +22,9 @@ comments:
 - date: 2026-11-26T20:27:22.542935+00:00
   author: mallox
   text: 'Answer: B (Also fix and research jobs, through a T3 Code server on dyson) (answered in INBOX-805)'
+- date: 2026-11-26T20:50:45.607758+00:00
+  author: claude
+  text: 'For route B (owner 2026-11-26: "Also fix and research jobs, through a T3 Code server on dyson"): T3 Code 0.1.13 (Mac, since 2026-11-26 12:44 PST) fixed tasks delegated to a linked machine on an older version not reporting back (pingdotgg/t3code PR 42717). Add to Done when: before a job goes to dyson''s T3, lotar compares the linked environment''s T3 version with the Mac''s (`t3 environment list`) and holds the job with a clear message when they differ or dyson doesn''t answer; it never falls back to the Mac. dyson''s setup keeps T3 current with `t3 update` (local LOCA-631 comment #24). Also 0.1.13: finished delegated child threads settle on their own (PR 43558), so remote job threads need no manual settle.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acc67bf8b282f21aec9a87cf0dde7958bfe602b82fd437e452b0a7ea25c1de5ac
 description: |-
@@ -163,3 +166,7 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-26T20:50:45.607758+00:00
+  actor: claude
+  changes:
+  - field: comment_added

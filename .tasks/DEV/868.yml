@@ -1,11 +1,10 @@
 title: comment_checks_lock took comment_merge's doc comment
-status: InProgress
+status: Done
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix-retry'
 created: 2026-11-25T07:45:42.688933+00:00
-modified: 2026-11-26T17:48:25.744990+00:00
+modified: 2026-11-26T20:43:12.142201+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -26,14 +25,22 @@ comments:
 - date: 2026-11-26T01:04:43.419642+00:00
   author: automation
   text: 'The @fix-retry job waits for its open prerequisites: DEV-797. It starts once they are done.'
+- date: 2026-11-26T20:43:03.863651+00:00
+  author: claude
+  text: |-
+    Nothing to change: DEV-797 landed with `comment_merge`'s doc comment already in place.
+
+    - `main` (`e4214c47d`, which contains DEV-797 `5c3ef018b`): "Comment lotar's merge outcome on the ticket, and keep it as the job's last message." sits right above `fn comment_merge` (`crates/lotar-agent/src/services/agent_job_service.rs:3985-3987`).
+    - `comment_checks_lock` never reached `main`: `git grep comment_checks_lock main` finds only ticket text. The check-lock code now lives in `merge.rs:306`.
+    - No commits beyond main: `git log main..HEAD` is empty.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aababe399e8f28fe918ab7c772959aac66cb5d87c9e24f9b62ef54f413e8cd232
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa686c00dbec3b4b7f50617e3990994ab19c94a7b71c6407e6bf5b621656bdced
 description: |-
   Found in the DEV-797 review: `fn comment_checks_lock` was inserted between `comment_merge`'s doc comment and its fn (`crates/lotar-agent/src/services/agent_job_service.rs:3808-3824`). Now `comment_checks_lock` has both doc paragraphs and `comment_merge` none.
   Done when: "Comment lotar's merge outcome on the ticket, and keep it as the job's last message." sits on `comment_merge` again.
 tags:
 - agent
-- fix-retried
 - waits
 history:
 - at: 2026-11-25T07:45:44.138837+00:00
@@ -97,3 +104,26 @@ history:
   - field: status
     old: Blocked
     new: InProgress
+- at: 2026-11-26T20:42:36.847086+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa686c00dbec3b4b7f50617e3990994ab19c94a7b71c6407e6bf5b621656bdced
+- at: 2026-11-26T20:43:03.863651+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:43:11.486380+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix-retry'
+- at: 2026-11-26T20:43:12.142201+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, fix-retried, waits
+    new: agent, waits

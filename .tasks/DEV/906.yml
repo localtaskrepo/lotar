@@ -1,15 +1,45 @@
 title: dev61_reference_kinds_test fails in a job worktree whose target links to agent.worktree.build_root
-status: Todo
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T19:25:16.556571+00:00
-modified: 2026-11-26T19:25:18.060855+00:00
+modified: 2026-11-26T20:52:15.237722+00:00
 relationships:
   related:
   - DEV-762
   - DEV-905
+comments:
+- date: 2026-11-26T20:52:08.089195+00:00
+  author: claude
+  text: |-
+    dev61 tests pass in a job worktree whose `target` links to the build root.
+
+    - Cause confirmed: `CARGO_TARGET_TMPDIR` resolves to `/Volumes/Builds/jobs/lotar/DEV-906/...`, so the canonical workspace path escapes the repo root
+    - `crates/lotar-lib/tests/dev61_reference_kinds_test.rs`: new `fixture_base()` keeps `CARGO_TARGET_TMPDIR` when it really lies in the checkout, else uses `<checkout>/.test-tmp/`
+    - `.gitignore`: `/.test-tmp/`
+    - Before: 3 of 18 failed (`file_reference_rejects_custom_configured_store_location`, `rest_file_reference_add_and_remove_roundtrip`, `code_references_reject_store_paths_and_stale_detach_still_works`); after: 18/18
+    - 22 changed lines: no small-diff tag
+  report:
+    commits:
+    - hash: f565ec57a
+      what: dev61 fixture uses the checkout's .test-tmp/ when target links outside it
+    checks:
+    - command: cargo nextest run --cargo-profile dev -p lotar-lib --test integration -E 'test(/dev61_reference_kinds_test::/)'
+      result: passed
+      reason: 18/18 in this job worktree, 3 failed before
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: merge runs the full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs it
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A201112dca23f251d4b5095e69820b4cf1300d02be05094b8089eb90a024f14bb
 description: |-
   Found by the DEV-905 job (2026-11-26): `file_reference_rejects_custom_configured_store_location` and `store_guard_fails_closed_on_invalid_configuration` fail with "Reference path escapes repository", also alone and without DEV-905's change.
 
@@ -34,3 +64,27 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T20:48:53.241500+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T20:48:54.903841+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A201112dca23f251d4b5095e69820b4cf1300d02be05094b8089eb90a024f14bb
+- at: 2026-11-26T20:52:08.089195+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:52:15.237722+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
