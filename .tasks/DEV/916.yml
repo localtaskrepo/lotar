@@ -1,11 +1,11 @@
 title: Test stub template-team-agent.sh waits for its go file with no bound (DEV-796 branch)
-status: Blocked
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-27T00:07:42.828735+00:00
-modified: 2026-11-27T03:57:19.276672+00:00
+modified: 2026-11-27T08:33:20.644253+00:00
 relationships:
   depends_on:
   - DEV-861
@@ -21,8 +21,34 @@ comments:
     - DEV-796 is on main: the unbounded loop is at `crates/lotar-lib/tests/agent_automation_integration_test.rs:2954` (`while [ ! -f "{go}" ]; do sleep 0.1; done`)
     - `git grep -n 'fn while_this_test_runs' crates/lotar-lib/tests` on main: no match. DEV-861 is still Merging
     - Added depends-on DEV-861 and tag `waits`. Next: once DEV-861 lands, add `&& {alive}` with `crate::common::while_this_test_runs()` there, then re-run the `while [ ! -f` grep (DEV-861 may cover the other unbounded loops it lists, e.g. in `agent_safety_test.rs`, `dev320`, `dev592`, `dev630`, `dev646`, `dev660`)
+- date: 2026-11-27T08:33:12.576920+00:00
+  author: claude
+  text: |-
+    The template-team stub's wait loop now ends with the test process.
+
+    - Rebased `agent/DEV-916` onto main (DEV-861 `8c30ba685` is there; branch had no own commits)
+    - `crates/lotar-lib/tests/agent_automation_integration_test.rs:2954`: `while [ ! -f "{go}" ] && {alive}; do sleep 0.1; done`, `alive = crate::common::while_this_test_runs()`
+    - `git grep -n 'while \[ ! -f' crates/lotar-lib/tests`: every loop now has the helper or a counter bound (`[ $i -lt N ]`); none left unbounded
+    - Commit `7f87f4e43`
+  report:
+    commits:
+    - hash: 7f87f4e43
+      what: bound the go-file wait in template-team-agent.sh by the test process
+    checks:
+    - command: cargo nextest run --cargo-profile dev shipped_agent_team_template_reworks_a_blocked_review_and_merges
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: Merge agent lands 7f87f4e43
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A367ce76bdd74d6b2c9958f1b72bf14db3c8b03cfb9dbb9380e87009f17bca911
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abe3c3ad780c978dbb055b88f6bd4e3e2272ca95b7a80f2bb8800e3125b731dcd
 description: |-
   Found 2026-11-26 in the DEV-861 review: the DEV-796 branch adds `while [ ! -f "{go}" ]; do sleep 0.1; done` in the stub script `template-team-agent.sh` (`crates/lotar-lib/tests/agent_automation_integration_test.rs`, about line 2966 on that branch). Two of these scripts from test runs started at 12:37 and 12:38 were still running at 16:07 (ppid 1), under `$TMPDIR/.lotar-test-scratch/`.
 
@@ -83,3 +109,27 @@ history:
   - field: tags
     old: waits
     new: ''
+- at: 2026-11-27T08:29:18.745750+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-27T08:29:20.190419+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abe3c3ad780c978dbb055b88f6bd4e3e2272ca95b7a80f2bb8800e3125b731dcd
+- at: 2026-11-27T08:33:12.576920+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T08:33:20.644253+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

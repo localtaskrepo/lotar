@@ -811,6 +811,8 @@ fn a_ticket_hands_its_context_from_harness_to_harness_through_its_states() {
         EnvVarGuard::set("HARNESSMUX_HOME", home.to_string_lossy().as_ref()),
         EnvVarGuard::set("LOTAR_TASKS_DIR", fixtures.tasks_root.to_string_lossy().as_ref()),
         EnvVarGuard::set("LOTAR_TEST_SILENT", "1"),
+        // The merge agent doesn't wait for the machine's check lock (DEV-908).
+        EnvVarGuard::set("LOTAR_CHECK_LOCK_HELD", "1"),
     ];
     AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Server);
     let mut storage = fixtures.create_storage();
@@ -1149,6 +1151,9 @@ fn t3_harness_and(profiles: &[(&str, &str, &str)], more_agents: &str) -> (TestFi
         EnvVarGuard::set("HARNESSMUX_HOME", home.to_string_lossy().as_ref()),
         EnvVarGuard::set("LOTAR_TASKS_DIR", fixtures.tasks_root.to_string_lossy().as_ref()),
         EnvVarGuard::set("LOTAR_TEST_SILENT", "1"),
+        // A merge agent waits for the machine's check lock, which another
+        // worktree's suite can hold for minutes (DEV-908).
+        EnvVarGuard::set("LOTAR_CHECK_LOCK_HELD", "1"),
     ];
     (fixtures, guards)
 }
