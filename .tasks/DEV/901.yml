@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T17:08:01.064005+00:00
-modified: 2026-11-26T21:27:51.744586+00:00
+modified: 2026-11-26T21:39:05.931491+00:00
 comments:
 - date: 2026-11-26T20:04:29.483394+00:00
   author: claude
@@ -28,6 +28,12 @@ comments:
 - date: 2026-11-26T21:27:51.744586+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T212746.696Z-71 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T212746.696Z-71 why.'
+- date: 2026-11-26T21:39:05.931491+00:00
+  author: codex
+  text: |-
+    2026-11-26, owner: “I would prefer if the agents on the mac can decide if they want to turn on the extra machine for work or not based on the work load.” Goal: save power and keep Dyson quiet “after 9 pm and before 9am” Pacific. He set the T3 desktop load-balancing preference to Prefer Dyson. The Mac can reach Dyson through T3 Connect with full access; a remote project-list call succeeded and returned no registered projects.
+
+    For the existing route B work, treat Dyson as optional daytime capacity. Reuse LOCA-707's Mac wake command and Dyson's 20-minute idle shutdown. Let the Mac consider waking Dyson when eligible work is waiting and the Mac is busy. Account for the job's expected duration near 21:00 and keep automatic wakes and new Dyson assignments within 09:00–21:00 America/Los_Angeles. A host preference in the desktop client only helps with new threads while Dyson is reachable. Verify daytime dispatch and quiet-hours deferral before calling the routing ready.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acc67bf8b282f21aec9a87cf0dde7958bfe602b82fd437e452b0a7ea25c1de5ac
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abec78b7dede343dabc4a24b01ec89af6c7439e651553efd8262e3b2e4be05e86
@@ -195,5 +201,9 @@ history:
     new: job-paused
 - at: 2026-11-26T21:27:51.744586+00:00
   actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:39:05.931491+00:00
+  actor: codex
   changes:
   - field: comment_added

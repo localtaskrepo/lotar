@@ -1,11 +1,11 @@
 title: 'Proposal: a built-in agent template from our working rules (second-provider review, one retry, comments reach the agent, prerequisites)'
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T18:50:35.107598+00:00
-modified: 2026-11-26T20:42:08.243381+00:00
+modified: 2026-11-26T21:34:52.211045+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -574,6 +574,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab1e53b916e854b9cdfeaf1b059cfdce628ef757fc79de47898a9ef761240dd1b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb1d8643c08edc7396a6f3fd47f68a4e48290caf4206e22da425c5db13864f37
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb541fcd6e15ba778ed8405c010783d3268361f87afb7447799721c914886f23
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A40ca7fcb4af355e63474a183d866ce2589b142cc19ed57fee0fe752758649bd8
 description: |-
   The agent templates lotar ships are far behind the setup our own repos run on, so someone who starts with `lotar init --template agent-pipeline` misses most of what we learned. The shipped templates run implement, test and merge, and send any failure back to the reporter. Ours adds a review on a second provider, one retry before a person is asked, the person's comment reaching the running agent, and tickets that wait Blocked until their prerequisites are done. Found by product development (2026-11-22). It came from the standards thread "Sharing Agent Setup With Teammates" (2026-11-21), where the owner wrote: "I was already mulling over a lotar template that includes our learnings for an easy project set up", and "I'm also thinking about other people that may want to use it, and keep using it the same as we are and improving it". It takes the standards Direction "a platform for other people" further. The thread holds the packaging question (plugins, copier, a shared repo); this ticket covers only what lotar itself ships.
 
@@ -1162,3 +1163,14 @@ history:
   - field: assignee
     old: mallox
     new: '@fix'
+- at: 2026-11-26T21:34:50.771700+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-26T21:34:52.211045+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A40ca7fcb4af355e63474a183d866ce2589b142cc19ed57fee0fe752758649bd8

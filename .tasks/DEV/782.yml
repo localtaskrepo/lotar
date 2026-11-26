@@ -3,8 +3,9 @@ status: Blocked
 priority: Low
 type: Bug
 reporter: claude
+assignee: '@fix'
 created: 2026-11-22T02:36:00.735704+00:00
-modified: 2026-11-24T23:16:01.370906+00:00
+modified: 2026-11-26T21:34:40.608304+00:00
 relationships:
   depends_on:
   - DEV-765
@@ -926,3 +927,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-765","DEV-840"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840"]}'
     new: '{"depends_on":["DEV-765","DEV-840"],"blocks":["DEV-826"],"related":["DEV-765","DEV-766","DEV-826","DEV-801","DEV-791","DEV-774","DEV-840","DEV-778"]}'
+- at: 2026-11-26T21:34:40.608304+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

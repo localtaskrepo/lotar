@@ -1,11 +1,11 @@
 title: A merge job taken over after lotar's exit resumes its merge agent without the checks lock
-status: HelpNeeded
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T07:45:41.052287+00:00
-modified: 2026-11-26T21:03:05.569606+00:00
+modified: 2026-11-26T21:35:18.957068+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -107,9 +107,13 @@ comments:
     - `925bc14df` (branch `agent/DEV-801`, not merged yet) sets `LOTAR_CHECK_LOCK_HELD=1` and `LOTAR_AGENT_QUEUE_DISABLE_WORKER=1` in `crates/lotar-lib/tests/common/mod.rs`
     - A test that proves a taken-over merge takes the lock has to clear `LOTAR_CHECK_LOCK_HELD` and set its own `LOTAR_CHECK_LOCK_PORT`, as the `dev797` tests do. A test whose job runs in a worker has to clear `LOTAR_AGENT_QUEUE_DISABLE_WORKER`
     - `dev503_harness_jobs_test.rs` changed there too (one line in `a_continued_merge_without_a_session_of_its_own_takes_the_reviews_thread`)
+- date: 2026-11-26T21:35:18.957068+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T213510.936Z-77 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T213510.936Z-77 why.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adb0a7e19c4da46432e915e480cfbd0fde092aff11314dfcb741be1bdda65d119
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A28118acf01dea3aac80b4fc195bac1b28817edc83e4f78d9cbce250ea5431ce1
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ce7499cac79969a6af3e6141c7a9ed4b3f29d7ae6c82fb8ac4a332a79245b97
 description: |-
   Found in the DEV-797 review: `adopt_orphaned_job` → `finish_orphaned_job` (`crates/lotar-agent/src/services/agent_job_service.rs`) resumes a merge job's agent session (a t3 thread may still run its full suites) but never takes the machine's check lock (`agent_job_service/check_lock.rs`, port 47586). The OS freed the lock when the old lotar exited, so a second merge can run its suites beside the adopted one, which DEV-797 forbids (a merge agent "holds it until the job ends").
 
@@ -128,6 +132,7 @@ tags:
 - fix-retried
 - waits
 - retry-fix
+- job-paused
 history:
 - at: 2026-11-25T07:45:42.255522+00:00
   actor: claude
@@ -294,5 +299,26 @@ history:
     new: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626","DEV-801"]}'
 - at: 2026-11-26T21:03:05.569606+00:00
   actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:35:13.280104+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-26T21:35:16.336348+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ce7499cac79969a6af3e6141c7a9ed4b3f29d7ae6c82fb8ac4a332a79245b97
+- at: 2026-11-26T21:35:18.809517+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, fix-retried, waits, retry-fix
+    new: agent, fix-retried, waits, retry-fix, job-paused
+- at: 2026-11-26T21:35:18.957068+00:00
+  actor: automation
   changes:
   - field: comment_added

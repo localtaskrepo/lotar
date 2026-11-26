@@ -1605,7 +1605,7 @@ fn build_prompt(
         out.push('\n');
         out.section("Comments");
         out.push_str(&format!(
-            "Comments ({} on the ticket{shown}All of them: `lotar show {id}`; the history: `lotar task timeline {id}`){}\n",
+            "Comments ({} on the ticket{shown}All of them, each cut to one line: `lotar show {id} --brief`; one in full: `lotar show {id} --comment <N>`; the history: `lotar task timeline {id}`){}\n",
             live_count,
             if picked.is_empty() { "" } else { ":" },
             id = task.id
@@ -6959,7 +6959,10 @@ mod tests {
 
         let prompt = build_prompt(&task, "merge it", None, BRIEF, None, None, None).text;
         assert!(prompt.contains("Comments (7 on the ticket;"), "{prompt}");
-        assert!(prompt.contains("`lotar show TEST-1`") && prompt.contains("`lotar task timeline TEST-1`"), "{prompt}");
+        assert!(
+            prompt.contains("`lotar show TEST-1 --brief`; one in full: `lotar show TEST-1 --comment <N>`") && prompt.contains("`lotar task timeline TEST-1`"),
+            "{prompt}"
+        );
         assert!(prompt.contains("- Question, by claude, 2026-11-16T02:00:00Z:\nQuestion: A or B?"), "{prompt}");
         assert!(!prompt.contains("old fix progress") && !prompt.contains("first review") && !prompt.contains("first fix"), "{prompt}");
         assert!(prompt.contains(&format!("Reworked: {} …", "x".repeat(PROMPT_EXCERPT_CHARS - "Reworked: ".len()))), "cut at the set length");
@@ -7004,7 +7007,7 @@ mod tests {
         assert!(prompt_comments(&task).is_empty());
 
         let prompt = build_prompt(&task, "go", None, BRIEF, None, None, None).text;
-        assert!(prompt.contains("\nComments (2 on the ticket. All of them: `lotar show TEST-1`; the history: `lotar task timeline TEST-1`)\n"), "{prompt}");
+        assert!(prompt.contains("\nComments (2 on the ticket. All of them, each cut to one line: `lotar show TEST-1 --brief`; one in full: `lotar show TEST-1 --comment <N>`; the history: `lotar task timeline TEST-1`)\n"), "{prompt}");
         assert!(!prompt.contains("below the") && !prompt.contains("Note before any job"), "{prompt}");
 
         // Automation's comment is never a fix comment, but before a hand-back it is the open question.

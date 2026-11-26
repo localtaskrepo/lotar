@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@review'
 created: 2026-11-26T01:18:52.353749+00:00
-modified: 2026-11-26T20:48:18.683153+00:00
+modified: 2026-11-26T21:35:28.007338+00:00
 relationships:
   related:
   - DEV-875
@@ -84,6 +84,9 @@ comments:
       result: not_run
       reason: no code changed this round, merge runs it
     next: Review again
+- date: 2026-11-26T21:35:28.007338+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T213523.870Z-78 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T213523.870Z-78 why.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A038063cbc62a9008d25ebe42791e04e1b9b8bb44d87c11815642b1e7f481e2cf
 - attachment: DEV-888-before.53340ace512ce77337a1963f3be62ff4.png
@@ -106,6 +109,7 @@ tags:
 - health
 - ui
 - review-returned
+- job-paused
 custom_fields:
   finding: ui:agent-jobs-instructions-remount
 history:
@@ -288,3 +292,13 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T21:35:27.881119+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, ui, review-returned
+    new: health, ui, review-returned, job-paused
+- at: 2026-11-26T21:35:28.007338+00:00
+  actor: automation
+  changes:
+  - field: comment_added

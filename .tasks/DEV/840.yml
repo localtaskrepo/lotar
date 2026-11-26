@@ -1,11 +1,11 @@
 title: 'Flaky: a Rust test sometimes leaves a .tmpXXXXXX entry in the test runner''s temp folder, failing a passing run'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T17:04:45.761529+00:00
-modified: 2026-11-26T19:59:11.111547+00:00
+modified: 2026-11-26T21:34:39.655764+00:00
 relationships:
   blocks:
   - DEV-782
@@ -195,6 +195,33 @@ comments:
     - Leak loop: `TMPDIR=<fresh> cargo nextest run -E 'test(/a_worker_started_from_another_folder|worker_drops_agent_session/)'` ran 10 times at load about 15, then 10 times with 24 `yes` loops (load up to 29). All passed, and nothing was left in any run. `node scripts/rust-test-runner.mjs --agent` on the same tests plus the unit test passed with an empty temp folder.
     - Findings: none blocking, no minor tickets filed. No stray files, and no second copy of the fix.
     - Not run: the full `npm run -s test:agent` under load, `npm test` and `npm run smoke` (the merge runs them). Worktree unchanged.
+- date: 2026-11-26T21:34:39.355371+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-840` is in `main`.
+
+    - Rebased `agent/DEV-840` onto `main` (`d1061401edfe`): `567c624d788a`
+    - The install `npm ci` passed
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `567c624d788a`
+    - Amended the pending `.tasks` changes into the merged commit: `a18d5ff8e97e`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[test:rust-temp-leftover]`
+  report:
+    commits:
+    - hash: a18d5ff8e
+      what: 'DEV-840 Flaky: a Rust test sometimes leaves a .tmpXXXXXX entry in the test runner''s temp folder, failing a passing run'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac7f05b3add60383e6fb133c3c983a1c54ea0e9592166ee8c6ff88c3c39d28ff6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6689f5b3356b418d238db98c339e79d7deaea9dada95c3a9eeb94907d6ecf659
@@ -206,10 +233,6 @@ description: |-
   Done: the test removes what it creates; a full run under load leaves nothing in the temp folder.
 tags:
 - health
-- job-paused
-- fix-retried
-- review-returned
-- review-returned-twice
 custom_fields:
   finding: test:rust-temp-leftover
 history:
@@ -461,3 +484,16 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T21:34:39.355371+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:34:39.655764+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, job-paused, fix-retried, review-returned, review-returned-twice
+    new: health

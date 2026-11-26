@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-26T19:25:16.556571+00:00
-modified: 2026-11-26T21:02:37.550055+00:00
+modified: 2026-11-26T21:35:37.205342+00:00
 relationships:
   related:
   - DEV-762
@@ -40,6 +40,9 @@ comments:
       result: not_run
       reason: merge runs it
     next: Review, then merge
+- date: 2026-11-26T21:35:37.205342+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T213533.553Z-79 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T213533.553Z-79 why.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A201112dca23f251d4b5095e69820b4cf1300d02be05094b8089eb90a024f14bb
 description: |-
@@ -52,6 +55,7 @@ description: |-
   Done when: these tests pass there too (e.g. a temp workspace inside the worktree, or resolve the link).
 tags:
 - health
+- job-paused
 custom_fields:
   finding: nextest:dev61_reference_kinds_test
 history:
@@ -102,3 +106,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-762","DEV-905","DEV-907"]}'
     new: '{"related":["DEV-762","DEV-905","DEV-907","DEV-801"]}'
+- at: 2026-11-26T21:35:37.091017+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, job-paused
+- at: 2026-11-26T21:35:37.205342+00:00
+  actor: automation
+  changes:
+  - field: comment_added
