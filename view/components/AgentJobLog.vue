@@ -249,12 +249,13 @@ const query = ref('')
 const expanded = ref(false)
 
 const instructionsId = `job-log-instructions-${useId()}`
-const instructionsOpen = ref(false)
+// Bound by a page that shows the Instructions button on its own while the log loads, so an open panel stays open.
+const instructionsOpen = defineModel<boolean>('instructionsOpen', { default: false })
 // The panel stays mounted once opened; it loads on its first open and again only while there is no record.
 const instructionsSeen = ref(false)
+watch(instructionsOpen, (value) => (instructionsSeen.value ||= value), { immediate: true })
 function toggleInstructions() {
   instructionsOpen.value = !instructionsOpen.value
-  instructionsSeen.value = true
 }
 
 function remember() {

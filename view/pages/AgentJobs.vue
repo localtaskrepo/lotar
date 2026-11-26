@@ -312,9 +312,17 @@
                 <div v-if="logsLoading[job.id]" class="muted">Loading logs…</div>
                 <div v-else-if="logsError[job.id]" class="error">{{ logsError[job.id] }}</div>
                 <div v-else-if="(logsByJob[job.id] || []).length === 0" class="muted">No log entries yet.</div>
-                <AgentJobLog v-else :entries="logsByJob[job.id] || []" :job="job" instructions viewer="agents" />
+                <AgentJobLog
+                  v-else
+                  v-model:instructions-open="instructionsOpen[job.id]"
+                  :entries="logsByJob[job.id] || []"
+                  :job="job"
+                  instructions
+                  viewer="agents"
+                />
                 <AgentRunInputs
                   v-if="logsLoading[job.id] || logsError[job.id] || !(logsByJob[job.id] || []).length"
+                  v-model:open="instructionsOpen[job.id]"
                   :job-id="job.id"
                 />
 
@@ -433,6 +441,8 @@ const logsByJob = ref<Record<string, AgentJobLogEntry[]>>({})
 const logsLoading = ref<Record<string, boolean>>({})
 const logsError = ref<Record<string, string>>({})
 const openLogs = ref<Record<string, boolean>>({})
+// The Instructions panel per job, shared by the button shown while the log loads and the log's own.
+const instructionsOpen = ref<Record<string, boolean>>({})
 const messageDrafts = ref<Record<string, string>>({})
 
 const profiles = ref<AgentProfileInfo[]>([])

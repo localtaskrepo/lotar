@@ -105,6 +105,7 @@
                 <p v-else-if="!(threads[item.entry.job.id] || []).length" class="muted">The thread is empty.</p>
                 <AgentJobLog
                   v-else
+                  v-model:instructions-open="instructionsOpen[item.entry.job.id]"
                   :entries="threads[item.entry.job.id] || []"
                   :job="item.entry.job"
                   instructions
@@ -116,6 +117,7 @@
                     threadErrors[item.entry.job.id] ||
                     !(threads[item.entry.job.id] || []).length
                   "
+                  v-model:open="instructionsOpen[item.entry.job.id]"
                   :job-id="item.entry.job.id"
                 />
               </div>
@@ -298,6 +300,8 @@ const jobSettings = (job: AgentJob) => [job.runner, runSettings(job.model, job.e
 
 // Threads load when opened and follow a running job's events.
 const openThreads = ref<Record<string, boolean>>({})
+// The Instructions panel per job, shared by the button shown while the thread loads and the log's own.
+const instructionsOpen = ref<Record<string, boolean>>({})
 const threads = ref<Record<string, AgentJobLogEntry[]>>({})
 const threadLoading = ref<Record<string, boolean>>({})
 const threadErrors = ref<Record<string, string>>({})

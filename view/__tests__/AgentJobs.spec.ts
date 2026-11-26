@@ -31,6 +31,7 @@ vi.mock('../api/client', () => ({
         addAgentProfile: vi.fn(),
         getAgentJobT3Thread: vi.fn(),
         moveAgentQueueEntry: vi.fn(),
+        getAgentJobInputs: vi.fn(),
     },
 }))
 
@@ -537,6 +538,35 @@ describe('AgentJobs log sequence join', () => {
     function occurrences(text: string, needle: string) {
         return text.split(needle).length - 1
     }
+
+    it('keeps the Instructions panel opened while the logs load open once the log arrives (DEV-888)', async () => {
+        listJobs(logJobA)
+        const logs = deferred<AgentJobLogsResponse>()
+        ;(api.getAgentJobLogs as any).mockReturnValue(logs.promise)
+        ;(api.getAgentJobInputs as any).mockReturnValue(new Promise(() => {}))
+        const wrapper = await mountAgentJobs()
+        try {
+            await clickLogsToggle(wrapper, 'logs-alpha')
+            expect(panelText(wrapper)).toContain('Loading logs')
+            const panel = cardFor(wrapper, 'logs-alpha').find('.log-panel')
+            const placeholder = panel.findAll('button').find((candidate) => candidate.text() === 'Instructions')
+            expect(placeholder, 'Instructions button while loading').toBeTruthy()
+            await placeholder!.trigger('click')
+            await flushPromises()
+
+            logs.resolve({ job: logJobA, events: [logEntry('agent_job_started', 1, '2026-10-08T10:20:01.100Z')] })
+            await flushPromises()
+
+            const after = cardFor(wrapper, 'logs-alpha').find('.log-panel')
+            expect(after.find('.job-log').exists()).toBe(true)
+            const toggle = after.get('.job-log__instructions')
+            expect(toggle.text()).toBe('Hide instructions')
+            expect(toggle.attributes('aria-expanded')).toBe('true')
+            expect(after.find('.job-log__instructions-panel').isVisible()).toBe(true)
+        } finally {
+            wrapper.unmount()
+        }
+    })
 
     it('shows the T3 Code thread row only for a t3 job (DEV-849)', async () => {
         const t3Job = job('job-logs-t3', { agent: 'logs-t3', runner: 't3', created_at: '2026-10-08T10:20:03.000Z' })

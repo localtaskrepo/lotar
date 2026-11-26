@@ -409,6 +409,53 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
         }
     });
 
+    it('keeps the Instructions panel opened while the logs load open once they arrive (DEV-888)', async () => {
+        const agents = await createFixtureAgents({ mock: {} }, 'lotar-smoke-agents-inputs-wait-');
+
+        try {
+            const workspace = await SmokeWorkspace.create({
+                seedFiles: { '.tasks/config.yml': configWithAgents(agents.yaml) },
+            });
+
+            try {
+                const task = await workspace.addTask('Run inputs while loading', { args: ['-p', 'UIAG'] });
+                const server = await startLotarServer(workspace);
+                try {
+                    await startJobViaApi(server.url, task.id, 'mock', 'Inputs while loading');
+                    await waitForJobStatusViaApi(server.url, task.id, 'completed');
+
+                    await withPage(`${server.url}/agents`, async (page) => {
+                        await page.waitForSelector('.job-card', { timeout: 15_000 });
+                        let releaseLogs = () => {};
+                        const logsHeld = new Promise<void>((resolve) => (releaseLogs = resolve));
+                        await page.route('**/api/jobs/logs?**', async (route) => {
+                            await logsHeld;
+                            await route.continue();
+                        });
+
+                        await page.getByRole('button', { name: 'Show logs', exact: true }).click();
+                        await page.getByText('Loading logs…').waitFor();
+                        await page.getByRole('button', { name: 'Instructions', exact: true }).click();
+                        await page.getByRole('table', { name: 'Settings' }).waitFor({ state: 'visible' });
+
+                        releaseLogs();
+                        await page.locator('.job-log').waitFor();
+                        const toggle = page.locator('.job-log__instructions');
+                        expect(await toggle.textContent()).toContain('Hide instructions');
+                        expect(await toggle.getAttribute('aria-expanded')).toBe('true');
+                        expect(await page.locator('.job-log > .run-inputs__panel').isVisible()).toBe(true);
+                    });
+                } finally {
+                    await server.stop();
+                }
+            } finally {
+                await workspace.dispose();
+            }
+        } finally {
+            await agents.dispose();
+        }
+    });
+
     it('guides setting up the first agent when none is configured', async () => {
         const workspace = await SmokeWorkspace.create({
             seedFiles: { '.tasks/config.yml': configWithAgents('') },

@@ -14,7 +14,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, useId } from 'vue'
+import { ref, useId, watch } from 'vue'
 import AgentRunInputsPanel from './AgentRunInputsPanel.vue'
 import UiButton from './UiButton.vue'
 
@@ -22,13 +22,14 @@ import UiButton from './UiButton.vue'
 defineProps<{ jobId: string }>()
 
 const panelId = `run-inputs-${useId()}`
-const open = ref(false)
+// Bound by a page that swaps this for the log's header button, so an open panel stays open.
+const open = defineModel<boolean>('open', { default: false })
 // The panel stays mounted once opened; it loads on its first open and again only while there is no record.
 const seen = ref(false)
+watch(open, (value) => (seen.value ||= value), { immediate: true })
 
 function toggle() {
   open.value = !open.value
-  seen.value = true
 }
 </script>
 
