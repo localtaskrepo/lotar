@@ -5,11 +5,13 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-26T19:25:16.556571+00:00
-modified: 2026-11-26T20:52:15.237722+00:00
+modified: 2026-11-26T21:02:37.550055+00:00
 relationships:
   related:
   - DEV-762
   - DEV-905
+  - DEV-907
+  - DEV-801
 comments:
 - date: 2026-11-26T20:52:08.089195+00:00
   author: claude
@@ -88,3 +90,15 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T21:02:05.827310+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-762","DEV-905"]}'
+    new: '{"related":["DEV-762","DEV-905","DEV-907"]}'
+- at: 2026-11-26T21:02:37.550055+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-762","DEV-905","DEV-907"]}'
+    new: '{"related":["DEV-762","DEV-905","DEV-907","DEV-801"]}'

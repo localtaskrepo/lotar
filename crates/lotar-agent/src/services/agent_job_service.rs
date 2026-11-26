@@ -577,6 +577,7 @@ impl AgentJobService {
                     is_merge_job,
                     scope,
                 });
+                crate::services::agent_active_jobs::register_queued(tasks_dir, &job_id, &ticket_id);
             } else {
                 // Slot available - increment running count
                 registry.running_count += 1;
@@ -793,7 +794,11 @@ impl AgentJobService {
         };
         if cancelled {
             // Remove from pending queue if it was queued
-            registry.pending_queue.retain(|p| p.job_id != id);
+            if let Some(index) = registry.pending_queue.iter().position(|p| p.job_id == id)
+                && let Some(pending) = registry.pending_queue.remove(index)
+            {
+                crate::services::agent_active_jobs::unregister_queued(&pending.tasks_dir, id);
+            }
             // A dispatched job owns its slot until its thread (and child) has exited.
         }
         drop(registry);
@@ -917,7 +922,9 @@ impl AgentJobService {
         if let Ok(mut registry) = JOB_REGISTRY.lock() {
             registry.jobs.clear();
             registry.active_by_ticket.clear();
-            registry.pending_queue.clear();
+            for pending in registry.pending_queue.drain(..) {
+                crate::services::agent_active_jobs::unregister_queued(&pending.tasks_dir, &pending.job_id);
+            }
             registry.running_count = 0;
             registry.max_parallel_jobs = None;
         }
@@ -6509,6 +6516,7 @@ fn process_pending_queue() {
             let Some(pending) = next.and_then(|index| registry.pending_queue.remove(index)) else {
                 break;
             };
+            crate::services::agent_active_jobs::unregister_queued(&pending.tasks_dir, &pending.job_id);
             registry.running_count += 1;
             started.push(pending);
         }

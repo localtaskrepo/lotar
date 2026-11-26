@@ -1,11 +1,11 @@
 title: 'Kept T3 Code threads of done tickets stay unsettled: 56 completed job threads in the sidebar on 0.15.6'
-status: Reviewing
+status: InProgress
 priority: High
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-22T21:19:09.010490+00:00
-modified: 2026-11-26T19:30:35.069620+00:00
+modified: 2026-11-26T21:04:30.940009+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -536,6 +536,7 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A93efbf3043cc8f88842f92b54d1bdb9f9224d1cfd00ffd4b602328de85b44f80
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A031b0d341593563131407ad4e61a142dc25461ebf4358f69dfdff0696637e2a9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8d1ba4d5235e800af0430f866e38c8eb7a54217a812e25223442350396163e9f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A203e8c6c32d413b7f02fbd4bd166d640c726e4be39315dedd938736acc6b3a79
 description: |-
   Found 2026-11-22 13:30 PST (chief of staff, owner: 't3 still has a lot of open threads. We're on the new version of lotar so I hope this can be cleaned up now?'). T3 Code lists 88 unsettled threads, 56 of them completed full-access job threads ('<ID> fix: ...', '<ID> review: ...'), many of done tickets: STD-298, STD-291, STD-276, DEV-747, DEV-752, HARN-10, LOCA-535 among them (staff briefing 'Threads to settle' lists 42). DEV-747's look (crates/lotar-agent/src/services/agent_job_service/kept.rs, in v0.15.6) should settle them every 30 s in lotar serve and the queue worker, but no log says 'Settled' or 'was not settled'. Suspects: threads() finds threads only from job logs (job_log_dirs) and lotar agent list-jobs shows no jobs for STD-298 any more, so pruned job logs leave a thread unknown; settle_ticket needs a harnessmux session record (resumed::session_of), else 'no harnessmux session holds it'. The chief of staff can't settle them by hand: its thread runs in auto mode, and T3 refuses t3_thread_organize on full-access threads (runtime_mode_escalation_denied). Done when: a failing test first; lotar settles the completed job threads of done tickets also when the job's log or session record is gone (find them from T3's thread list, e.g. thread title or harnessmux metadata), and logs each settle or refusal where repos.ts or the briefing can see it; after the release the current backlog is settled (count before and after). The release needs the owner's OK.
 
@@ -1101,3 +1102,14 @@ history:
   - field: tags
     old: review-returned, job-paused, fix-retried, retry-fix, review-blocked
     new: review-returned, job-paused, fix-retried, retry-fix, review-returned-twice
+- at: 2026-11-26T21:04:29.583084+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-26T21:04:30.940009+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A203e8c6c32d413b7f02fbd4bd166d640c726e4be39315dedd938736acc6b3a79

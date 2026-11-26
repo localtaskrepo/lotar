@@ -147,6 +147,7 @@ pub fn unregister(tasks_dir: &Path, job_id: &str) {
     let _ = std::fs::remove_file(dir.join(format!("{name}.json")));
     let _ = std::fs::remove_file(dir.join(format!("{name}.cancel")));
     let _ = std::fs::remove_file(dir.join(format!("{name}.prompt")));
+    let _ = std::fs::remove_file(dir.join(format!("{name}.queued")));
     let _lock = lock_outcome(&dir, name);
     mark_ended(&dir, name);
     let _ = std::fs::remove_file(dir.join(format!("{name}.outcome.json")));
@@ -476,6 +477,63 @@ pub fn cancel_requested(tasks_dir: &Path, job_id: &str) -> bool {
     safe_name(job_id).is_some_and(|name| dir(tasks_dir).join(format!("{name}.cancel")).exists())
 }
 
+/// A job waiting in a process's own queue (`lotar serve` with its slots
+/// full), so other processes count it as queued (DEV-871).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct QueuedJob {
+    pub job_id: String,
+    pub ticket_id: String,
+    pub owner_pid: u32,
+}
+
+/// Record that this process queues the job. A record that can't be
+/// written only hides the job from the other processes.
+pub fn register_queued(tasks_dir: &Path, job_id: &str, ticket_id: &str) {
+    let Some(name) = safe_name(job_id) else {
+        return;
+    };
+    let dir = dir(tasks_dir);
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let record = QueuedJob { job_id: job_id.to_string(), ticket_id: ticket_id.to_string(), owner_pid: std::process::id() };
+    if let Ok(json) = serde_json::to_string(&record) {
+        let _ = crate::storage::safety::atomic_write_file(&dir.join(format!("{name}.queued")), &json);
+    }
+}
+
+/// The job left this process's queue: it started or was cancelled.
+pub fn unregister_queued(tasks_dir: &Path, job_id: &str) {
+    if let Some(name) = safe_name(job_id) {
+        let _ = std::fs::remove_file(dir(tasks_dir).join(format!("{name}.queued")));
+    }
+}
+
+/// Jobs other live processes queue for the tasks directory. Records of
+/// processes that are gone are removed.
+pub fn queued_elsewhere(tasks_dir: &Path) -> Vec<QueuedJob> {
+    let Ok(entries) = std::fs::read_dir(dir(tasks_dir)) else {
+        return Vec::new();
+    };
+    let own = std::process::id();
+    let mut jobs = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().is_none_or(|ext| ext != "queued") {
+            continue;
+        }
+        let Some(record) = std::fs::read_to_string(&path).ok().and_then(|text| serde_json::from_str::<QueuedJob>(&text).ok()) else {
+            continue;
+        };
+        if !process_alive(record.owner_pid) {
+            let _ = std::fs::remove_file(&path);
+        } else if record.owner_pid != own {
+            jobs.push(record);
+        }
+    }
+    jobs
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -519,6 +577,32 @@ mod tests {
         assert_eq!((claimed.owner_pid, claimed.session_id.as_deref()), (std::process::id(), orphan.session_id.as_deref()));
         assert!(claim(tasks.path(), "job-2").is_none(), "a live owner keeps it");
         assert!(orphaned(tasks.path()).is_empty());
+        unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn queued_records_of_other_live_processes_count() {
+        let _queue = tempfile::tempdir().unwrap();
+        // SAFETY: test-local override of the queue directory.
+        unsafe { std::env::set_var("LOTAR_AGENT_QUEUE_DIR", _queue.path()) };
+        let tasks = tempfile::tempdir().unwrap();
+        let write = |job_id: &str, owner_pid: u32| {
+            let record = QueuedJob { job_id: job_id.into(), ticket_id: "T-1".into(), owner_pid };
+            std::fs::create_dir_all(dir(tasks.path())).unwrap();
+            std::fs::write(dir(tasks.path()).join(format!("{job_id}.queued")), serde_json::to_string(&record).unwrap()).unwrap();
+        };
+        register_queued(tasks.path(), "own", "T-1");
+        assert!(queued_elsewhere(tasks.path()).is_empty(), "this process counts its own queue");
+        // The parent process (the test runner) stands for another live one.
+        let other = std::os::unix::process::parent_id();
+        write("other", other);
+        write("dead", 0);
+        let found = queued_elsewhere(tasks.path());
+        assert_eq!(found, vec![QueuedJob { job_id: "other".into(), ticket_id: "T-1".into(), owner_pid: other }]);
+        assert!(!dir(tasks.path()).join("dead.queued").exists(), "a dead process's record is removed");
+        unregister_queued(tasks.path(), "own");
+        assert!(!dir(tasks.path()).join("own.queued").exists());
         unsafe { std::env::remove_var("LOTAR_AGENT_QUEUE_DIR") };
     }
 

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T03:06:54.457789+00:00
-modified: 2026-11-26T19:32:54.867083+00:00
+modified: 2026-11-26T21:07:29.006064+00:00
 relationships:
   related:
   - DEV-725
@@ -583,6 +583,12 @@ comments:
     - The "Done when" still names `GET /api/agent-queue`. An earlier review had that route dropped: `GET /api/jobs` `queue` lists the queue, and the docs say so
 
     **Tickets filed:** none
+- date: 2026-11-26T21:07:29.006064+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-786` onto `main` conflicts in `crates/lotar-core/src/api_types.rs`, `crates/lotar-lib/src/cli/args/agent.rs`, `crates/lotar-lib/tests/integration.rs`, `view/api/types.ts`; lotar aborted the rebase, `agent/DEV-786` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afd042500c99a795d93102eafd7d96b77fadad790c7d3ec5a01f1a2ca674be5b5
 - attachment: dev786-after-dark-1440.4b81d270faa893b496e3c88852237f86.png
@@ -1372,3 +1378,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T21:07:29.006064+00:00
+  actor: automation
+  changes:
+  - field: comment_added

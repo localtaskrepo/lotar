@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-24T17:22:39.025840+00:00
-modified: 2026-11-26T19:38:17.158912+00:00
+modified: 2026-11-26T21:07:48.008069+00:00
 relationships:
   related:
   - DEV-786
@@ -133,6 +133,9 @@ comments:
       result: not_run
       reason: full suites run once at merge (DEV-797)
     next: 'Review, then merge: branch now sits on main 0cf94860d'
+- date: 2026-11-26T21:07:48.008069+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T210742.685Z-57 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T210742.685Z-57 why.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccadac812bf0d870bfbbe766e85d4fa8b4c1ee86b5fb92a636b67bb7b4d7502
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad137a9ea927a6d1359e36a34500fde57c179e80bfcf6cfe12c8f66b9efa0796c
@@ -155,6 +158,7 @@ description: |-
   - [ ] Docs on the rule's `prompt` say when ticket values are filled in.
 tags:
 - agent
+- job-paused
 history:
 - at: 2026-11-24T17:22:39.294489+00:00
   actor: claude
@@ -370,3 +374,13 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T21:07:47.957010+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent
+    new: agent, job-paused
+- at: 2026-11-26T21:07:48.008069+00:00
+  actor: automation
+  changes:
+  - field: comment_added

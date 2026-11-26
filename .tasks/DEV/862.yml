@@ -1,11 +1,11 @@
 title: Record each provider's usage and reset time from agent jobs and show it (lotar usage)
-status: Merging
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T02:16:34.229598+00:00
-modified: 2026-11-26T19:59:04.990983+00:00
+modified: 2026-11-26T21:07:56.893792+00:00
 relationships:
   related:
   - DEV-584
@@ -129,6 +129,10 @@ comments:
     - `git log main..HEAD` is empty: `09c9ae6a0` (DEV-862) is an ancestor of `main` (now `577caa2ff`), and `agent/DEV-862` has no other commits.
     - The merge landed after comment #5's `test:agent` rerun passed; comment #4 had already passed the review of the earlier `701c218b5`.
     - Nothing reran; no tickets filed.
+- date: 2026-11-26T21:07:56.491624+00:00
+  author: automation
+  text: |
+    Nothing to merge: `agent/DEV-862` is in `main` already.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5219365971ba02a0ee9d2bace68d1167cb8547d9891f1ab62439510801e5afa7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aac9edf314d3ae62de4b8ccaab3a38bfbad52c78b39714fecc38bbc04912a8b36
@@ -147,8 +151,6 @@ description: |-
   - [ ] `lotar usage` lists the readings (provider, account, window, used, status, resets at, read at), from any directory, no tasks dir needed. `--format json` gives `{"file": ..., "readings": [...]}` with the fields above. No file: empty list, exit 0. Unreadable or malformed file: error naming the file, exit 1.
   - [ ] `docs/help/usage.md` (linked from the help index) says what is recorded, from which runners, where, and what is not (no reading while no job runs; the OAuth usage poll is the owner's call, see the comment of 2026-11-25).
   - [ ] Tests: the reading from a Usage event and from a paused failure, newest wins per key, provider and account naming, the CLI's empty, text, JSON and malformed-file output.
-tags:
-- fix-retried
 history:
 - at: 2026-11-25T02:16:34.607507+00:00
   actor: claude
@@ -319,3 +321,16 @@ history:
   - field: relationships
     old: '{"related":["DEV-584","DEV-777","DEV-832","DEV-853","DEV-890","DEV-864","DEV-871"]}'
     new: '{"related":["DEV-584","DEV-777","DEV-832","DEV-853","DEV-890","DEV-864","DEV-871","DEV-840"]}'
+- at: 2026-11-26T21:07:56.491624+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:07:56.893792+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: fix-retried
+    new: ''

@@ -1,15 +1,21 @@
 title: 'Timeline: read a job''s conversation inline from its harnessmux event log'
-status: Todo
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T19:31:53.927572+00:00
-modified: 2026-11-26T19:31:55.215291+00:00
+modified: 2026-11-26T21:07:08.577168+00:00
 relationships:
   related:
   - DEV-849
   - DEV-850
+comments:
+- date: 2026-11-26T21:07:08.577168+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T210626.099Z-53 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T210626.099Z-53 why.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7143b46bbd3ddfe5ad20074d6ebde47c173ed5b407d1270ea3e88107f01c75f3
 description: |-
   Ravi asked on 2026-11-24 to review the full chain of agent work in the ticket timeline. The approach is agreed in DEV-850: [docs/research/inline-transcript-review.md](https://github.com/localtaskrepo/lotar/blob/main/docs/research/inline-transcript-review.md). Ravi chose on 2026-11-26: "expand (Load on open only)".
 
@@ -33,6 +39,7 @@ description: |-
 tags:
 - agent
 - ui
+- job-paused
 history:
 - at: 2026-11-26T19:31:54.873044+00:00
   actor: claude
@@ -45,3 +52,24 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T21:07:05.055274+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T21:07:05.947269+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7143b46bbd3ddfe5ad20074d6ebde47c173ed5b407d1270ea3e88107f01c75f3
+- at: 2026-11-26T21:07:08.428800+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, ui
+    new: agent, ui, job-paused
+- at: 2026-11-26T21:07:08.577168+00:00
+  actor: automation
+  changes:
+  - field: comment_added

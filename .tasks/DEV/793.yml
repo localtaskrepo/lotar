@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T14:05:11.563685+00:00
-modified: 2026-11-26T19:37:16.163198+00:00
+modified: 2026-11-26T21:07:37.585404+00:00
 relationships:
   related:
   - DEV-725
@@ -237,6 +237,12 @@ comments:
       - `npm run -s lint:agent` passed.
     - **Not run:** the full `npm test` and `npm run smoke`, which the merge runs. They failed last time under load, on UI tests unrelated to this change.
     - No UI changes, no stray files, one commit. Nothing new to file.
+- date: 2026-11-26T21:07:37.585404+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-793` onto `main` conflicts in `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-793` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae4fdf07e45e5d08840b6db8ca5bd9908ae2b2f9ca24ad5c743aefe6e9d75503c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6d8192ab561e43d0dbaf9c1144ee00f67f5d29b2bc8bf5155fc6cfffcb924d1f
@@ -531,3 +537,7 @@ history:
   - field: assignee
     old: '@review-claude'
     new: '@merge'
+- at: 2026-11-26T21:07:37.585404+00:00
+  actor: automation
+  changes:
+  - field: comment_added

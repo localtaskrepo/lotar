@@ -4,7 +4,7 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-25T22:17:22.622204+00:00
-modified: 2026-11-26T20:27:36.686788+00:00
+modified: 2026-11-26T20:59:10.921071+00:00
 relationships:
   blocks:
   - DEV-893
@@ -24,6 +24,7 @@ relationships:
   - DEV-828
   - DEV-866
   - DEV-886
+  - DEV-905
 comments:
 - date: 2026-11-26T02:11:58.070807+00:00
   author: claude
@@ -362,3 +363,9 @@ history:
     new: Done
   - field: assignee
     old: '@fix'
+- at: 2026-11-26T20:59:10.921071+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801","DEV-804","DEV-882","DEV-896","DEV-797","DEV-881","DEV-880","DEV-875","DEV-876","DEV-825","DEV-887","DEV-828","DEV-866","DEV-886"]}'
+    new: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801","DEV-804","DEV-882","DEV-896","DEV-797","DEV-881","DEV-880","DEV-875","DEV-876","DEV-825","DEV-887","DEV-828","DEV-866","DEV-886","DEV-905"]}'

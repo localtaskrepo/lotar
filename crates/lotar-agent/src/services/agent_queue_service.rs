@@ -544,7 +544,7 @@ impl AgentQueueService {
     }
 
     /// The jobs running and queued for the tasks directory in every process:
-    /// this one's, the records of the others (DEV-279) and the queue file's
+    /// this one's, the records of the others (DEV-279, DEV-871) and the queue file's
     /// `pending` entries (DEV-522). Without a limit in this process's
     /// registry, the configured global limit (DEV-771).
     pub fn queue_stats(tasks_dir: &Path, pending: &[AgentQueueEntry]) -> AgentQueueStats {
@@ -554,6 +554,8 @@ impl AgentQueueService {
                 .ok()
                 .and_then(|config| config.get_resolved_config().agent_worktree.max_parallel_jobs);
         }
+        // Jobs queued in another process's memory left the queue file (DEV-871).
+        stats.queued += crate::services::agent_active_jobs::queued_elsewhere(tasks_dir).len();
         stats
     }
 
@@ -1635,6 +1637,27 @@ mod tests {
     fn set_due(tasks_dir: &Path) {
         let due = time::now_rfc3339();
         with_locked_queue(tasks_dir, |state| state.pauses.iter_mut().for_each(|pause| pause.next_try_at = due.clone())).unwrap();
+    }
+
+    /// DEV-871: a job queued in another live process's memory counts as
+    /// queued here; one of a process that is gone doesn't.
+    #[cfg(unix)]
+    #[test]
+    fn queued_counts_the_jobs_other_processes_queue() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let tasks_dir = dir.path().join("tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        let pending = [entry("TEST-1"), entry("TEST-2"), entry("TEST-3")];
+        assert_eq!(AgentQueueService::queue_stats(&tasks_dir, &pending).queued, 3);
+
+        crate::services::agent_active_jobs::register_queued(&tasks_dir, "job-1", "TEST-4");
+        let records = std::fs::read_dir(queue_dir()).unwrap().flatten().find(|e| e.file_name().to_string_lossy().starts_with("active-")).unwrap().path();
+        let record = |job: &str, pid: u32| serde_json::json!({"job_id": job, "ticket_id": "TEST-4", "owner_pid": pid}).to_string();
+        // The serving process's record: the test runner, alive and not this process.
+        std::fs::write(records.join("job-1.queued"), record("job-1", std::os::unix::process::parent_id())).unwrap();
+        std::fs::write(records.join("job-2.queued"), record("job-2", 0)).unwrap();
+        assert_eq!(AgentQueueService::queue_stats(&tasks_dir, &pending).queued, 4, "the other process's queued job counts, the dead one's doesn't");
     }
 
     /// DEV-604: a signing pause holds only jobs that commit, a disk pause

@@ -1,14 +1,46 @@
 title: config show leaves out agent.worktree and labels every default (home) when a home config exists
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T19:25:32.394470+00:00
-modified: 2026-11-26T20:52:20.413291+00:00
+modified: 2026-11-26T21:02:16.838633+00:00
 relationships:
   related:
   - DEV-905
+  - DEV-906
+comments:
+- date: 2026-11-26T21:02:05.539044+00:00
+  author: claude
+  text: |-
+    Fixed: `config show` YAML now has an `agent.worktree` block, and a key the home config doesn't set is no longer labelled `(home)`.
+
+    - **YAML:** `render.rs` writes `agent.worktree.*` under `agent:` (12 keys, each with its own label). Before, only the JSON had them.
+    - **Labels:** `source_labels.rs` now credits home only for keys the `~/.lotar` file sets (`home_layer_keys()`). Before, it compared values, and every unset key in the parsed home config holds the default, so all defaults matched. `source_label_for_global` now takes the scope context instead of 7 arguments.
+    - **Needs DEV-905:** that branch (Reviewing, not merged) makes the merge and labels of `agent.worktree` work key by key. Without it the repo's `enabled`/`build_root` are still lost and `max_parallel_jobs` shows `(default)`. With `b3d0631fd` applied on top, the ticket's check shows `enabled: true # (global)`, `build_root: /tmp/builds # (global)`, `max_parallel_jobs: 3 # (home)`, and nothing else `(home)`. The two branches apply cleanly together.
+    - **Test:** `config_show_full_with_home_config_shows_worktree_and_labels_unset_keys_default` in `crates/lotar-lib/tests/config_explain_test.rs`. It doesn't depend on DEV-905.
+    - `dev61_reference_kinds_test` fails here with or without this change: that's DEV-906, the `target` link to `/Volumes/Builds`.
+  report:
+    commits:
+    - hash: a81285e07
+      what: YAML agent.worktree block; home credited only for keys the home file sets
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: cargo nextest run -p lotar-core -p lotar-lib -E 'test(/config|source_label|port|inspect|precedence|dev265/)'
+      result: passed
+      reason: 529 passed; dev61_reference_kinds_test left out, it fails the same way without this change (DEV-906)
+    - command: ticket check (config show --explain --full, temp HOME, LOTAR_IGNORE_HOME_CONFIG=0)
+      result: passed
+      reason: with DEV-905 applied on top temporarily
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: 'Review, then merge after DEV-905: the right worktree values and labels need both'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab16f27083c5f528df245bcfb6b6173afb0e70c46ca82ae243eb6648699b9929a
 description: |-
@@ -44,3 +76,22 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab16f27083c5f528df245bcfb6b6173afb0e70c46ca82ae243eb6648699b9929a
+- at: 2026-11-26T21:02:05.539044+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:02:05.827631+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-905"]}'
+    new: '{"related":["DEV-905","DEV-906"]}'
+- at: 2026-11-26T21:02:16.838633+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

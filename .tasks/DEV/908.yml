@@ -1,17 +1,45 @@
 title: 'Two dev503 continued-merge tests time out at 60 s once under load and pass alone: not in the wall-clock group'
-status: Todo
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review-light'
 created: 2026-11-26T19:27:41.962615+00:00
-modified: 2026-11-26T19:27:44.272088+00:00
+modified: 2026-11-26T21:04:12.432430+00:00
 relationships:
   related:
   - DEV-858
+  - DEV-801
+comments:
+- date: 2026-11-26T21:04:01.768789+00:00
+  author: claude
+  text: |-
+    Both continued-merge tests now run in the serial wall-clock group.
+
+    - `.config/nextest.toml`: added both tests by name to the `wall-clock` filter, so they run one at a time and get 2 retries
+    - Check: `cargo nextest run --workspace --test integration dev503` passed 58/58 on a loaded machine, but `a_continued_merge_in_the_reviews_process_runs_with_the_merge_profiles_env` needed its retry (57 s on the passing try)
+    - Likely root cause, from the DEV-801 session: the merges wait on the machine's real check lock, which another worktree's suite holds. DEV-801 (`925bc14df`, not merged yet) sets `LOTAR_CHECK_LOCK_HELD=1` in test processes; its test passed in 1.7 s with that fix. That change is in `tests/common/mod.rs` and the dev503 test file, so it doesn't overlap with this one
+  report:
+    commits:
+    - hash: 05fdc397a
+      what: both tests join the wall-clock filter in .config/nextest.toml
+    checks:
+    - command: cargo nextest show-config test-groups --workspace
+      result: passed
+      reason: both tests listed in wall-clock
+    - command: cargo nextest run --workspace --test integration dev503
+      result: passed
+      reason: 58/58, the env test flaky 2/3 at 57 s under load (retry passed)
+    - command: npm run lint
+      result: not_run
+      reason: config-only change, no code
+    next: Review, then merge; rebase over DEV-801 if it lands first (no file overlap)
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abdbc73e5c042eb609474382b70ddcaca9f0f02c95c0b38424a98ca70a7a7c532
 description: 'Found in the DEV-858 review on main 0cf94860d plus the DEV-858 test: `cargo nextest run --workspace --test integration dev503` failed `a_continued_merge_in_the_reviews_process_runs_with_the_merge_profiles_env` and `a_continued_merge_without_a_session_of_its_own_takes_the_reviews_thread` after about 60 s each, right after a cold `cargo build --workspace`; the rerun passed 59/59 in 14 s. Check: rerun dev503 under load. Done: both join the serial wall-clock filter in `.config/nextest.toml` (AGENTS.md), or their wait is fixed.'
 tags:
 - health
+- small-diff
 custom_fields:
   finding: nextest:dev503-continued-merge-flake
 history:
@@ -26,3 +54,39 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T20:59:55.880482+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T20:59:57.220631+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abdbc73e5c042eb609474382b70ddcaca9f0f02c95c0b38424a98ca70a7a7c532
+- at: 2026-11-26T21:04:01.314723+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, small-diff
+- at: 2026-11-26T21:04:01.768789+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:04:03.436653+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-858"]}'
+    new: '{"related":["DEV-858","DEV-801"]}'
+- at: 2026-11-26T21:04:12.432430+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review-light'

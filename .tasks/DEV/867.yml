@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T07:45:41.052287+00:00
-modified: 2026-11-26T20:48:05.046648+00:00
+modified: 2026-11-26T21:03:05.569606+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -99,6 +99,14 @@ comments:
       result: not_run
       reason: the merge runs it; no UI change
     next: Review, then merge
+- date: 2026-11-26T21:03:05.569606+00:00
+  author: claude
+  text: |-
+    Note from DEV-801 for this fix's new check-lock test: test processes now start as if they held the lock.
+
+    - `925bc14df` (branch `agent/DEV-801`, not merged yet) sets `LOTAR_CHECK_LOCK_HELD=1` and `LOTAR_AGENT_QUEUE_DISABLE_WORKER=1` in `crates/lotar-lib/tests/common/mod.rs`
+    - A test that proves a taken-over merge takes the lock has to clear `LOTAR_CHECK_LOCK_HELD` and set its own `LOTAR_CHECK_LOCK_PORT`, as the `dev797` tests do. A test whose job runs in a worker has to clear `LOTAR_AGENT_QUEUE_DISABLE_WORKER`
+    - `dev503_harness_jobs_test.rs` changed there too (one line in `a_continued_merge_without_a_session_of_its_own_takes_the_reviews_thread`)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adb0a7e19c4da46432e915e480cfbd0fde092aff11314dfcb741be1bdda65d119
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A28118acf01dea3aac80b4fc195bac1b28817edc83e4f78d9cbce250ea5431ce1
@@ -284,3 +292,7 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626"]}'
     new: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626","DEV-801"]}'
+- at: 2026-11-26T21:03:05.569606+00:00
+  actor: claude
+  changes:
+  - field: comment_added

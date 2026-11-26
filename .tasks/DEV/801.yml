@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@fix-retry'
 created: 2026-11-22T19:22:12.213895+00:00
-modified: 2026-11-26T20:48:05.046052+00:00
+modified: 2026-11-26T21:04:03.435233+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -29,6 +29,8 @@ relationships:
   - DEV-883
   - DEV-896
   - DEV-867
+  - DEV-906
+  - DEV-908
 comments:
 - date: 2026-11-22T22:40:05.875209+00:00
   author: claude
@@ -103,6 +105,43 @@ comments:
 - date: 2026-11-26T20:45:00.096704+00:00
   author: automation
   text: The fix agent's job job-20261126T202853.768Z-40 failed (lotar agent logs job-20261126T202853.768Z-40); @fix-retry retries it on branch agent/DEV-801.
+- date: 2026-11-26T21:02:37.265751+00:00
+  author: claude
+  text: |-
+    Fixed the Rust flakes; the smoke flake didn't reproduce, so its failure now reports the cause.
+
+    - **Temp-folder leak** (comments 1–10): a queue worker started by a test's `lotar` call ran on after the test and recreated `.tmpX/.tasks` from `--tasks-dir`. Test processes now start with `LOTAR_AGENT_QUEUE_DISABLE_WORKER=1` (`crates/lotar-lib/tests/common/mod.rs`). The tests that need a worker opt in: `agent_safety` worker tests, `dev361`, `cli_agent_check` (it now also waits for its worker to end) and the `dev503` continued-merge test
+    - **`dev605_merge_without_agent_test`** (comment 12): test processes now start with `LOTAR_CHECK_LOCK_HELD=1`, also under a plain `cargo nextest run`, so merges never wait on another worktree's lock. This also fixes `dev503 a_continued_merge_without_a_session_of_its_own_takes_the_reviews_thread`, which timed out at 60 s on HEAD
+    - New tests for both defaults failed before the fix: `the_tests_never_wait_for_the_machines_check_lock`, `the_tests_start_no_queue_worker_unless_they_ask_for_one`
+    - **Smoke 'Instructions button'** (comment 11): passed every run here. Its failure now names the cause: no record, panel closed again, or the log re-mounted
+    - No test joined the `wall-clock` group. `dev61_reference_kinds_test` also fails on HEAD; that is DEV-906
+    - `crates/lotar-lib/tests/README.md` documents the two defaults and how to opt in
+  report:
+    commits:
+    - hash: 925bc14df
+      what: test processes start with no queue worker and as if they held the check lock; worker tests opt in
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: npm run -s test:rust -- -p lotar-lib --test integration -E <138 CLI-spawning modules>
+      result: passed
+      reason: 1035/1035 at load ~50 with the machine lock held elsewhere, temp guard clean
+    - command: npm run -s test:rust -- -p lotar-lib --test integration -E <agent_safety, cli_agent_check, dev361, dev503, dev605, dev660, dev797>
+      result: passed
+      reason: 136/136 after the last edits
+    - command: dev605_merge_without_agent_test with a fake lock held on its port
+      result: passed
+      reason: 22/22
+    - command: npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts
+      result: passed
+      reason: 15/15, also 8 parallel runs at load 50; the flake did not reproduce
+    - command: npm run -s test:agent
+      result: not_run
+      reason: full suite runs at merge (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: full suite runs at merge (DEV-797)
+    next: The merge's full suites confirm; if the Instructions smoke test fails again, its error now shows the panel state, fix from that
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75080ac346701fc3377f56ac792640c8450190058560a4bf13c0ec6cbdc24d02
 description: |-
@@ -264,3 +303,19 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896"]}'
     new: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867"]}'
+- at: 2026-11-26T21:02:37.265751+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:02:37.549515+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867"]}'
+    new: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906"]}'
+- at: 2026-11-26T21:04:03.435233+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906"]}'
+    new: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906","DEV-908"]}'

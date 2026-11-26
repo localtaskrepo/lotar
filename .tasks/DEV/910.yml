@@ -1,14 +1,20 @@
 title: lotar agent queue says idle (nothing queued) while it counts jobs queued in lotar serve's memory
-status: Todo
+status: InProgress
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T19:40:17.216351+00:00
-modified: 2026-11-26T19:40:18.481961+00:00
+modified: 2026-11-26T21:08:03.491384+00:00
 relationships:
   related:
   - DEV-871
+comments:
+- date: 2026-11-26T21:08:03.491384+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T210757.533Z-60 (fix) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T210757.533Z-60 why.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afc0d53bae55baf591510f51ca1605d4de7c5708d320028e2cb712e47bd6136ce
 description: |-
   Found in the review of DEV-871.
 
@@ -20,6 +26,8 @@ description: |-
 
   - [ ] With jobs queued only in another process, `lotar agent queue` doesn't say `idle`/nothing queued: it says the jobs wait in that process (for example "queued in lotar serve, waiting for a free slot"), or the docs' `idle` wording says it covers only the queue file
   - [ ] A test covers the case
+tags:
+- job-paused
 history:
 - at: 2026-11-26T19:40:18.139003+00:00
   actor: claude
@@ -32,3 +40,24 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-26T21:08:00.512834+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T21:08:01.114024+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afc0d53bae55baf591510f51ca1605d4de7c5708d320028e2cb712e47bd6136ce
+- at: 2026-11-26T21:08:03.451755+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: job-paused
+- at: 2026-11-26T21:08:03.491384+00:00
+  actor: automation
+  changes:
+  - field: comment_added
