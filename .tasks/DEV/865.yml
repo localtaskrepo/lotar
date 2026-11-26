@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T05:09:26.871873+00:00
-modified: 2026-11-26T06:55:27.457463+00:00
+modified: 2026-11-26T17:48:50.237809+00:00
 relationships:
   related:
   - DEV-798
@@ -109,6 +109,8 @@ references:
 - attachment: before-light-1440.a61858ece3481bb2a4e288828960c2c6.png
 - attachment: before-light-1920.28407d10d3b9158c93b0cda9129b2cc8.png
 - attachment: before-light-390.4d1ab47afda6c5ec6bb2949d369efe6e.png
+releases:
+- 12
 description: |-
   Found in the review of DEV-798.
 
@@ -349,3 +351,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-26T17:48:50.237809+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

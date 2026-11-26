@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T16:42:37.579831+00:00
-modified: 2026-11-25T12:25:28.619349+00:00
+modified: 2026-11-26T17:48:49.377321+00:00
 relationships:
   related:
   - DEV-824
@@ -144,6 +144,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A689e19b6ca434ecd9efbb258cb37a9453c44b16777c05bb7706c7bbaf0460e43
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad5d55e5c1efc528a26267f309fba529309fc5f8a5feb7af032cfcd079d3b7a35
+releases:
+- 12
 description: |-
   Found by the security pass 2026-W47 (standards STD-328): 8 open CodeQL alerts, all warnings: #35 js/incomplete-sanitization scripts/tests/install-local.test.mjs:82; #34 rust/cleartext-logging crates/lotar-core/src/storage/manager.rs:94; #32 rust/cleartext-logging crates/lotar-lib/tests/dev482_macos_signing_test.rs:65; #30 js/insecure-randomness view/components/ThemeSelect.vue:144; #25 js/shell-command-injection-from-environment smoke/tests/fixtures.agent.smoke.spec.ts:32; #24, #14, #10 js/incomplete-url-substring-sanitization in view/__tests__ and smoke tests.
 
@@ -280,3 +282,8 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T17:48:49.377321+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

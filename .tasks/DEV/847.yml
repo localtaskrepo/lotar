@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T19:02:19.747340+00:00
-modified: 2026-11-26T00:03:42.465122+00:00
+modified: 2026-11-26T17:48:49.656531+00:00
 relationships:
   related:
   - DEV-869
@@ -129,6 +129,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f26d9e60c1a3e9028a825c798e3c8b40a39d439df14ec7de0633850b721c04b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A52027990c744b9c68f5c0b55ade2e20531d05d0c3315fce63e0fa3c2212eaad8
+releases:
+- 12
 description: 'Found: in mallocator/foundera, `lotar trust --status` (0.15.6) lists every automation rule, also those with no run action, as "rule ''<name>'' on <event> runs null" (about 40 of 60 lines). That hides the real commands an owner should review. Check: `lotar trust --status` in a repo whose automation.yml has rules without run. Done: only rules with a run command are listed.'
 tags:
 - health
@@ -233,3 +235,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-869"]}'
     new: '{"related":["DEV-869","DEV-777"]}'
+- at: 2026-11-26T17:48:49.656531+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

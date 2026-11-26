@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@review-claude'
 created: 2026-11-25T02:16:34.229598+00:00
-modified: 2026-11-26T16:56:40.564804+00:00
+modified: 2026-11-26T17:48:50.142069+00:00
 relationships:
   related:
   - DEV-584
@@ -123,6 +123,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5219365971ba02a0ee9d2bace68d1167cb8547d9891f1ab62439510801e5afa7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aac9edf314d3ae62de4b8ccaab3a38bfbad52c78b39714fecc38bbc04912a8b36
+releases:
+- 12
 description: |-
   Owner 2026-11-24: "maybe that's a trigger we should have in general when we run out of credit, that there's a cleanup process"; he picked 'File both'. Nothing on the Mac stores the Claude five-hour window's usage or reset time: T3 shows it (18:00 on 2026-11-24) but saves it nowhere, the claude CLI has no usage command. lotar's jobs run Claude through the Agent SDK/ACP and get its rate-limit events (used share, resetsAt); Codex reports account/rateLimits. Save the newest reading per provider (and account) where scripts can read it, and show it with `lotar usage` (--format json): provider, used percent per window, resets_at, read_at. Standards' out-of-credit schedule builds on it.
 
@@ -284,3 +286,8 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T17:48:50.142069+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

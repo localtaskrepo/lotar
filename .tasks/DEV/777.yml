@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T23:46:50.851529+00:00
-modified: 2026-11-26T03:47:00.058536+00:00
+modified: 2026-11-26T17:48:47.362868+00:00
 relationships:
   depends_on:
   - DEV-757
@@ -355,6 +355,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70289a6ac85c2cb755275c3f5d6fdd8eb8331fdd6675cfee9939402f867ece8e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6a0c657469e64f57736d65ab25286f98b753dbb913c64520f3ef1c584be4155f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A12e15d70337811904e15781d831cdcf5c5bf2b46978884b44729003105686e97
+releases:
+- 12
 description: |-
   Found in the DEV-757 review (2026-11-21).
 
@@ -842,3 +844,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801","DEV-832","DEV-833","DEV-767","DEV-876","DEV-769","DEV-819","DEV-831","DEV-842","DEV-845","DEV-847","DEV-859","DEV-848","DEV-862"]}'
     new: '{"depends_on":["DEV-757","local:LOCA-601"],"related":["DEV-757","DEV-774","DEV-801","DEV-832","DEV-833","DEV-767","DEV-876","DEV-769","DEV-819","DEV-831","DEV-842","DEV-845","DEV-847","DEV-859","DEV-848","DEV-862","DEV-829"]}'
+- at: 2026-11-26T17:48:47.362868+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

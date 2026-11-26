@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:26:48.779913+00:00
-modified: 2026-11-25T05:39:53.205143+00:00
+modified: 2026-11-26T17:48:48.052012+00:00
 relationships:
   related:
   - DEV-738
@@ -411,6 +411,8 @@ comments:
     next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6b8de6dee0c38aaf4f039850e5ecfc1d554b84abbcbc572423d73dc89c735ee8
+releases:
+- 12
 description: 'Found: the DEV-738 review job filed its docs follow-up with lotar add in the DEV-738 worktree. Its .tasks copy predates main''s DEV-788 (flaky smoke, 2026-11-22T07:34), so the new ticket got DEV-788 too (commit c1dc25aa2 on agent/DEV-738 adds .tasks/DEV/788.yml). Its fix job then ran on agent/DEV-788, the flaky-smoke ticket''s branch, and merging agent/DEV-738 would hit an add/add conflict on .tasks/DEV/788.yml. Check: from a job worktree, lotar add allocates an ID that is already taken in the main checkout''s .tasks. Done: tickets filed from a job''s worktree go to the main checkout''s tasks directory (or get an ID free there), and a test covers it.'
 tags:
 - health
@@ -586,3 +588,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-738","DEV-788","DEV-803","DEV-825","DEV-818","DEV-801","DEV-778","DEV-824"]}'
     new: '{"related":["DEV-738","DEV-788","DEV-803","DEV-825","DEV-818","DEV-801","DEV-778","DEV-824","DEV-838"]}'
+- at: 2026-11-26T17:48:48.052012+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

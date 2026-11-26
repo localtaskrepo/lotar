@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T20:47:04.852936+00:00
-modified: 2026-11-25T05:42:12.288793+00:00
+modified: 2026-11-26T17:48:47.105432+00:00
 relationships:
   blocks:
   - DEV-769
@@ -558,6 +558,8 @@ references:
 - attachment: dev767-r2-before-taskpanel-light-1920.041c3c3e79e392c7e8ad3f66e8706179.png
 - attachment: dev767-r2-before-taskpanel-light-390.62c1f7d301eac291149720c9c66488b7.png
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab7f46f7a0d3e6cd1b2268ff8594406ade9344298cd05b58728c13af5bd9a3ea9
+releases:
+- 12
 description: |-
   A job's log doesn't say what went into the run. The prompt lotar builds (8–12 KB: agent instructions, "This job", ticket context, relationships, comments, recent context, earlier sessions, user request) and the session settings are never written to lotar's log. The first turn is deliberately not logged (`drive_turns`, `agent_job_service.rs` ~:4592). The owner asked on 2026-11-21 for "the instruction set that a run used. As a button that you can expand … to reconstruct and fine tune it".
 
@@ -1168,3 +1170,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-769","DEV-807"],"related":["DEV-807","DEV-757","DEV-766","DEV-765","DEV-837","DEV-774","DEV-791","DEV-801","DEV-816","DEV-805","DEV-777","DEV-833","DEV-825","DEV-861"]}'
     new: '{"blocks":["DEV-769","DEV-807"],"related":["DEV-807","DEV-757","DEV-766","DEV-765","DEV-837","DEV-774","DEV-791","DEV-801","DEV-816","DEV-805","DEV-777","DEV-833","DEV-825","DEV-861","DEV-793"]}'
+- at: 2026-11-26T17:48:47.105432+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

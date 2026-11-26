@@ -1,11 +1,11 @@
 title: Release v0.15.7
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: claude
 created: 2026-11-22T19:39:15.567169+00:00
-modified: 2026-11-26T17:30:39.113274+00:00
+modified: 2026-11-26T17:48:50.761711+00:00
 relationships:
   related:
   - DEV-725
@@ -35,6 +35,16 @@ comments:
 
     - Fixes on main: `e82f2c7ca` (DEV-835) is on `main`; DEV-815, DEV-816 done.
     - Bump `0.15.6` → `0.15.7` in `Cargo.toml`/`Cargo.lock` on branch `release-0.15.7`; local `npm run lint`, `npm test`, `npm run smoke` running.
+- date: 2026-11-26T17:48:50.430465+00:00
+  author: claude
+  text: |-
+    v0.15.7 is out and installed here.
+
+    - Bump `71791a991` on `main`; local `npm run lint`, `npm test`, `npm run smoke` passed; QA run `45866742282` success.
+    - Signed tag `v0.15.7` pushed; Release run `45868488816`: every job success (crates, npm, Homebrew, Scoop, Docker, signing).
+    - `brew upgrade lotar` → `lotar 0.15.7`; the DEV server on :19301 restarted on it (`--exit-on-upgrade`).
+    - `lotar automation simulate` loads `.tasks/DEV/automation.yml` again (DEV-835's `job: { pause: auth }`); `lotar trust --status` says trusted.
+    - Release record 0.15.7: added the 63 tickets merged since `v0.15.6` that were in no release.
 releases:
 - 12
 description: |-
@@ -105,3 +115,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-725","DEV-815","DEV-816","DEV-817","DEV-835","DEV-840","DEV-866","DEV-886","DEV-882"]}'
     new: '{"related":["DEV-725","DEV-815","DEV-816","DEV-817","DEV-835","DEV-840","DEV-866","DEV-886","DEV-882","DEV-883"]}'
+- at: 2026-11-26T17:48:50.430465+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:48:50.761711+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: Done

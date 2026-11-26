@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T08:21:23.478863+00:00
-modified: 2026-11-26T00:03:42.463497+00:00
+modified: 2026-11-26T17:48:49.043322+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -238,6 +238,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A79bd84d501d1c5828dc2e5db03a4cb7b7dc5cfb7a51dbfcfb4a18fdf9d7acde9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac3077bdf4629a8babb7356f251f34b8e19d6ad6b2895a79f2d6632831f30aed8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab67d4046d6f1333034bb8f0358654b8f3c1b37da7532aa1b4379940af9d1a3c9
+releases:
+- 12
 description: |-
   Found in the DEV-816 review: `.github/skills/release/SKILL.md` step 4 says a minor or major release 'waits for his OK: ask him first'. `docs/release-guide.md` Pre-Release Checklist step 1 says a minor or major bump happens 'only when he asks for or approves it'. So when he asked for the minor himself (v0.14.0: 'create a release now with a minor bump'), the skill would still make the agent ask again. His words: 'Only minor changes need my okay.'
 
@@ -558,3 +560,8 @@ history:
   - field: relationships
     old: '{"depends_on":["local:LOCA-601","DEV-816"],"related":["DEV-816","DEV-832","DEV-834","DEV-833"]}'
     new: '{"depends_on":["local:LOCA-601","DEV-816"],"related":["DEV-816","DEV-832","DEV-834","DEV-833","DEV-777"]}'
+- at: 2026-11-26T17:48:49.043322+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

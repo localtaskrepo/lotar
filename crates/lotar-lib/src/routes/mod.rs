@@ -53,6 +53,7 @@ mod relationships;
 mod releases;
 mod scan;
 mod sprints;
+mod status;
 mod sync;
 mod tasks;
 mod whoami;
@@ -227,6 +228,7 @@ pub fn initialize(api_server: &mut ApiServer) {
     sync::register(api_server);
     projects::register(api_server);
     activity::register(api_server);
+    status::register(api_server);
 }
 
 #[cfg(test)]

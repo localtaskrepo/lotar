@@ -1882,6 +1882,51 @@ export interface AgentQueueOverview {
     waiting_for_prerequisites: AgentParkedTicket[]
 }
 
+/** GET /api/status (DEV-881): this instance's jobs, queue and waiting tickets; every link absolute */
+export interface StatusFeed {
+    version: number
+    instance: { name: string; url: string }
+    generated_at: string
+    running: StatusRunningJob[]
+    queue: StatusQueue
+    waiting: StatusWaitingTicket[]
+}
+
+export interface StatusRunningJob {
+    job_id: string
+    ticket_id: string
+    title: string
+    profile: string
+    runner: string
+    started_at: string
+    job_url: string
+    ticket_url: string
+}
+
+export interface StatusQueue {
+    count: number
+    held: boolean
+    held_reason?: string | null
+    entries: StatusQueueEntry[]
+}
+
+export interface StatusQueueEntry {
+    ticket_id: string
+    profile: string
+    queued_at: string
+    waits_for: string
+    ticket_url: string
+}
+
+export interface StatusWaitingTicket {
+    ticket_id: string
+    title: string
+    status: 'HelpNeeded' | 'Blocked'
+    assignee?: string | null
+    since: string
+    ticket_url: string
+}
+
 export interface AgentJobListResponse {
     jobs: AgentJob[]
     queue_stats?: AgentQueueStats | null

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T08:06:40.134808+00:00
-modified: 2026-11-25T19:54:07.278832+00:00
+modified: 2026-11-26T17:48:47.752100+00:00
 relationships:
   depends_on:
   - DEV-766
@@ -178,6 +178,8 @@ references:
 - attachment: agents-after-light-390.48381a20b40b22320f3276c02de14d48.png
 - attachment: agents-before-dark-390.0f9b32b44683d7b7d29623f12e0ea036.png
 - attachment: agents-after-dark-390.019219696e1564fe2c994dd137922dd0.png
+releases:
+- 12
 description: |-
   Found in the review of DEV-766.
 
@@ -505,3 +507,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-766"],"related":["DEV-766","DEV-818","DEV-779","DEV-866","DEV-774","DEV-800","DEV-781","DEV-825","DEV-811"]}'
     new: '{"depends_on":["DEV-766"],"related":["DEV-766","DEV-818","DEV-779","DEV-866","DEV-774","DEV-800","DEV-781","DEV-825","DEV-811","DEV-769"]}'
+- at: 2026-11-26T17:48:47.752100+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

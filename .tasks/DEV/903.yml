@@ -1,0 +1,20 @@
+title: Release v0.15.8
+status: Todo
+priority: Medium
+type: Chore
+reporter: claude
+assignee: claude
+created: 2026-11-26T17:48:57.525302+00:00
+modified: 2026-11-26T17:48:58.609873+00:00
+releases:
+- 13
+description: |-
+  Next lotar release, a patch bump to v0.15.8 unless the owner asks for a minor.
+
+  Steps: `.github/skills/release/SKILL.md` and `docs/release-guide.md`. Tickets that wait for this release are Blocked and depend on it (`lotar task relationships add DEV-N <this> --kind depends-on`); closing this ticket hands them to @fix to run their checks.
+history:
+- at: 2026-11-26T17:48:58.609873+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

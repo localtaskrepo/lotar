@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:21:29.504789+00:00
-modified: 2026-11-25T17:39:57.021645+00:00
+modified: 2026-11-26T17:48:48.004470+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -291,6 +291,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A947bb4072416ede8dccb89d889752b0b6982a4016f903ec8f9bf732820d8ac20
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6983b0a0fc203bb7c2193948fc5a233166ecf9c20d2eefe1aa49474924401baa
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae960071d43c32cb994af71b582843e1c2aa780d8dbad9c27fd108ed926c8a5ec
+releases:
+- 12
 description: |-
   Standards STD-299 (owner 2026-11-22, his pick verbatim: "Bundle health findings"): one health ticket per repo per day collects that day's findings. The daily `repos.ts --report` run now does that itself (finding `health:<date>`, one section per finding). Agents that file a problem during the day (`lotar add --finding <check>:<subject> --tag health`, about 55 tickets in 72 h besides flaky tests) still get one ticket each: lotar has no way to add a new key to an open ticket.
 
@@ -728,3 +730,8 @@ history:
   - field: relationships
     old: '{"depends_on":["local:LOCA-601"],"related":["standards:STD-299","DEV-821","DEV-830","DEV-832","DEV-833","DEV-834","DEV-798","DEV-824","DEV-863","DEV-864","DEV-789","DEV-836","DEV-849"]}'
     new: '{"depends_on":["local:LOCA-601"],"related":["standards:STD-299","DEV-821","DEV-830","DEV-832","DEV-833","DEV-834","DEV-798","DEV-824","DEV-863","DEV-864","DEV-789","DEV-836","DEV-849","DEV-811"]}'
+- at: 2026-11-26T17:48:48.004470+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

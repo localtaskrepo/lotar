@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T20:12:34.614201+00:00
-modified: 2026-11-25T02:22:56.607343+00:00
+modified: 2026-11-26T17:48:48.161331+00:00
 relationships:
   depends_on:
   - DEV-763
@@ -153,6 +153,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeced1b04e5228831466e9cd5e5b40847be299d3a868889d3e80daab96d8a6ba1
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A42c6f21cbc4db470efa47a8538c852ec26c98bba092340aef9f8aae5c2a138d3
+releases:
+- 12
 description: |-
   Found in the DEV-763 review (2026-11-22).
 
@@ -341,3 +343,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-763"],"related":["DEV-763","DEV-786","DEV-767","DEV-771","DEV-774","DEV-768","DEV-806","DEV-833","DEV-840","DEV-821"]}'
     new: '{"depends_on":["DEV-763"],"related":["DEV-763","DEV-786","DEV-767","DEV-771","DEV-774","DEV-768","DEV-806","DEV-833","DEV-840","DEV-821","DEV-769"]}'
+- at: 2026-11-26T17:48:48.161331+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:10:25.728494+00:00
-modified: 2026-11-26T04:56:14.835219+00:00
+modified: 2026-11-26T17:48:47.956043+00:00
 relationships:
   depends_on:
   - DEV-771
@@ -314,6 +314,8 @@ references:
 - attachment: DEV-798-after-dark-1920.dd45c44dc1cea0c8f428f062dd641af5.png
 - attachment: DEV-798-after-dark-1440.58655bd05ff2063e8dbddb1bc0216d2e.png
 - attachment: DEV-798-after-dark-390.5802e01bdcd7db0bcbf83ce1efc3ab13.png
+releases:
+- 12
 description: |-
   Found in the review of DEV-771 (branch agent/DEV-771, 3333807b1): with 3 tickets in the on-disk queue the All tab shows 'All 0' above the **Waiting in the queue** card listing them (view/pages/AgentJobs.vue:401 counts jobs only). The Queued tab counts jobs waiting for prerequisites too (AgentJobs.vue:406), while the Queued count at the top and docs/help/agent.md say they don't count as queued.
 
@@ -767,3 +769,8 @@ history:
   - field: tags
     old: ui, job-paused, fix-retried, review-returned
     new: ui
+- at: 2026-11-26T17:48:47.956043+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T07:34:05.012147+00:00
-modified: 2026-11-24T16:05:15.366347+00:00
+modified: 2026-11-26T17:48:47.703652+00:00
 relationships:
   blocks:
   - DEV-824
@@ -194,6 +194,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A00eba8331e1b4442199bd2736f308391518047db59474cfa0c61a0898113a84c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa50b0d4d92d6a344c5466c713576a982c93b232e1afe53fe0ea758a6ccb4dbb6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae81eeeffd44cb0fe8b45dd8f03e6c8bcc4538caea7a3597f4a91ed6f40b15c0a
+releases:
+- 12
 description: |-
   Found: merging DEV-765 on 2026-11-21, two full `npm run smoke` runs failed on different tests while load average was 40-48 on 14 cores: run 1 `harness.agent-launcher.smoke.spec.ts` (batch-shim test, 'fixture child did not exit within 20000ms'); run 2 nine tests in `ui.theming`, `harness.server` (occupied port, expected /Failed to bind/), `ui.config-coverage`, `ui.backlog-order`, `ui.filter-panel`, `ui.global-actions` (120 s timeouts) and `harness.failed-test-cleanup` (Tests left playwright temp entries). Each file passes alone (32/32, launcher test in 0.8 s). Related: DEV-779 (same for test:ui).
   Check: `npm run smoke` while the machine is busy.
@@ -408,3 +410,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-824"],"related":["DEV-765","DEV-779","DEV-776","DEV-781","DEV-801","DEV-802","DEV-738","DEV-803","DEV-780","DEV-783","DEV-824"]}'
     new: '{"blocks":["DEV-824"],"related":["DEV-765","DEV-779","DEV-776","DEV-781","DEV-801","DEV-802","DEV-738","DEV-803","DEV-780","DEV-783","DEV-824","DEV-830"]}'
+- at: 2026-11-26T17:48:47.703652+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

@@ -15,6 +15,7 @@ pub mod sprint_analytics;
 pub mod sprint_reports;
 pub mod sprint_timing;
 pub mod sprint_velocity;
+pub mod status_feed;
 pub mod sync_report_service;
 pub mod sync_service;
 pub mod task_timeline;

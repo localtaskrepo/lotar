@@ -3318,6 +3318,29 @@
         }
       }
     },
+    "/api/status": {
+      "get": {
+        "summary": "Status feed of this instance",
+        "description": "One small document for a tool that shows several instances: this instance's running jobs, its agent queue and the tickets HelpNeeded or Blocked, each with an absolute link into this instance's UI. Read-only, no parameters, cheap to call every minute. See docs/help/serve.md#status-feed.",
+        "responses": {
+          "200": {
+            "description": "The status feed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {"data": {"$ref": "#/components/schemas/StatusFeed"}},
+                  "required": ["data"]
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/whoami": {
       "get": {
         "summary": "Current user identity",
@@ -10835,6 +10858,74 @@
           "status": {"type": "string", "nullable": true, "description": "The ticket's status before it was set to Blocked."}
         },
         "required": ["ticket_id", "agent", "parked_at"]
+      },
+      "StatusFeed": {
+        "type": "object",
+        "description": "GET /api/status. Fields are only added, never change meaning; `version` grows with them.",
+        "properties": {
+          "version": {"type": "integer", "description": "Format version, 1."},
+          "instance": {"$ref": "#/components/schemas/StatusInstance"},
+          "generated_at": {"type": "string", "format": "date-time"},
+          "running": {"type": "array", "description": "Jobs running now, oldest first.", "items": {"$ref": "#/components/schemas/StatusRunningJob"}},
+          "queue": {"$ref": "#/components/schemas/StatusQueue"},
+          "waiting": {"type": "array", "description": "Tickets HelpNeeded or Blocked, longest waiting first.", "items": {"$ref": "#/components/schemas/StatusWaitingTicket"}}
+        },
+        "required": ["version", "instance", "generated_at", "running", "queue", "waiting"]
+      },
+      "StatusInstance": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string", "description": "`ui.name`, else the repository's folder name."},
+          "url": {"type": "string", "format": "uri", "description": "The web UI's address: `server.public_url`, else `http://<Host header>`."}
+        },
+        "required": ["name", "url"]
+      },
+      "StatusRunningJob": {
+        "type": "object",
+        "properties": {
+          "job_id": {"type": "string"},
+          "ticket_id": {"type": "string"},
+          "title": {"type": "string", "description": "Empty when the ticket can't be read."},
+          "profile": {"type": "string", "description": "Agent profile (fix, review, merge, ...); empty for a bare runner."},
+          "runner": {"type": "string"},
+          "started_at": {"type": "string", "format": "date-time"},
+          "job_url": {"type": "string", "format": "uri", "description": "The job's log: `<url>/agents?job=<job_id>`."},
+          "ticket_url": {"type": "string", "format": "uri", "description": "`<url>/task/<ticket_id>`."}
+        },
+        "required": ["job_id", "ticket_id", "title", "profile", "runner", "started_at", "job_url", "ticket_url"]
+      },
+      "StatusQueue": {
+        "type": "object",
+        "properties": {
+          "count": {"type": "integer", "description": "Number of entries."},
+          "held": {"type": "boolean", "description": "The queue starts no new job: memory or disk space is short, or the queue is paused."},
+          "held_reason": {"type": "string", "nullable": true, "description": "Why it is held."},
+          "entries": {"type": "array", "description": "Waiting entries in start order, as `lotar agent queue` lists them.", "items": {"$ref": "#/components/schemas/StatusQueueEntry"}}
+        },
+        "required": ["count", "held", "entries"]
+      },
+      "StatusQueueEntry": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {"type": "string"},
+          "profile": {"type": "string", "description": "Agent profile, the kind of job; empty for a bare runner."},
+          "queued_at": {"type": "string", "format": "date-time"},
+          "waits_for": {"type": "string", "description": "What the entry waits for."},
+          "ticket_url": {"type": "string", "format": "uri"}
+        },
+        "required": ["ticket_id", "profile", "queued_at", "waits_for", "ticket_url"]
+      },
+      "StatusWaitingTicket": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {"type": "string"},
+          "title": {"type": "string"},
+          "status": {"type": "string", "enum": ["HelpNeeded", "Blocked"]},
+          "assignee": {"type": "string", "nullable": true, "description": "Who it waits on."},
+          "since": {"type": "string", "format": "date-time", "description": "When it got that status: the date of its question."},
+          "ticket_url": {"type": "string", "format": "uri"}
+        },
+        "required": ["ticket_id", "title", "status", "since", "ticket_url"]
       },
       "AgentJobCancelRequest": {
         "type": "object",

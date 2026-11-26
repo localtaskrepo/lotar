@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T02:40:57.765513+00:00
-modified: 2026-11-26T03:32:17.263218+00:00
+modified: 2026-11-26T17:48:48.749338+00:00
 relationships:
   related:
   - DEV-808
@@ -95,6 +95,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4ccd370f7deef9474d7a8ac5052c860af8776fc0857317e7dd90f1555006eb54
+releases:
+- 12
 description: 'Found 2026-11-22 (DEV-808): with lotar 0.15.6, `lotar --tasks-dir .tasks priority AR-1 High` in a workspace whose rule has `run: ''pwd > out.txt''` fails with "Automation rule ''r'' failed on AR-1: IO error: No such file or directory (os error 2)" and the command never runs. `--tasks-dir ./.tasks`, an absolute path and no flag all work. Likely the run''s working folder is the tasks dir''s parent, which is the empty path for `.tasks`. Check: a test with `--tasks-dir .tasks` and a run that writes a file. Done: the run runs in the workspace root.'
 tags:
 - health
@@ -196,3 +198,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-808","DEV-846","DEV-887","DEV-889"]}'
     new: '{"related":["DEV-808","DEV-846","DEV-887","DEV-889","DEV-860"]}'
+- at: 2026-11-26T17:48:48.749338+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

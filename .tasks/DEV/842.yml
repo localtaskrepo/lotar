@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T17:22:19.506908+00:00
-modified: 2026-11-26T01:30:37.593542+00:00
+modified: 2026-11-26T17:48:49.498800+00:00
 relationships:
   related:
   - DEV-776
@@ -202,6 +202,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac862ff1db012f6c60ec944f429edcf793a121169e64009b3e22ffd95e959d446
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa083705d689638b5d42dc2f74eaf183603326604249803d596b0f1bc71da7dd0
+releases:
+- 12
 description: |-
   Found in the DEV-818 review: the DEV-818 fix job's description edit at 2026-11-23 04:34Z replaced the ticket's whole Found / Done when text with '-'. DEV-776 fixed the same for lotar comment; task edit and add were left out. The job prompt itself tells agents to run lotar task edit <ID> -D ..., so the heredoc form is what they reach for.
 
@@ -390,3 +392,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-776","DEV-818","DEV-832","DEV-791","DEV-809","DEV-845","DEV-819","DEV-777","DEV-876"]}'
     new: '{"related":["DEV-776","DEV-818","DEV-832","DEV-791","DEV-809","DEV-845","DEV-819","DEV-777","DEV-876","DEV-808"]}'
+- at: 2026-11-26T17:48:49.498800+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

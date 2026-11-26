@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T22:44:15.700672+00:00
-modified: 2026-11-26T06:55:18.836825+00:00
+modified: 2026-11-26T17:48:50.033834+00:00
 relationships:
   depends_on:
   - DEV-849
@@ -226,6 +226,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A0f7b2ad21b329c956bc057d49740b709449b6c3e6cfcb28dd8ed0357cb80b3ee
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1a8fde63d3da51b14097b1f1ced5fc01af6d027e69cfab0dfe58d128c01170e4
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aca14a4616e87559135993edbeda6ad81addd1ad1c831e53eae92da62ad605282
+releases:
+- 12
 description: |-
   Found in the DEV-849 review: `from_shown` in `crates/lotar-agent/src/services/agent_job_service/t3_state.rs` maps T3 status `completed` with no `activeRunId` to `finished`. A thread that ended its turn on `t3_background_wait` (non-empty `pendingBackgroundTasks` or `blockedOnThreadWait: true` in `t3 thread show --json`) is still working: its lotar job ends only after the wake run. The row then says Finished while the job runs. T3 really shows such a thread as `status: waiting` (review 2026-11-25), sometimes `completed`.
 
@@ -484,3 +486,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-849"],"related":["DEV-849","DEV-729","DEV-853","DEV-876"]}'
     new: '{"depends_on":["DEV-849"],"related":["DEV-849","DEV-729","DEV-853","DEV-876","DEV-865"]}'
+- at: 2026-11-26T17:48:50.033834+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

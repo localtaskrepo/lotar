@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T07:46:13.287811+00:00
-modified: 2026-11-26T03:47:07.605834+00:00
+modified: 2026-11-26T17:48:48.980612+00:00
 relationships:
   depends_on:
   - DEV-768
@@ -242,6 +242,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9dbdf67ec25cdf70803ba1ac5468fb767e2d10d33c420300a4dc2c25585140ca
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aaf70e148e6a38633840acb6c2942e6b2a97b2579f2c0601ab4065189f094b29d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7fa7017131369ba7ed320b3262dde8b3dbc5f28e43bc8a3930e741ccf26ee73b
+releases:
+- 12
 description: |-
   Found in the DEV-768 review: `f6a3671d2` (now `a7d97ede2` on `agent/DEV-768`) adds `agents.<name>.description`, shown under the name and matched by the picker's search, but two docs still describe the state before it.
 
@@ -569,3 +571,8 @@ history:
   - field: tags
     old: docs, job-paused, fix-retried
     new: docs
+- at: 2026-11-26T17:48:48.980612+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

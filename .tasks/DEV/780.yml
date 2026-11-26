@@ -4,7 +4,7 @@ priority: Medium
 type: Feature
 reporter: triage
 created: 2026-11-22T00:32:24.998213+00:00
-modified: 2026-11-23T03:32:08.556149+00:00
+modified: 2026-11-26T17:48:47.460440+00:00
 relationships:
   related:
   - DEV-754
@@ -127,6 +127,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4daf3b5b2d12896a61a7f9fca80a3131f0ea4b09b3f1277a7366a2ee06bf4c7c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A974d60a3d140702c1e709d552928bdcf5b95add9333671ad6a9385812a48072e
+releases:
+- 12
 description: 'Found: .lotar-worktrees/lotar/DEV-754 holds only target/ and git worktree list doesn''t show it; jobs job-20261121T211326.368Z-110 and job-20261122T003045.021Z-125 failed with ''already exists''. Check: git worktree add succeeds for a ticket whose folder has no worktree. Done: leftover folder removed, or worktree setup clears an empty leftover folder.'
 tags:
 - health
@@ -314,3 +316,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-754","DEV-765","DEV-770","DEV-725","DEV-793","DEV-779","DEV-788","DEV-787","DEV-763","DEV-792"]}'
     new: '{"related":["DEV-754","DEV-765","DEV-770","DEV-725","DEV-793","DEV-779","DEV-788","DEV-787","DEV-763","DEV-792","DEV-797"]}'
+- at: 2026-11-26T17:48:47.460440+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

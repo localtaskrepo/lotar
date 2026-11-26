@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-24T16:08:21.742893+00:00
-modified: 2026-11-26T16:56:21.506478+00:00
+modified: 2026-11-26T17:48:49.205376+00:00
 relationships:
   related:
   - DEV-604
@@ -165,6 +165,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5ff06e8317883aa88fd31e0eb8d7df2aa53ee9d651f0dbc2a23a0118cdec8a29
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab163d45f911817cfc6f0f956a14a22c5ac52b3c58625de84e773bf21b6bb297b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A352edfd1f3632d5e987af7b932a3512056876182c8a61cbdd0f55f2a67cdd250
+releases:
+- 12
 description: |-
   ## Found (communication review, 2026-11-24)
 
@@ -406,3 +408,8 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T17:48:49.205376+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

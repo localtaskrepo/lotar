@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T02:40:59.050764+00:00
-modified: 2026-11-25T19:54:07.281556+00:00
+modified: 2026-11-26T17:48:48.804240+00:00
 relationships:
   related:
   - DEV-808
@@ -82,6 +82,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad6d87720ac3c91fa1b717273d8d97acda5d66e2be7041353e7ba424919e7f577
+releases:
+- 12
 description: 'Found 2026-11-22 (DEV-808): 5 inbox answers posted at once to a `lotar serve` with standards'' INBOX/STD rules. One relay''s `lotar comment STD-1` failed at once with "A pending task/sprint transaction journal exists at <root>/.txn-pending.json; a crashed multi-file mutation is waiting to be rolled back", while the other relays ran. Nothing had crashed. refuse_under_pending_transaction (crates/lotar-core/src/storage/safety.rs) assumes "journals are only created by writers that hold this same lock", but the task lock is per project folder (STD/.task.lock) and the journal is per workspace, so a live transaction from another project''s writer (here INBOX, `lotar status INBOX-n Done`) looks like a crashed one. Check: two processes, one holding a transaction in project A, the other commenting in project B, must both succeed. Done: a live journal makes other writers wait (or doesn''t apply), and only a crashed one is refused.'
 tags:
 - health
@@ -165,3 +167,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-808"]}'
     new: '{"related":["DEV-808","DEV-769"]}'
+- at: 2026-11-26T17:48:48.804240+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

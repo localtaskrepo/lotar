@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T22:24:48.000467+00:00
-modified: 2026-11-24T23:16:01.373220+00:00
+modified: 2026-11-26T17:48:48.506915+00:00
 relationships:
   blocks:
   - DEV-831
@@ -397,6 +397,8 @@ comments:
     Nothing to merge: `agent/DEV-816` is in `main` already.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac7caf16d93d900e94ee980dba78bb581cdef0f79576babed2575fefcfb41922e
+releases:
+- 12
 description: |-
   Owner 2026-11-22 (chief of staff thread): "Let's change the rule for releasing. Only minor changes need my okay. Patch level updates can always be done". Scope (picker): every repo; a major release asks him too. Shared rule: standards global/AGENTS.md ("publishing but patch releases"), docs/decisions/2026-11-22-releases.md (STD-311).
 
@@ -648,3 +650,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-831"],"related":["DEV-804","DEV-817","DEV-831","DEV-840","DEV-791","DEV-767"]}'
     new: '{"blocks":["DEV-831"],"related":["DEV-804","DEV-817","DEV-831","DEV-840","DEV-791","DEV-767","DEV-778"]}'
+- at: 2026-11-26T17:48:48.506915+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T04:07:55.489110+00:00
-modified: 2026-11-25T05:04:48.144980+00:00
+modified: 2026-11-26T17:48:48.861758+00:00
 relationships:
   depends_on:
   - DEV-788
@@ -408,6 +408,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Affda45e3048e5d634241bc902b9629de1ed00f8394caeeff9421234739b70cb3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2bedcc571ade6a085bbf5786d2a3a74b8b66ed4ff28def6e122e3e4d5ed859ba
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6d99e2afbdb832004d993b34b5cb169d42a5559a91561d24175231307c14c7db
+releases:
+- 12
 description: 'Found: reviewing DEV-788 (commit 830fe5ba3). The new test in smoke/tests/harness.server.smoke.spec.ts:196 passes 3/3 with the stderrClosed(child.stderr) call in smoke/helpers/server.ts:267 removed, so it does not show the exit-before-stderr race it names. The fix agent said so too. Check: remove that call, run npx vitest run --config smoke/vitest.config.ts smoke/tests/harness.server.smoke.spec.ts -t ''whole stderr''. Done: the test fails without the wait (for example a child whose stderr pipe is still written after its exit), or the test is reworded as a plain regression check.'
 tags:
 - health
@@ -728,3 +730,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-788","local:LOCA-601"],"related":["DEV-788","DEV-832"]}'
     new: '{"depends_on":["DEV-788","local:LOCA-601"],"related":["DEV-788","DEV-832","DEV-800","DEV-802","DEV-838"]}'
+- at: 2026-11-26T17:48:48.861758+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

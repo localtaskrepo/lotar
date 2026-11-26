@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T22:17:22.622204+00:00
-modified: 2026-11-26T17:31:09.967403+00:00
+modified: 2026-11-26T17:48:15.114273+00:00
 relationships:
   blocks:
   - DEV-893
@@ -15,6 +15,7 @@ relationships:
   - DEV-804
   - DEV-882
   - DEV-896
+  - DEV-797
 comments:
 - date: 2026-11-26T02:11:58.070807+00:00
   author: claude
@@ -262,3 +263,9 @@ history:
   - field: status
     old: HelpNeeded
     new: Todo
+- at: 2026-11-26T17:48:15.114273+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801","DEV-804","DEV-882","DEV-896"]}'
+    new: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801","DEV-804","DEV-882","DEV-896","DEV-797"]}'

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T03:06:52.324630+00:00
-modified: 2026-11-22T22:48:51.391173+00:00
+modified: 2026-11-26T17:48:47.508684+00:00
 relationships:
   related:
   - DEV-726
@@ -114,6 +114,8 @@ comments:
     next: 'None: Done'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1924bde0bfa0885fd85e4266862a953a8495f52ea6d26e813016d1eae3ce1bd9
+releases:
+- 12
 description: |-
   Evidence 2026-11-21 (owner asked to speed the queue up; he picked this, 2026-11-21 ~19:00 PST): last 48 h 55 tickets, 189 jobs, 82.5 slot-hours on 3 slots; merge agent 34 jobs, median 34 min, 33 h; flaky-test tickets 27 h (DEV-748..761); load average 17-20 on 14 cores, 36 seen (DEV-755). Nearly every merge-agent job came from lotar's own merge failing a check that passes alone: sse_delivers_during_a_steady_stream_of_events (DEV-726, 730, 740, 744), the 'Created task' test (DEV-734, 742, 748-751), vitest worker timeouts (DEV-752), smoke timeouts (DEV-756, 761). Do: when a check fails, rerun that check once (no other check of this merge running) and merge if it passes; log both runs. Hand to @merge only when the rerun fails too or the rebase conflicts. Done when: a test shows a check that fails once then passes lands without a merge agent; the job log names the rerun.
 
@@ -260,3 +262,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756","DEV-786","DEV-761","DEV-725","DEV-738","DEV-784","DEV-762","DEV-788"]}'
     new: '{"related":["DEV-726","DEV-734","DEV-748","DEV-752","DEV-755","DEV-756","DEV-786","DEV-761","DEV-725","DEV-738","DEV-784","DEV-762","DEV-788","DEV-793"]}'
+- at: 2026-11-26T17:48:47.508684+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

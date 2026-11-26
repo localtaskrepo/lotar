@@ -4,7 +4,7 @@ priority: Medium
 type: Feature
 reporter: claude
 created: 2026-11-25T05:05:15.164063+00:00
-modified: 2026-11-26T15:09:56.677954+00:00
+modified: 2026-11-26T17:48:50.191282+00:00
 relationships:
   blocks:
   - DEV-891
@@ -166,6 +166,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad1b755a5ab91c95e3b823fcce51ab6579ef57c31453ec859b3d0d1fbc4d71942
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8ddcd2dcc4c43f0e3b898aa2d3ff0ab186958018063caaf2bfdf445b3fae9f9c
+releases:
+- 12
 description: |-
   `lotar add --finding <key> --bundle health` (DEV-800) puts a new finding into the day's open bundle only while no agent job holds it. With the shared rules, a health bundle starts its fix agent as soon as it is created, so a bundle will rarely collect more than one finding. STD-299's goal, one health ticket per repo per day, then isn't met for findings agents file.
 
@@ -370,3 +372,8 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T17:48:50.191282+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

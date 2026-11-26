@@ -1,11 +1,11 @@
 title: 'Checks: full suites once per ticket, at merge, and only one full suite on the machine at a time'
-status: Merging
+status: Done
 priority: High
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:02:53.318852+00:00
-modified: 2026-11-26T17:30:51.594168+00:00
+modified: 2026-11-26T17:48:24.250458+00:00
 relationships:
   blocks:
   - DEV-801
@@ -26,6 +26,7 @@ relationships:
   - DEV-853
   - DEV-881
   - DEV-882
+  - DEV-883
 comments:
 - date: 2026-11-22T21:30:02.840094+00:00
   author: claude
@@ -236,6 +237,34 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-797` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service.rs`; lotar aborted the rebase, `agent/DEV-797` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-26T17:48:14.818511+00:00
+  author: claude
+  text: |-
+    Merged into local `main` as `3d83a25ad`, not pushed yet.
+
+    - Rebase conflict in `crates/lotar-agent/src/services/agent_job_service.rs`, one line: main gave `job_env` two new arguments (`&profile, runner_kind`), the branch made `env` mutable to add `LOTAR_CHECK_LOCK_HELD`. I kept both.
+    - `npm ci`, `lint:agent`, `test:agent` (nextest 2589 passed) and `smoke` (411 passed) all passed on `311da2ed7`. Then main fast-forwarded and I amended the open `.tasks` changes in (`3d83a25ad`).
+    - Trust: the merge changed no rule or config files, so I didn't run `lotar trust`.
+    - Push: local `main` is 3 ahead of and 1 behind `origin/main` (`71791a991 DEV-804 Release v0.15.7`), so git would refuse the push. Triage has already given DEV-882/DEV-883 (@fix) the job of rebasing local `main` onto `origin/main` and pushing. That rebase pushes `3d83a25ad` too, so I left the main checkout alone.
+  report:
+    commits:
+    - hash: 3d83a25ad
+      what: DEV-797 lock hold through hand-off, merge agent takes the lock, wait comment
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: nextest 2589/2589, view 1623/1623
+    - command: npm run -s smoke
+      result: passed
+      reason: 411/411
+    - command: git push
+      result: not_run
+      reason: local main is behind origin/main by 71791a991 (DEV-804 release); the rebase onto it is DEV-882/DEV-883's step
+    next: DEV-882/DEV-883 fix job rebases local main onto origin/main and pushes, DEV-797 included
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A24997d74fd08e2c2eb74c51480fcdf71764ecf6fa3b20ccc8e7adbbd95e01ac8
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abbebea19908acedec9b979da44631b9668a7b16d048b62abbf9f92ab411f1264
@@ -579,3 +608,19 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T17:48:14.818511+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T17:48:15.113336+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873","DEV-884","DEV-880","DEV-853","DEV-881","DEV-882"]}'
+    new: '{"blocks":["DEV-801","DEV-867","DEV-868"],"related":["DEV-763","DEV-780","DEV-787","DEV-792","DEV-867","DEV-868","DEV-832","DEV-784","DEV-873","DEV-884","DEV-880","DEV-853","DEV-881","DEV-882","DEV-883"]}'
+- at: 2026-11-26T17:48:24.250458+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

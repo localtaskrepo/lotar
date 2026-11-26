@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T06:13:38.957747+00:00
-modified: 2026-11-24T16:08:02.731252+00:00
+modified: 2026-11-26T17:48:47.653763+00:00
 relationships:
   related:
   - DEV-772
@@ -92,6 +92,8 @@ comments:
     next: 'None: landed; the temp leak is tracked on DEV-801'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5f4408af6858c3a0bb37fa97e5f4fd3186eac9d65a094f00a7885b3a0f55baa6
+releases:
+- 12
 description: 'Found in the review of DEV-772 (2026-11-21): `crates/lotar-lib/tests/agent_automation_integration_test.rs:2376` waits `wait_for_completed_jobs(&created.id, 3, 6000)` (raised to the 30 s `WAIT_FLOOR_MS`) and then 10 s for Done, for the same implement, test, merge pipeline whose waits DEV-772 moved to `JOB_END_LIMIT_MS`. Not seen failing yet. Check: `npm run -s test:agent` at load average 35+. Done: waits for tickets or jobs that three agent jobs move use `JOB_END_LIMIT_MS`.'
 tags:
 - health
@@ -188,3 +190,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-772","DEV-801","DEV-779","DEV-780","DEV-797"]}'
     new: '{"related":["DEV-772","DEV-801","DEV-779","DEV-780","DEV-797","DEV-791"]}'
+- at: 2026-11-26T17:48:47.653763+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

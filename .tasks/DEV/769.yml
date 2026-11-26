@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T20:47:12.959394+00:00
-modified: 2026-11-26T00:58:33.285983+00:00
+modified: 2026-11-26T17:48:47.211917+00:00
 relationships:
   depends_on:
   - DEV-766
@@ -330,6 +330,8 @@ references:
 - attachment: after-instructions-open-task-thread-light-1440.5349b55f318642edc5e4384687ab7e49.png
 - attachment: after-instructions-open-task-thread-light-1920.6413124ee0e8b56ae91123c1ff4557d6.png
 - attachment: after-instructions-open-task-thread-light-390.19ce38ba4ae31db850f8f81c066f2bed.png
+releases:
+- 12
 description: |-
   The job log viewer (`view/components/AgentJobLog.vue`, used by `view/pages/AgentJobs.vue` and the task panel thread in `view/components/task-panel/TaskPanelTimelineTab.vue`) is one flat list with no filter or search. The owner asked on 2026-11-21 to "look at some of the project logs to see what else could maybe be done to make it easier to understand what's going [on], how to filter down to the data you need, and be smart about the UI and UX".
 
@@ -959,3 +961,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-766","DEV-767"],"blocks":["DEV-859"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859","DEV-774","DEV-805","DEV-875","DEV-789","DEV-803","DEV-807","DEV-811","DEV-823","DEV-777"]}'
     new: '{"depends_on":["DEV-766","DEV-767"],"blocks":["DEV-859"],"related":["harnessmux:HARN-15","DEV-768","DEV-832","DEV-836","DEV-849","DEV-859","DEV-774","DEV-805","DEV-875","DEV-789","DEV-803","DEV-807","DEV-811","DEV-823","DEV-777","DEV-798"]}'
+- at: 2026-11-26T17:48:47.211917+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

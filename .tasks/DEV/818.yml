@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T22:45:30.423583+00:00
-modified: 2026-11-26T01:22:36.826464+00:00
+modified: 2026-11-26T17:48:48.560004+00:00
 relationships:
   related:
   - DEV-789
@@ -209,6 +209,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A21c093248c4aae62a7aad5cd3e16a2804c2430af1d91e5ceeadf55daad4f3035
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7feb52b860f4446b6e8cc9eec1771469a9c51b9975e416f5b5e91b9942206808
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeb844846ff0b392d0aaef50525b40e15c09db52466754f46f50fc27141003393
+releases:
+- 12
 description: |-
   Found in the review of DEV-789.
 
@@ -458,3 +460,8 @@ history:
   - field: tags
     old: agent, health, job-paused, review-returned, fix-retried
     new: agent, health
+- at: 2026-11-26T17:48:48.560004+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

@@ -1,11 +1,11 @@
 title: comment_checks_lock took comment_merge's doc comment
-status: Blocked
+status: InProgress
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@fix-retry'
 created: 2026-11-25T07:45:42.688933+00:00
-modified: 2026-11-26T01:04:43.419642+00:00
+modified: 2026-11-26T17:48:25.744990+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -91,3 +91,9 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T17:48:25.744990+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress

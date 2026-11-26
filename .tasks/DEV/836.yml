@@ -4,7 +4,7 @@ priority: Medium
 type: Feature
 reporter: claude
 created: 2026-11-24T16:20:40.092908+00:00
-modified: 2026-11-26T14:08:41.599666+00:00
+modified: 2026-11-26T17:48:49.256928+00:00
 relationships:
   related:
   - DEV-626
@@ -208,6 +208,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afdff923307b2151f64ebb64163c5e4b967df1a53cbcb71561098f28d975cf660
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6e1b6cd8ad7b5209381a5abaeda94bee06a34b3812d95b9f2cf16bf0f890292f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8531e9e9d417d7977cb5f76d8825ae085b657f2f319c5f848681dde63055ddb
+releases:
+- 12
 description: 'Found: on 2026-11-24 at 16:00 UTC, T3 Code''s limit-resume message (''Continue where you left off.'') restarted 10 STD-328 fix threads from jobs filed hourly on 2026-11-23 (07:51 to 18:30). All of them run Opus in /Users/mallox/Development/.lotar-worktrees/standards/STD-328, with no lotar job (lotar agent list-jobs shows only failed jobs). lotar commented ''Stop it in T3 Code'', but nobody acts on that, and the threads would race on one worktree and on its dependency updates. DEV-626 (Done) covered resume after a restart, not resume after a limit. Check: t3_thread_list titleContains STD-328 shows several threads running at once. Done when a limit resume runs at most one thread per ticket (the newest tracked job, or none while the ticket is Blocked), and lotar''s job retries don''t leave a T3 thread behind that T3 can resume later.'
 tags:
 - health
@@ -449,3 +451,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-626","DEV-835","DEV-769","DEV-800","DEV-810","DEV-811","DEV-876"]}'
     new: '{"related":["DEV-626","DEV-835","DEV-769","DEV-800","DEV-810","DEV-811","DEV-876","DEV-899"]}'
+- at: 2026-11-26T17:48:49.256928+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

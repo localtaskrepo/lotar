@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T21:14:20.898265+00:00
-modified: 2026-11-25T12:41:44.074721+00:00
+modified: 2026-11-26T17:48:48.330683+00:00
 relationships:
   blocks:
   - DEV-828
@@ -140,6 +140,8 @@ references:
 - attachment: dev809-before-light-1440.ba28e5042307c199162b0cd553995b5a.png
 - attachment: dev809-before-light-1920.bb28c64e95bcf4145f89839f5c44d2ec.png
 - attachment: dev809-before-light-390.0aab3838f25d723f9a136b84361a71c2.png
+releases:
+- 12
 description: |-
   Owner 2026-11-22: "You can't edit an existing question? I thought we support (soft) deletes. If not ... file as a feature request on lotar."
 
@@ -434,3 +436,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-828"],"related":["DEV-810","DEV-828","DEV-801","DEV-791","DEV-807","DEV-842","DEV-845"]}'
     new: '{"blocks":["DEV-828"],"related":["DEV-810","DEV-828","DEV-801","DEV-791","DEV-807","DEV-842","DEV-845","DEV-832"]}'
+- at: 2026-11-26T17:48:48.330683+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

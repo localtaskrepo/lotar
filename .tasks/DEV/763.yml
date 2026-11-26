@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T20:23:21.712446+00:00
-modified: 2026-11-23T06:12:32.297287+00:00
+modified: 2026-11-26T17:48:47.055660+00:00
 relationships:
   blocks:
   - DEV-805
@@ -105,6 +105,8 @@ comments:
     next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ac80fce578d49cd6af0680151dbd45f0fa3adbe1305fd23d0db8488ee866016
+releases:
+- 12
 description: |-
   The owner asked (2026-11-21): can T3 jobs get stuck? About 3 should be active, and he doesn't know how many run through lotar on other harnesses.
 
@@ -301,3 +303,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-805"],"related":["DEV-755","DEV-770","DEV-725","DEV-729","DEV-805","DEV-780","DEV-771","DEV-797","DEV-803"]}'
     new: '{"blocks":["DEV-805"],"related":["DEV-755","DEV-770","DEV-725","DEV-729","DEV-805","DEV-780","DEV-771","DEV-797","DEV-803","DEV-806"]}'
+- at: 2026-11-26T17:48:47.055660+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

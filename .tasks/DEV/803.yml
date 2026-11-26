@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:27:28.533467+00:00
-modified: 2026-11-25T19:54:07.279495+00:00
+modified: 2026-11-26T17:48:48.102053+00:00
 relationships:
   related:
   - DEV-738
@@ -121,6 +121,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A403495f232f793ff0dd6be6046a5ba2fa34cf84d94311e60290786b09dd57251
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A87107c8b9f73647db9021bfb49bef370260407e08906c0e13e8ff081abf38875
+releases:
+- 12
 description: |-
   Found in the DEV-738 review (filed there as DEV-788 in its worktree, an ID main already had, see DEV-802): docs/help/automation.md:230 (job_paused, from DEV-739) says a taken-over job that can't resume its session runs again in a new one, 'a job with nothing to run again fails'. Since DEV-738 (e343b4e33, on main) a t3 job fails there too, so its job_failed rules run, not job_paused. Check: read the job_paused line against docs/help/agent.md (Jobs whose process died).
 
@@ -257,3 +259,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-738","DEV-739","DEV-788","DEV-802","DEV-763"]}'
     new: '{"related":["DEV-738","DEV-739","DEV-788","DEV-802","DEV-763","DEV-769"]}'
+- at: 2026-11-26T17:48:48.102053+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

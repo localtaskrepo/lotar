@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T21:53:12.043089+00:00
-modified: 2026-11-26T01:03:36.485727+00:00
+modified: 2026-11-26T17:48:48.455900+00:00
 relationships:
   blocks:
   - DEV-808
@@ -392,6 +392,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abd8a3d74b5d576a0f613d6baed1c7bc8a33dcde7a18ac90585f463926f291532
+releases:
+- 12
 description: |-
   Found 2026-11-22: on all six lotar 0.15.6 servers (launch agents, started 11:28) /api/files/resolve and /api/files/content never answer, so file names in tickets aren't links. /api/tasks/get answers in 0.04 s. A fresh `lotar serve` on the same tasks dir, started from a terminal, serves /api/files/content in 15 ms.
 
@@ -644,3 +646,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-808"],"related":["DEV-813","DEV-814","DEV-768","DEV-808","DEV-784","DEV-837"]}'
     new: '{"blocks":["DEV-808"],"related":["DEV-813","DEV-814","DEV-768","DEV-808","DEV-784","DEV-837","DEV-825"]}'
+- at: 2026-11-26T17:48:48.455900+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

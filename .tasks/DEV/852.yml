@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T21:03:41.684865+00:00
-modified: 2026-11-26T02:14:43.540877+00:00
+modified: 2026-11-26T17:48:49.884002+00:00
 relationships:
   blocks:
   - DEV-796
@@ -110,6 +110,8 @@ comments:
       reason: 411/411 after moving ui.relationships to wall-clock
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae300be0eb1776a74acd7f47cd42c1d251db1f4df2ca39cae4f189033f9da6082
+releases:
+- 12
 description: |-
   A rule's `comment` action writes plain text only, so a rule that asks a person a choice has to shell out: `run: lotar comment --question ... --option ...`, which needs `lotar trust`. Found while drafting DEV-796 (built-in `agent-team` template): a shipped template can't rely on `run`, so its questions come out as prose without options. The owner chose to fix this first (DEV-796, 2026-11-24: "First fix the lotar gaps (question comments in rules, job reporter), then build").
 
@@ -302,3 +304,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-796","DEV-878","DEV-879"],"related":["DEV-796","DEV-488","DEV-851","DEV-878","DEV-879","DEV-853"]}'
     new: '{"blocks":["DEV-796","DEV-878","DEV-879"],"related":["DEV-796","DEV-488","DEV-851","DEV-878","DEV-879","DEV-853","DEV-884"]}'
+- at: 2026-11-26T17:48:49.884002+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

@@ -1215,6 +1215,90 @@ pub struct AgentQueueStats {
     pub max_parallel: Option<usize>,
 }
 
+/// `GET /api/status` (DEV-881): this instance's running jobs, its agent queue
+/// and the tickets that wait for someone, for a tool that shows several
+/// instances side by side. Every link is absolute.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct StatusFeed {
+    /// Format version; grows when fields are added, changes meaning never.
+    pub version: u32,
+    pub instance: StatusInstance,
+    /// When this document was made (RFC 3339).
+    pub generated_at: String,
+    /// The jobs running now, oldest first.
+    pub running: Vec<StatusRunningJob>,
+    pub queue: StatusQueue,
+    /// Tickets HelpNeeded or Blocked, longest waiting first.
+    pub waiting: Vec<StatusWaitingTicket>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct StatusInstance {
+    /// `ui.name`, else the repository's folder name.
+    pub name: String,
+    /// The web UI's address: `server.public_url`, else the address the request was sent to.
+    pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct StatusRunningJob {
+    pub job_id: String,
+    pub ticket_id: String,
+    /// The ticket's title; empty when the ticket can't be read.
+    pub title: String,
+    /// The agent profile (fix, review, merge, ...); empty for a bare runner.
+    pub profile: String,
+    pub runner: String,
+    pub started_at: String,
+    /// The job's log in this instance's UI.
+    pub job_url: String,
+    pub ticket_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct StatusQueue {
+    /// Number of entries.
+    pub count: usize,
+    /// The queue starts no new job: memory is short, or the queue is paused.
+    pub held: bool,
+    /// Why it is held.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub held_reason: Option<String>,
+    /// The waiting entries in start order, as `lotar agent queue` lists them.
+    pub entries: Vec<StatusQueueEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct StatusQueueEntry {
+    pub ticket_id: String,
+    /// The agent profile, the kind of job (fix, review, merge, ...); empty for a bare runner.
+    pub profile: String,
+    pub queued_at: String,
+    /// What the entry waits for.
+    pub waits_for: String,
+    pub ticket_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct StatusWaitingTicket {
+    pub ticket_id: String,
+    pub title: String,
+    /// `HelpNeeded` or `Blocked`.
+    pub status: String,
+    /// Who it waits on.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub assignee: Option<String>,
+    /// When it got that status: the date of its question (RFC 3339).
+    pub since: String,
+    pub ticket_url: String,
+}
+
 /// List of available agent profiles
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]

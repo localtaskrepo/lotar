@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T22:50:59.233215+00:00
-modified: 2026-11-26T00:03:42.465498+00:00
+modified: 2026-11-26T17:48:50.092491+00:00
 relationships:
   depends_on:
   - DEV-769
@@ -161,6 +161,8 @@ references:
 - attachment: dev859-after-dark-1920.07aad0abebc379db8095af95e97a19c6.webp
 - attachment: dev859-after-dark-1440.5cab86c86e02085e4bedf9aad2861eac.webp
 - attachment: dev859-after-dark-390.86cf8ea4d64db521b5bbe89f990c9cd0.webp
+releases:
+- 12
 description: |-
   Found in the DEV-769 review: searching a job log for a word that only appears in a tool call's output (for example `npm`) opens the Tools group and counts "3 matches", but each call stays folded, so its output and the highlight are hidden. `groupOpen` in `view/components/AgentJobLog.vue` opens the group; `view/components/AgentJobToolCall.vue` opens a call only when it failed.
 
@@ -403,3 +405,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-769"],"related":["DEV-769","DEV-880"]}'
     new: '{"depends_on":["DEV-769"],"related":["DEV-769","DEV-880","DEV-777"]}'
+- at: 2026-11-26T17:48:50.092491+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

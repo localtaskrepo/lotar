@@ -3,8 +3,9 @@ status: Blocked
 priority: Medium
 type: Chore
 reporter: claude
+assignee: '@fix'
 created: 2026-11-22T19:22:12.213895+00:00
-modified: 2026-11-26T17:30:29.123036+00:00
+modified: 2026-11-26T17:48:24.820212+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -221,3 +222,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832"]}'
     new: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896"]}'
+- at: 2026-11-26T17:48:24.820212+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

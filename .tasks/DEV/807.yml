@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T20:45:46.748448+00:00
-modified: 2026-11-25T19:54:07.279881+00:00
+modified: 2026-11-26T17:48:48.275672+00:00
 relationships:
   depends_on:
   - DEV-767
@@ -252,6 +252,8 @@ references:
 - attachment: DEV-807-after-light-1440.76b711064ba9a10443270941493cfeb6.png
 - attachment: DEV-807-after-light-1920.add2592378e17be06d5d674b704ff31e.png
 - attachment: DEV-807-after-light-390.1cfb0a58d0c6ce5279598c459e4ed39c.png
+releases:
+- 12
 description: |-
   Found in the DEV-767 review (f384ce022).
 
@@ -571,3 +573,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-767"],"related":["DEV-767","DEV-809"]}'
     new: '{"depends_on":["DEV-767"],"related":["DEV-767","DEV-809","DEV-769"]}'
+- at: 2026-11-26T17:48:48.275672+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

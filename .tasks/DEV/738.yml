@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-20T20:32:05.812565+00:00
-modified: 2026-11-22T19:37:31.081079+00:00
+modified: 2026-11-26T17:48:46.954226+00:00
 relationships:
   depends_on:
   - DEV-734
@@ -152,6 +152,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8e00b511ae7a936e7eab274a7e6c9b20d70ffb41671cd32ad36e0d96f9cc7ab6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4c3058150474b974691f040dd630f743ca2dae8ae1ac8d27c0e9bdd4a96edb97
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa7d00ad34d4bad6293aa0383dbdf38ecff19484be6e1722b7678312aef383b7b
+releases:
+- 12
 description: |-
   Found in the DEV-734 review (2026-11-20): `resume_session_to_end` (`crates/lotar-agent/src/services/agent_job_service.rs:2169`) now queues any taken-over job whose session can't be opened again with `session: fresh`. For a `t3` job the T3 Code thread keeps running in T3 Code (docs/help/agent.md: the takeover follows it, and starts no thread when it can't tell whether one exists, as that could be a second one). When only harnessmux's record is gone (the test `a_taken_over_job_whose_session_cant_be_resumed_runs_again` in `dev510_t3_session_test.rs` does exactly this), the retry starts a second thread next to the first. Check: take over a t3 job whose harnessmux session record is deleted while its thread still runs. Done: lotar starts no second thread then (fails as before, or finds the thread by its title) and the docs say which.
 
@@ -404,3 +406,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-734"],"related":["DEV-734","DEV-757","DEV-766","DEV-775","DEV-776","DEV-781","DEV-802","DEV-788","DEV-803"]}'
     new: '{"depends_on":["DEV-734"],"related":["DEV-734","DEV-757","DEV-766","DEV-775","DEV-776","DEV-781","DEV-802","DEV-788","DEV-803","DEV-783"]}'
+- at: 2026-11-26T17:48:46.954226+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

@@ -132,6 +132,7 @@ Exactly one case does not fail on a busy port: when **no** source configured a p
 - `GET /api/projects/list` - List projects
 - `GET /api/projects/stats?project=PREFIX` - Project stats
 - `GET /api/whoami` - Resolve the identity that auto-populates reporter/assignee fields.
+- `GET /api/status` - This instance's [status feed](#status-feed): running jobs, agent queue and the tickets that wait for someone.
 - Sprint endpoints (`/api/sprints/*`) expose creation, listing, metrics, and cleanup flows (see `docs/help/sprints.md` for the full matrix).
 - Release endpoints (`/api/releases/*`) create, list, fill and release releases (see [Releases](./releases.md)).
 
@@ -148,6 +149,34 @@ Exactly one case does not fail on a busy port: when **no** source configured a p
 		- Emits `:heartbeat` comments periodically when idle to keep connections alive
 		- A filesystem watcher monitors `.tasks/**` and emits `project_changed` events whenever YAML files are added/modified/removed, ensuring the UI refreshes even when tasks are edited outside the browser.
 	- Testing aids: set `LOTAR_SSE_READY=1` and pass `?ready=1` to receive a one-time `ready` event when the connection is established (used by the smoke suite).
+
+### Status feed
+
+`GET /api/status` returns one small document about this instance, for a tool that shows several instances side by side and links into each one's UI. It knows nothing about other instances and needs no configuration. It reads only the jobs in memory, the job records and the queue's state; the waiting tickets come from a list the task events keep current, so it is cheap to call every minute.
+
+```json
+{ "data": {
+  "version": 1,
+  "instance": { "name": "lotar", "url": "https://lotar.example.com" },
+  "generated_at": "2026-11-25T22:00:00Z",
+  "running": [ { "job_id": "job-1", "ticket_id": "DEV-12", "title": "Fix the login", "profile": "fix", "runner": "t3",
+                 "started_at": "2026-11-25T21:40:00Z", "job_url": "https://lotar.example.com/agents?job=job-1",
+                 "ticket_url": "https://lotar.example.com/task/DEV-12" } ],
+  "queue": { "count": 1, "held": true, "held_reason": "waiting for memory: ...",
+             "entries": [ { "ticket_id": "DEV-14", "profile": "review", "queued_at": "2026-11-25T21:50:00Z",
+                            "waits_for": "waiting for memory: ...", "ticket_url": "https://lotar.example.com/task/DEV-14" } ] },
+  "waiting": [ { "ticket_id": "DEV-9", "title": "Pick a name", "status": "HelpNeeded", "assignee": "mallox",
+                 "since": "2026-11-25T20:00:00Z", "ticket_url": "https://lotar.example.com/task/DEV-9" } ]
+} }
+```
+
+- `version`: the format's version. New fields may be added; existing ones keep their meaning. Ignore fields you don't know.
+- `instance.name`: `ui.name`, else the repository's folder name. `instance.url`: `server.public_url`, else `http://` and the request's `Host`. Every link starts with it.
+- `running`: the jobs running now in any process for this tasks directory, oldest first; `profile` is the agent profile (empty for a bare runner) and `job_url` opens the job's log on the Agents page.
+- `queue`: the waiting entries in start order, as `lotar agent queue` lists them, with what each waits for. `held` is true while new jobs wait for memory or disk space or the queue is paused, and `held_reason` says why (several reasons joined by `; `).
+- `waiting`: tickets HelpNeeded or Blocked, longest waiting first, with `assignee` (who it waits on) and `since` (when it got that status, the date of its question).
+
+Access is as for the other endpoints (see [Host checks](#host-checks)): a program on the same machine reads `http://localhost:<port>/api/status`; through a reverse proxy, the proxy's domain. A web page on another origin can't read it from the browser: fetch it from the page's server.
 
 ## Access URLs
 

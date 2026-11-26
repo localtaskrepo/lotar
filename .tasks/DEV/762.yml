@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T20:21:04.802424+00:00
-modified: 2026-11-24T16:34:29.638090+00:00
+modified: 2026-11-26T17:48:47.005674+00:00
 relationships:
   blocks:
   - DEV-778
@@ -135,6 +135,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A554b4ea9c0d8ed6283d447223332845ede88e3fc4c30c0320f2860da1f2baf4b
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af0b6c51dd8a69092ea4dc318cbe5ec4cc7a5a615cf20396821e9f4d924576f11
+releases:
+- 12
 description: |-
   Owner 2026-11-21: "alright, file the work and kick it off. You have convinced me." The Mac gets an APFS volume for builds (/Volumes/Builds, 250 GB quota, excluded from Time Machine). The setup is local LOCA-571. This ticket is lotar's side.
 
@@ -328,3 +330,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-778"],"related":["DEV-635","DEV-778","DEV-760","DEV-781","DEV-725","DEV-750","DEV-783","DEV-820","DEV-806"]}'
     new: '{"blocks":["DEV-778"],"related":["DEV-635","DEV-778","DEV-760","DEV-781","DEV-725","DEV-750","DEV-783","DEV-820","DEV-806","DEV-837"]}'
+- at: 2026-11-26T17:48:47.005674+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T21:21:07.483127+00:00
-modified: 2026-11-26T03:47:00.059728+00:00
+modified: 2026-11-26T17:48:48.399745+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -386,6 +386,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3ea828ca27512a1b05b3602aa38158f1bdf5c2a2ee1936ae5726ea3ad1c2c59f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aea6c11622088ffe2d4bb3e4a4fc1bab99805d521908749128fc78e5b5aff1783
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb59a72c702edd83c482a3a0f80be8d97da7778eac54a10a0aeb70943dbf378a
+releases:
+- 12
 description: 'Found (STD-305, 2026-11-22, lotar 0.15.6): `lotar --project DEV config set issue.types Feature,Bug,Chore,Research` rewrote .tasks/DEV/config.yml and dropped the owner-decision comments on agent.worktree (max_parallel_jobs, waiting_run). It also turned the flow list waiting_run: [cargo, clean, --workspace] into a block list. Same in standards .tasks/INBOX/config.yml. Check: copy a project config with comments into a scratch .tasks, run config set on one key, then diff. Done: config set changes only that key and keeps comments and the formatting of other keys, with a test.'
 tags:
 - health
@@ -793,3 +795,8 @@ history:
   - field: relationships
     old: '{"depends_on":["local:LOCA-601"],"related":["DEV-266","DEV-407","DEV-832","DEV-834","DEV-833","DEV-855","DEV-768","DEV-821","DEV-789","DEV-800","DEV-836","DEV-799","DEV-769"]}'
     new: '{"depends_on":["local:LOCA-601"],"related":["DEV-266","DEV-407","DEV-832","DEV-834","DEV-833","DEV-855","DEV-768","DEV-821","DEV-789","DEV-800","DEV-836","DEV-799","DEV-769","DEV-829"]}'
+- at: 2026-11-26T17:48:48.399745+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

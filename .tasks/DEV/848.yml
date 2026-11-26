@@ -5,7 +5,7 @@ type: Bug
 reporter: codex
 assignee: '@merge'
 created: 2026-11-24T20:03:06.454346+00:00
-modified: 2026-11-26T03:32:05.950941+00:00
+modified: 2026-11-26T17:48:49.704974+00:00
 relationships:
   related:
   - DEV-300
@@ -152,6 +152,8 @@ comments:
     next: 'Owner: run lotar sync check against the live jira.default profile; a refusal names the bad character in the inline token'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afb1d4edb4cd314d39fbe0fcb99cb68949c3d001274e5c8a91e9f7560539b8217
+releases:
+- 12
 description: |-
   The owner asked on Nov 24 to investigate why installed LoTaR 0.15.6 on macOS returns HTTP 401 for a Jira Cloud scoped token stored inline. The same installed CLI connects when the token comes from the environment. This affects the test site for STD-317.
 
@@ -334,3 +336,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-300","DEV-777","DEV-819","DEV-839","DEV-860","DEV-887"]}'
     new: '{"related":["DEV-300","DEV-777","DEV-819","DEV-839","DEV-860","DEV-887","DEV-889"]}'
+- at: 2026-11-26T17:48:49.704974+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

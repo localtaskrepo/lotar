@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T00:07:07.617585+00:00
-modified: 2026-11-26T00:33:43.709009+00:00
+modified: 2026-11-26T17:48:48.618394+00:00
 relationships:
   related:
   - DEV-623
@@ -142,6 +142,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2a0ceaa47a6640fdc6dc5091e8e1e101051bb83529f4ab09999e77f38275e1c3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A317eced5048001ad3214ea1d73ba8616b72f7057d458d896a0f91bfedca751f3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aeb848eef88cc6e7815227cd279561f9d9b69411c4d5fdf42b02edb80ec621cc4
+releases:
+- 12
 description: |-
   Found 2026-11-22: from 22:25Z every queue on the Mac was held with 'waiting for memory: swap 3.4 of 4.0 GB used (85%, limit 85%)' (lotar 36 queued, 0 running; standards 14 queued). At the same time kern.memorystatus_vm_pressure_level was normal and memory_pressure reported 63% free. macOS keeps pages in swap after a shortage is over and gives swap back only slowly or at a reboot, so the swap rule (DEV-623) can hold all jobs indefinitely while RAM is free. Nothing in lotar agent queue says the hold may never clear.
 
@@ -305,3 +307,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-623","DEV-827","DEV-842","DEV-873","DEV-837","DEV-777"]}'
     new: '{"related":["DEV-623","DEV-827","DEV-842","DEV-873","DEV-837","DEV-777","DEV-848"]}'
+- at: 2026-11-26T17:48:48.618394+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

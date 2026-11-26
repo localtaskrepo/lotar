@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T16:34:28.930701+00:00
-modified: 2026-11-26T16:02:26.409450+00:00
+modified: 2026-11-26T17:48:49.320939+00:00
 relationships:
   related:
   - DEV-623
@@ -249,6 +249,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4e50ed7331f1c1454dca4b704bafbafba48f76bd1261bfe3101c6502de1904c3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A65e86708fd02583215565a3ac4f491a402a9da97617e83ef5e45676fece55760
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3157d180840bfbd3c7ccae11947aec16c026163772e4d73af2f8c5f8f14de908
+releases:
+- 12
 description: |-
   Each open lotar ticket keeps a job worktree with its own Rust target/ of 4 to 14 GB. On 2026-11-24, 46 such worktrees held 168 GB, and free disk fell from 301 GB to 181 GB in two days (about 65 GB a day). At that pace the Mac drops under the live disk check's 50 GB floor in about two days and fills in about three; the last time it filled was 2026-11-17. The queue already holds jobs while memory is short (DEV-623) but starts jobs regardless of free disk. Found by reliability (2026-11-24).
 
@@ -459,3 +461,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-623","DEV-762","DEV-767","DEV-812","DEV-815","DEV-604","DEV-827","DEV-885","DEV-819","DEV-898","DEV-887"]}'
     new: '{"related":["DEV-623","DEV-762","DEV-767","DEV-812","DEV-815","DEV-604","DEV-827","DEV-885","DEV-819","DEV-898","DEV-887","DEV-786"]}'
+- at: 2026-11-26T17:48:49.320939+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

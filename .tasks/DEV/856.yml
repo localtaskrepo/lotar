@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T21:51:57.586081+00:00
-modified: 2026-11-26T03:23:14.031549+00:00
+modified: 2026-11-26T17:48:49.984814+00:00
 relationships:
   related:
   - DEV-786
@@ -91,6 +91,8 @@ references:
 - attachment: before-light-1440.138e34621a73d702ae5737c688806e3b.png
 - attachment: before-light-1920.ad0753945bac448d022f5eef67a562c1.png
 - attachment: before-light-390.621a4496c868705eef333ced428385dd.png
+releases:
+- 12
 description: 'Found while taking DEV-786 screenshots: with agent.worktree.max_parallel_jobs: 0 (new jobs paused) the Agents page header shows ''∞ Max parallel'', because AgentJobs.vue renders `queueStats.max_parallel || ''∞''`. Check: set the limit to 0, open /agents. Done: the header shows 0 (paused), and ∞ only when no limit is set.'
 tags:
 - health
@@ -228,3 +230,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-786"]}'
     new: '{"related":["DEV-786","DEV-832"]}'
+- at: 2026-11-26T17:48:49.984814+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

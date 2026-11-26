@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T05:02:58.468147+00:00
-modified: 2026-11-26T03:32:05.949974+00:00
+modified: 2026-11-26T17:48:48.916104+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -298,6 +298,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa20fca3e06de377b085dbea4c093250c6cd112c522dc349ff2a285b8e92898f1
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae52271fdd1b77b0ad8fe810da184b538890138522de5382fccaafe768ad91c3c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7f0d442eb975996f9aa9c80638bf51a55f27414acd7f1500dc437332c87d47ab
+releases:
+- 12
 description: |-
   Found in DEV-819 (comment for STD-296, the standards reliability role): a memory hold leaves no record once it clears. Log its start and end (reason, since, until) in the server log ~/Library/Logs/lotar-services/<repo>.log.
 
@@ -704,3 +706,8 @@ history:
   - field: relationships
     old: '{"depends_on":["local:LOCA-601"],"related":["DEV-819","DEV-791","DEV-837","DEV-833","DEV-876","DEV-882","DEV-860","DEV-887"]}'
     new: '{"depends_on":["local:LOCA-601"],"related":["DEV-819","DEV-791","DEV-837","DEV-833","DEV-876","DEV-882","DEV-860","DEV-887","DEV-889"]}'
+- at: 2026-11-26T17:48:48.916104+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

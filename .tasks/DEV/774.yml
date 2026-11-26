@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-21T22:42:33.887526+00:00
-modified: 2026-11-25T20:08:38.476625+00:00
+modified: 2026-11-26T17:48:47.315685+00:00
 relationships:
   depends_on:
   - harnessmux:HARN-13
@@ -130,6 +130,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6331f86331214fb16e5f95218a7af2feca6938bae968e0bb650aafa789a84b43
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6f823ae5fe624249af05cfbf43a32985189d25e5c5b1c24fa3b10538e5f10fc7
+releases:
+- 12
 description: |-
   DEV-766 builds tool entries from harnessmux 0.2.0's `Event.raw`. claude-agent-acp sends a Bash command or Read path only in an in-progress `tool_call_update`, which 0.2.0 drops, so Claude tool rows show only "Terminal" and the output. harnessmux 0.3.0 (HARN-14) emits it as `tool.updated` and adds `input`, `locations`, `output` and `plan`, but is not on crates.io (HARN-13 waits for the owner).
 
@@ -355,3 +357,8 @@ history:
   - field: relationships
     old: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778","DEV-782","DEV-767","DEV-805","DEV-833","DEV-769","DEV-789","DEV-810"]}'
     new: '{"depends_on":["harnessmux:HARN-13","harnessmux:HARN-16"],"related":["DEV-766","DEV-777","DEV-778","DEV-782","DEV-767","DEV-805","DEV-833","DEV-769","DEV-789","DEV-810","DEV-850"]}'
+- at: 2026-11-26T17:48:47.315685+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

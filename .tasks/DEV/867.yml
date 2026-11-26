@@ -1,11 +1,11 @@
 title: A merge job taken over after lotar's exit resumes its merge agent without the checks lock
-status: Blocked
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix-retry'
 created: 2026-11-25T07:45:41.052287+00:00
-modified: 2026-11-26T01:04:41.825078+00:00
+modified: 2026-11-26T17:48:25.394743+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -93,3 +93,9 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-26T17:48:25.394743+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress

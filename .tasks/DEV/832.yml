@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T16:02:54.224101+00:00
-modified: 2026-11-26T16:57:45.234844+00:00
+modified: 2026-11-26T17:48:49.098241+00:00
 relationships:
   related:
   - DEV-777
@@ -256,6 +256,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac6399386a6cea6eeb5ad94b21639914a2a3cbeac4c6d5e80ec5a4bd8b60b2deb
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A47244efc33641b5d379dce4b8cfdccdd3ddfa91a2ffdf7038fc68ea31b117a32
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa1f8f887e534880d8b2ae3b73b31d0fd24d345072aebaeb2dc1a300b65f6a408
+releases:
+- 12
 description: 'Found 2026-11-24 ~08:00 PT, after the weekly limit reset: ListAgents lists four ''DEV-811 rework'' sessions (2b0465, 876756, 25d2e3, c8b9a8) busy at once in .lotar-worktrees/lotar/DEV-811, and also 2-5 copies for DEV-777, DEV-778, DEV-796, DEV-800, DEV-824, DEV-828, DEV-830, DEV-831 and STD-328. They edit the same files at once: on DEV-811 one session changed yaml_patch.rs between another''s read and its write. Check: after a resume, count the live sessions per job (ListAgents or ps of claude --add-dir <worktree>). Done: one session per job resumes, with a test.'
 tags:
 - health
@@ -516,3 +518,8 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T17:48:49.098241+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

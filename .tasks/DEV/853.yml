@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T21:03:52.499574+00:00
-modified: 2026-11-26T06:59:44.544054+00:00
+modified: 2026-11-26T17:48:49.934152+00:00
 relationships:
   blocks:
   - DEV-796
@@ -108,6 +108,8 @@ comments:
       reason: 411 tests
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae6bd9f491ce149b694b17e3c83860a5ec42c3891d300777f4c6d15265cd66607
+releases:
+- 12
 description: |-
   An agent job's lotar commands record the person who runs lotar as author and reporter, unless the prompt tells the agent to set `LOTAR_DEFAULT_REPORTER`. Our prompts repeat "Run lotar with LOTAR_DEFAULT_REPORTER set to your agent name (claude, codex)" in about 10 rules, and comment conditions (`comment: { author: ... }`) rely on it to tell a person's comment from an agent's. A shipped template (DEV-796, `agent-team`) can't count on every prompt saying it. The owner chose to fix this first (DEV-796, 2026-11-24: "First fix the lotar gaps (question comments in rules, job reporter), then build").
 
@@ -331,3 +333,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-796"],"related":["DEV-796","DEV-854","DEV-849","DEV-852","DEV-862","DEV-857"]}'
     new: '{"blocks":["DEV-796"],"related":["DEV-796","DEV-854","DEV-849","DEV-852","DEV-862","DEV-857","DEV-797"]}'
+- at: 2026-11-26T17:48:49.934152+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

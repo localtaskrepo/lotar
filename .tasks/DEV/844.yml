@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T17:30:03.578015+00:00
-modified: 2026-11-26T03:23:14.031187+00:00
+modified: 2026-11-26T17:48:49.550771+00:00
 relationships:
   depends_on:
   - DEV-821
@@ -97,6 +97,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1b6334253d092bdb815a9d1ea20b967ac4eb05f37759228370c057cc8771dd06
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac453b498fe330d5e1884e94989ba616bf8ec22980d0162e238ebb1c3c9c827df
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5edee8e588ed26789db25142ef7eb97f6a65979f35e2bc5984bfee9529e513b1
+releases:
+- 12
 description: |-
   Found in the DEV-821 review: docs/help/trust.md:45 reads 'A run skipped while `lotar trust` was already replaying runs right after its skip is recorded.' It means: such a run is replayed right after its skip is recorded (crates/lotar-agent/src/services/automation_service.rs, after report_skipped_run: DEV-821).
 
@@ -238,3 +240,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-821"],"related":["DEV-821"]}'
     new: '{"depends_on":["DEV-821"],"related":["DEV-821","DEV-832"]}'
+- at: 2026-11-26T17:48:49.550771+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

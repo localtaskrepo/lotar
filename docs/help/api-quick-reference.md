@@ -95,6 +95,7 @@ Projects, people and config
 - GET  /api/projects/stats?project=PREFIX -> { data: stats }
 - POST /api/projects/create ({ name, prefix?, values? }) -> { data }; creates the project config
 - GET  /api/whoami -> { data: string }; the identity used for `@me`
+- GET  /api/status -> { data: StatusFeed }; this instance's running jobs, agent queue (held or not, and why) and tickets HelpNeeded or Blocked, every link absolute, `version` 1 ([status feed](serve.md#status-feed))
 - GET  /api/config/inspect[?project=PREFIX] -> { data: ConfigInspectResult }; effective values with the source of each (there is no CLI `config inspect`; use `lotar config show --explain`)
 
 Sprints

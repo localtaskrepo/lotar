@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T18:56:52.105522+00:00
-modified: 2026-11-26T00:04:41.912415+00:00
+modified: 2026-11-26T17:48:49.603234+00:00
 relationships:
   related:
   - DEV-825
@@ -128,6 +128,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acb1cbebeb545bfdc2bcca307b19f8b9296c9f7ff5d0fe03ce112d0035a699ed3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A866aae813f35da8073eae1d715e02ba1fa7262952a554714981ab78ee1942388
+releases:
+- 12
 description: 'Found: reviewing DEV-825, commit `3fad61477` on `agent/DEV-825` is titled "DEV-825 first". The fix job was told so: its prompt (session `lotar-95e687-DEV-825-fix`) says `message "DEV-825 first"`, where `.tasks/DEV/automation.yml:134` has `"${{ticket.id}} ${{ticket.title}}"`. Other jobs got their full title (DEV-747, DEV-563). DEV-825 was filed from a review worktree on 2026-11-23 and briefly had a scratch-looking relation to DEV-3, so the title the job read may have come from a scratch ticket. Check: `grep -o "DEV-825 first" ~/.local/state/harnessmux/sessions/lotar-95e687-DEV-825-fix.events.jsonl`. Done: the cause is found and fixed, and a job prompt always carries the ticket''s current title. The DEV-825 commit gets its real title when it is merged (unpushed, so an amend).'
 tags:
 - health
@@ -252,3 +254,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-825","DEV-3","DEV-563","DEV-747","DEV-870","DEV-809","DEV-821","DEV-842","DEV-777"]}'
     new: '{"related":["DEV-825","DEV-3","DEV-563","DEV-747","DEV-870","DEV-809","DEV-821","DEV-842","DEV-777","DEV-843"]}'
+- at: 2026-11-26T17:48:49.603234+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T20:41:41.734525+00:00
-modified: 2026-11-26T05:04:01.974794+00:00
+modified: 2026-11-26T17:48:48.210215+00:00
 relationships:
   related:
   - DEV-768
@@ -230,6 +230,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A642ef826e6b6f0189e480109c48c8141facb6f82b65050a811ec205dd26a474a
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6f8bfef170fb28dcbe55400ddf10a4d062b9bb1ba46a61b9cb5b508311f67b0d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa278657374d23870011dee2983ed021ded2cbb59d7ca112e783389184f14a908
+releases:
+- 12
 description: |-
   Seen 2026-11-22 11:38-11:43 PST after brew upgrade to 0.15.6: `lotar agent queue` showed Running 1, Queued 25, reason "waiting for the running jobs of their tickets to end". The real reason: the 0.15.5 worker (pid 52655) saw the upgrade and took no new entries until its last job (DEV-768, a T3 rework) ended (crates/lotar-agent/src/services/agent_queue_service.rs:629, "After an upgrade, take no new entries"). worker_state (same file, ~line 452) has no case for it and falls through to the default text at line 475, which names the wrong cause. A long or hung job on the old binary holds every slot's new work for as long as it runs.
 
@@ -498,3 +500,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-768","TEST-1","TEST-2","DEV-762","DEV-763","DEV-784","DEV-361","DEV-805","DEV-832"]}'
     new: '{"related":["DEV-768","TEST-1","TEST-2","DEV-762","DEV-763","DEV-784","DEV-361","DEV-805","DEV-832","DEV-786"]}'
+- at: 2026-11-26T17:48:48.210215+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#12'
