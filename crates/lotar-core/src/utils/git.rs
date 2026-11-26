@@ -200,13 +200,12 @@ pub fn spawn_in_process_group(command: &mut Command) -> std::io::Result<Child> {
 }
 
 /// Kills a child started by [`spawn_in_process_group`] together with its
-/// children, and reaps it.
+/// children, and reaps it. Children that started a process group of their
+/// own, as a nested `lotar` call's run command does, are killed with their
+/// group too (DEV-808).
 pub fn kill_process_group(child: &mut Child) {
     #[cfg(unix)]
-    // SAFETY: plain kill(2) on the child's own process group.
-    unsafe {
-        libc::kill(-(child.id() as i32), libc::SIGKILL);
-    }
+    kill_tree(child.id());
     let _ = child.kill();
     let _ = child.wait();
 }
@@ -249,6 +248,61 @@ fn default_excludes_file() -> Option<PathBuf> {
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").filter(|dir| !dir.is_empty()).map(|home| PathBuf::from(home).join(".config")))?;
     Some(config.join("git").join("ignore"))
+}
+
+/// Stops `root`'s process group and every process below `root` with its
+/// group. The processes are stopped before they are listed and killed, so
+/// none can start a new one in between or lose its parent link to `root`.
+#[cfg(unix)]
+fn kill_tree(root: u32) {
+    let Ok(root) = i32::try_from(root) else { return };
+    let signal = |pid: i32, signal: i32| {
+        // SAFETY: plain kill(2) on a pid or, when negative, a process group.
+        unsafe { libc::kill(pid, signal) };
+    };
+    signal(-root, libc::SIGSTOP);
+    let mut tree = descendants(root);
+    tree.iter().for_each(|&pid| signal(pid, libc::SIGSTOP));
+    for pid in descendants(root) {
+        if !tree.contains(&pid) {
+            signal(pid, libc::SIGSTOP);
+            tree.push(pid);
+        }
+    }
+    // SAFETY: getpgrp(2) and getpgid(2) only read process groups.
+    let own_group = unsafe { libc::getpgrp() };
+    for &pid in &tree {
+        let group = unsafe { libc::getpgid(pid) };
+        if group > 1 && group != own_group && group != root {
+            signal(-group, libc::SIGKILL);
+        }
+        signal(pid, libc::SIGKILL);
+    }
+    signal(-root, libc::SIGKILL);
+}
+
+/// Every process below `root`, from the process table `ps` lists.
+#[cfg(unix)]
+fn descendants(root: i32) -> Vec<i32> {
+    let Ok(ps) = Command::new("ps").args(["-A", "-o", "pid=", "-o", "ppid="]).stdin(Stdio::null()).stderr(Stdio::null()).output() else {
+        return Vec::new();
+    };
+    let pairs: Vec<(i32, i32)> = String::from_utf8_lossy(&ps.stdout)
+        .lines()
+        .filter_map(|line| {
+            let mut fields = line.split_whitespace().map(str::parse::<i32>);
+            Some((fields.next()?.ok()?, fields.next()?.ok()?))
+        })
+        .collect();
+    let mut found = Vec::new();
+    let mut parents = vec![root];
+    while let Some(parent) = parents.pop() {
+        let children = pairs.iter().filter(|&&(pid, ppid)| ppid == parent && pid != root).map(|&(pid, _)| pid);
+        let before = found.len();
+        found.extend(children);
+        parents.extend_from_slice(&found[before..]);
+    }
+    found
 }
 
 /// Repository routing keys removed by [`clear_repository_env`]: presence in

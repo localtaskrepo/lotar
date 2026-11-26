@@ -1,0 +1,166 @@
+title: 'Activity feed: every BlobBatch drop now runs ps -A twice to kill a healthy git cat-file (DEV-808''s kill_tree)'
+status: Merging
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@merge'
+created: 2026-11-27T14:47:12.984378+00:00
+modified: 2026-11-27T14:53:33.385725+00:00
+relationships:
+  related:
+  - DEV-808
+  - DEV-466
+comments:
+- date: 2026-11-27T14:51:37.998380+00:00
+  author: claude
+  text: |-
+    A normal activity-feed end no longer kills git cat-file: no `ps` runs.
+
+    - `BlobBatch::drop` in `crates/lotar-lib/src/services/audit_service.rs` closes git's stdin, waits up to 1 s (`BLOB_BATCH_EXIT_WAIT`) for it to exit, and calls `kill_process_group` only if it's still running.
+    - A timed-out read still kills at once (DEV-466 test unchanged).
+    - New test `dropped_batch_closes_input_instead_of_killing`: a stub writes a marker after end of input. It fails with the old drop (killed first) and passes now. No kill means no `ps`, also once DEV-808's `kill_tree` lands.
+    - DEV-808 only changes `git.rs` and the automation files, so this commit doesn't conflict with it.
+    - Commit `c083d1ebd`; 37+/4−, so no small-diff tag.
+    - No guidance correction; no durable finding.
+  report:
+    commits:
+    - hash: c083d1ebd
+      what: BlobBatch drop closes stdin, waits up to 1 s, kills only if git is still running
+    checks:
+    - command: cargo nextest run -p lotar-lib blob_batch_tests
+      result: passed
+      reason: new test fails with the old drop, passes after
+    - command: cargo nextest run --workspace -E 'test(/feed|history/)'
+      result: passed
+      reason: 25 tests
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: Review, then merge; independent of DEV-808 (no shared file)
+- date: 2026-11-27T14:53:25.432550+00:00
+  author: claude
+  text: |-
+    Review: passed. A normal drop closes stdin and lets `git cat-file` exit without a kill. Every "Done when" item holds.
+
+    - Reviewed `c083d1ebd`, the only commit in `main..HEAD`. The branch has no newer rework. It changes only `crates/lotar-lib/src/services/audit_service.rs`.
+    - `Drop` (`audit_service.rs:105`) closes stdin, then polls `try_wait` for up to 1 s. It calls `kill_process_group` only when the wait times out or `try_wait` fails. No path in the drop can panic.
+    - A timed-out read still kills at once (`read`, `audit_service.rs:68`). The later drop then finds the process already exited and returns, so it doesn't kill a second time.
+    - The other drop caller, `load_task_version_batched` (`audit_service.rs:877`, `*blobs = None` on error), works too: git has already exited or been killed, or it exits once its input closes.
+    - The new test fails on the old drop: I removed the stdin close and the wait, it reported `FAIL`, and I restored the file. With the fix it passes.
+    - `git.rs` is unchanged, so this can't conflict with DEV-808. On main, `kill_process_group` is still the plain `SIGKILL` version.
+    - Reran: `npm ci` passed, `cargo nextest run -p lotar-lib blob_batch_tests` passed (2), the activity feed test passed, and `npm run lint` passed. The worktree is clean.
+    - No minor findings, so no tickets filed.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac8c351facab0d2f67165f2c044d5f961217fef3f9d2e56d8bbcd602dcc68ad05
+description: |-
+  Found in the DEV-808 review (2026-11-27): `kill_process_group` in `crates/lotar-core/src/utils/git.rs` now calls `kill_tree`, which SIGSTOPs the group and lists the process table with `ps -A` twice. `BlobBatch`'s `Drop` (`crates/lotar-lib/src/services/audit_service.rs:97`) calls it at the normal end of every tracked activity feed, so each feed request spawns two `ps` (~40 ms each here) to stop a `git cat-file --batch` that has no children.
+
+  ## Done when
+
+  - [x] A normal `BlobBatch` drop closes git's stdin first and waits up to 1 s for `git cat-file --batch` to exit on that end of input; it then calls no kill, so no `ps` runs.
+  - [x] A batch process that is still running after that wait is killed with `kill_process_group` (DEV-808's `kill_tree` once merged), as before. A read that timed out keeps killing at once (DEV-466 test unchanged).
+  - [x] If closing stdin or waiting fails, the drop falls back to `kill_process_group`; the drop never panics.
+  - [x] Test in `audit_service.rs` `blob_batch_tests`: a stub batch that writes a marker after it reads end of input fails before the change (killed before stdin closes) and passes after.
+  - [x] The change stays in `audit_service.rs`: no conflict with DEV-808's `git.rs`. `npm run lint` and the `blob_batch_tests` pass.
+history:
+- at: 2026-11-27T14:47:13.551127+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-808"]}'
+- at: 2026-11-27T14:47:13.997038+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-27T14:47:43.729312+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T14:47:44.399507+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac8c351facab0d2f67165f2c044d5f961217fef3f9d2e56d8bbcd602dcc68ad05
+- at: 2026-11-27T14:48:34.842979+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-808 review (2026-11-27): `kill_process_group` in `crates/lotar-core/src/utils/git.rs` now calls `kill_tree`, which SIGSTOPs the group and lists the process table with `ps -A` twice. `BlobBatch`'s `Drop` (`crates/lotar-lib/src/services/audit_service.rs:97`) calls it at the normal end of every tracked activity feed, so each feed request spawns two `ps` (~40 ms each here) to stop a `git cat-file --batch` that has no children.
+
+      Done when: the normal drop path closes stdin and kills only the child's own group (or kill_tree runs only after a timeout), with a test or measurement showing no `ps` at a normal drop.
+    new: |-
+      Found in the DEV-808 review (2026-11-27): `kill_process_group` in `crates/lotar-core/src/utils/git.rs` now calls `kill_tree`, which SIGSTOPs the group and lists the process table with `ps -A` twice. `BlobBatch`'s `Drop` (`crates/lotar-lib/src/services/audit_service.rs:97`) calls it at the normal end of every tracked activity feed, so each feed request spawns two `ps` (~40 ms each here) to stop a `git cat-file --batch` that has no children.
+
+      ## Done when
+
+      - [ ] A normal `BlobBatch` drop closes git's stdin first and waits up to 1 s for `git cat-file --batch` to exit on that end of input; it then calls no kill, so no `ps` runs.
+      - [ ] A batch process that is still running after that wait is killed with `kill_process_group` (DEV-808's `kill_tree` once merged), as before. A read that timed out keeps killing at once (DEV-466 test unchanged).
+      - [ ] If closing stdin or waiting fails, the drop falls back to `kill_process_group`; the drop never panics.
+      - [ ] Test in `audit_service.rs` `blob_batch_tests`: a stub batch that writes a marker after it reads end of input fails before the change (killed before stdin closes) and passes after.
+      - [ ] The change stays in `audit_service.rs`: no conflict with DEV-808's `git.rs`. `npm run lint` and the `blob_batch_tests` pass.
+- at: 2026-11-27T14:48:35.164565+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-808"]}'
+    new: '{"related":["DEV-808","DEV-466"]}'
+- at: 2026-11-27T14:51:37.920531+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-808 review (2026-11-27): `kill_process_group` in `crates/lotar-core/src/utils/git.rs` now calls `kill_tree`, which SIGSTOPs the group and lists the process table with `ps -A` twice. `BlobBatch`'s `Drop` (`crates/lotar-lib/src/services/audit_service.rs:97`) calls it at the normal end of every tracked activity feed, so each feed request spawns two `ps` (~40 ms each here) to stop a `git cat-file --batch` that has no children.
+
+      ## Done when
+
+      - [ ] A normal `BlobBatch` drop closes git's stdin first and waits up to 1 s for `git cat-file --batch` to exit on that end of input; it then calls no kill, so no `ps` runs.
+      - [ ] A batch process that is still running after that wait is killed with `kill_process_group` (DEV-808's `kill_tree` once merged), as before. A read that timed out keeps killing at once (DEV-466 test unchanged).
+      - [ ] If closing stdin or waiting fails, the drop falls back to `kill_process_group`; the drop never panics.
+      - [ ] Test in `audit_service.rs` `blob_batch_tests`: a stub batch that writes a marker after it reads end of input fails before the change (killed before stdin closes) and passes after.
+      - [ ] The change stays in `audit_service.rs`: no conflict with DEV-808's `git.rs`. `npm run lint` and the `blob_batch_tests` pass.
+    new: |-
+      Found in the DEV-808 review (2026-11-27): `kill_process_group` in `crates/lotar-core/src/utils/git.rs` now calls `kill_tree`, which SIGSTOPs the group and lists the process table with `ps -A` twice. `BlobBatch`'s `Drop` (`crates/lotar-lib/src/services/audit_service.rs:97`) calls it at the normal end of every tracked activity feed, so each feed request spawns two `ps` (~40 ms each here) to stop a `git cat-file --batch` that has no children.
+
+      ## Done when
+
+      - [x] A normal `BlobBatch` drop closes git's stdin first and waits up to 1 s for `git cat-file --batch` to exit on that end of input; it then calls no kill, so no `ps` runs.
+      - [x] A batch process that is still running after that wait is killed with `kill_process_group` (DEV-808's `kill_tree` once merged), as before. A read that timed out keeps killing at once (DEV-466 test unchanged).
+      - [x] If closing stdin or waiting fails, the drop falls back to `kill_process_group`; the drop never panics.
+      - [x] Test in `audit_service.rs` `blob_batch_tests`: a stub batch that writes a marker after it reads end of input fails before the change (killed before stdin closes) and passes after.
+      - [x] The change stays in `audit_service.rs`: no conflict with DEV-808's `git.rs`. `npm run lint` and the `blob_batch_tests` pass.
+- at: 2026-11-27T14:51:37.998380+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T14:51:48.974424+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T14:53:25.432550+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T14:53:33.385725+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

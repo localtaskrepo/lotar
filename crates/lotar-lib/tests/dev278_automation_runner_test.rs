@@ -7,7 +7,10 @@ use crate::common;
 use common::TestFixtures;
 
 fn with_rules(rules: &str) -> TestFixtures {
-    let fixtures = TestFixtures::new();
+    with_rules_in(TestFixtures::new(), rules)
+}
+
+fn with_rules_in(fixtures: TestFixtures, rules: &str) -> TestFixtures {
     std::fs::write(fixtures.tasks_root.join("config.yml"), "default:\n  project: AR\n").unwrap();
     std::fs::write(fixtures.tasks_root.join("automation.yml"), format!("automation:\n  rules:\n{rules}")).unwrap();
     fixtures
@@ -43,6 +46,43 @@ fn run_commands_time_out() {
     // The owner sees it on the ticket, not only in a server log (DEV-808).
     let task = std::fs::read_to_string(fixtures.tasks_root.join("AR").join("1.yml")).unwrap();
     assert!(task.contains("stopped its run on AR-1: it did not finish within 1s."), "{task}");
+}
+
+/// A run whose command starts a process group of its own, as a nested
+/// `lotar` call's run does: the timeout stops that group too, not only the
+/// run's own group (DEV-808).
+#[test]
+fn run_timeout_stops_nested_process_groups() {
+    let fixtures = TestFixtures::new();
+    let pid_file = fixtures.get_temp_path().join("nested.pid");
+    let script = format!("perl -e 'setpgrp(0, 0); sleep 600' & echo $! > {}; wait", pid_file.display());
+    let fixtures = with_rules_in(
+        fixtures,
+        &format!(
+            "    - name: nested\n      on:\n        updated:\n          run:\n            command: sh\n            args: ['-c', {script:?}]\n            timeout: 1s\n"
+        ),
+    );
+    lotar(&fixtures, &["add", "one"], "");
+    let out = lotar(&fixtures, &["priority", "AR-1", "High"], "");
+    assert!(String::from_utf8_lossy(&out.stderr).contains("did not finish within 1s"), "{}", String::from_utf8_lossy(&out.stderr));
+    let pid = std::fs::read_to_string(&pid_file).unwrap();
+    assert!(stops_running(pid.trim()), "{} in the nested process group is still running", pid.trim());
+}
+
+/// Whether `pid` is gone or a zombie within a few seconds.
+fn stops_running(pid: &str) -> bool {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        let ps = std::process::Command::new("ps").args(["-o", "stat=", "-p", pid]).output().unwrap();
+        if !ps.status.success() || String::from_utf8_lossy(&ps.stdout).trim_start().starts_with('Z') {
+            return true;
+        }
+        if std::time::Instant::now() >= deadline {
+            let _ = std::process::Command::new("kill").args(["-9", pid]).status();
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
 }
 
 #[test]

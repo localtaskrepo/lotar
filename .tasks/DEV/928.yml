@@ -1,16 +1,17 @@
 title: 'Test a failed internal-API settle of a done ticket''s failed T3 thread: noted once, retried at the next look'
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T09:55:29.362385+00:00
-modified: 2026-11-27T14:28:01.686867+00:00
+modified: 2026-11-27T14:35:22.239441+00:00
 relationships:
   related:
   - DEV-917
   - DEV-918
   - DEV-931
+  - DEV-826
 comments:
 - date: 2026-11-27T13:11:22.942512+00:00
   author: claude
@@ -64,6 +65,27 @@ comments:
 - date: 2026-11-27T14:28:01.686867+00:00
   author: automation
   text: Waited 11 min for the machine's check lock, held by lotar's merge checks of STD-384 in /Users/mallox/Development/.lotar-worktrees/standards/STD-384 (pid 95753), since 14:11 UTC; the merge agent starts now.
+- date: 2026-11-27T14:35:15.527429+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `906eafc66` is on `main` and `origin/main`.
+
+    - `main` had moved on (DEV-826 `20c71f03b`), so I rebased `agent/DEV-928` onto it without conflicts: `59a179971`.
+    - Ran `npm ci`, then `lint:agent`, `test:agent` and `smoke` on the rebased commit. All passed (smoke: 415 tests).
+    - `git merge --ff-only` fast-forwarded the main checkout. I amended the pending `.tasks` ticket edits into that commit (`906eafc66`).
+    - No rules or config files changed, so `lotar trust` wasn't needed.
+    - Pushed `20c71f03b..906eafc66`; the main checkout is clean.
+  report:
+    commits:
+    - hash: 906eafc66
+      what: DEV-928 test for a refused internal-API settle, noted once and retried
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af0931223529be1e84dfc6bbd530ac8faa9a283fab9779d47ef5d31204c94ca5b
 description: |-
@@ -143,3 +165,19 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T14:35:15.527429+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T14:35:15.812932+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-917","DEV-918","DEV-931"]}'
+    new: '{"related":["DEV-917","DEV-918","DEV-931","DEV-826"]}'
+- at: 2026-11-27T14:35:22.239441+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

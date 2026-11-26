@@ -1833,12 +1833,7 @@ const DEFAULT_RUN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(
 fn run_and_wait(mut cmd: Command, timeout: std::time::Duration, ignore_failure: bool) -> LoTaRResult<(String, Option<std::process::ExitStatus>)> {
     use std::io::Read;
     cmd.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped());
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        cmd.process_group(0);
-    }
-    let mut child = cmd.spawn()?;
+    let mut child = crate::utils::git::spawn_in_process_group(&mut cmd)?;
     let drain = |pipe: Option<Box<dyn Read + Send>>| {
         std::thread::spawn(move || {
             let mut tail = BoundedTail { limit: ASYNC_STDERR_LOG_LIMIT, ..BoundedTail::default() };
@@ -1862,13 +1857,7 @@ fn run_and_wait(mut cmd: Command, timeout: std::time::Duration, ignore_failure: 
             break Some(status);
         }
         if Instant::now() >= deadline {
-            #[cfg(unix)]
-            // SAFETY: plain kill(2) on the child's own process group.
-            unsafe {
-                libc::kill(-(child.id() as i32), libc::SIGKILL);
-            }
-            let _ = child.kill();
-            let _ = child.wait();
+            crate::utils::git::kill_process_group(&mut child);
             break None;
         }
         std::thread::sleep(std::time::Duration::from_millis(20));

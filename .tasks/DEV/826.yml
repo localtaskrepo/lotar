@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T04:27:39.844205+00:00
-modified: 2026-11-27T14:04:12.525982+00:00
+modified: 2026-11-27T14:42:44.714834+00:00
 relationships:
   depends_on:
   - DEV-782
@@ -16,6 +16,8 @@ relationships:
   - DEV-915
   - DEV-909
   - DEV-918
+  - DEV-928
+  - DEV-931
 comments:
 - date: 2026-11-23T07:49:44.529276+00:00
   author: claude
@@ -445,3 +447,15 @@ history:
   - field: tags
     old: ui, agent, review-returned
     new: ui, agent
+- at: 2026-11-27T14:35:15.812284+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-782"],"related":["DEV-782","DEV-765","DEV-771","DEV-915","DEV-909","DEV-918"]}'
+    new: '{"depends_on":["DEV-782"],"related":["DEV-782","DEV-765","DEV-771","DEV-915","DEV-909","DEV-918","DEV-928"]}'
+- at: 2026-11-27T14:42:44.714834+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-782"],"related":["DEV-782","DEV-765","DEV-771","DEV-915","DEV-909","DEV-918","DEV-928"]}'
+    new: '{"depends_on":["DEV-782"],"related":["DEV-782","DEV-765","DEV-771","DEV-915","DEV-909","DEV-918","DEV-928","DEV-931"]}'
