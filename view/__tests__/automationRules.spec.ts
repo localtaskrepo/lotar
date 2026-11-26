@@ -150,6 +150,15 @@ describe('automationRules utilities', () => {
         expect(describeConditions(rule.when).items).toEqual(['queue pause the job opened is auth'])
     })
 
+    it('keeps comment maps without a question yaml-only without calling them questions', () => {
+        const rule = { name: 'Note', on: { created: { comment: { text: 'Hi ${{ticket.id}}' } } } }
+        const state = getEditableRuleState(rule)
+
+        expect(state.editable).toBe(false)
+        expect(state.unsupportedReasons).toEqual(['Task created: comments written as a map are currently YAML-only.'])
+        expect(summarizeAutomationRule(rule).actions.join(' ')).toContain('comment: Hi ${{ticket.id}}')
+    })
+
     it('describes tell_agent actions and keeps them yaml-only', () => {
         const rule = {
             name: 'Comments reach the agent',

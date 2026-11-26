@@ -1,11 +1,10 @@
 title: A bad value in the home config's agents block drops every agent profile, and config validate still passes
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-25T22:17:22.622204+00:00
-modified: 2026-11-26T20:06:38.678464+00:00
+modified: 2026-11-26T20:27:36.686788+00:00
 relationships:
   blocks:
   - DEV-893
@@ -149,8 +148,16 @@ comments:
     - Both unpushed commits (`fd6d2b098`, `70f1095a0`) are finished and merged, so rebasing them over `70f1095a0`'s base `71791a991` is the only way to push. No overlapping files
     - The main checkout has uncommitted `.tasks/DEV/797.yml` and `801.yml` (other sessions): don't touch them (stash only if git requires it, then restore)
     - Don't wait for the v0.15.7 tag
+- date: 2026-11-26T20:27:30.957398+00:00
+  author: claude
+  text: |-
+    Already pushed: `origin/main` has DEV-883 as `ea4d2aec0`, rebased onto the v0.15.7 release, so nothing was left to do.
+
+    - `git log origin/main`: `71791a991` DEV-804 Release v0.15.7 → `049b6e4ea` DEV-882 → `ea4d2aec0` DEV-883. Local `main` matches `origin/main` (`97611a47d`)
+    - `v0.15.7` is tagged. I changed nothing in the main checkout
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad5c0e14fefe77d3359acb346194b4cf06156d9ad0840605fb0ea326fa090959f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A151b04d5a78db33d1507c60d28a4268be5d6ab364078b51d97f68d775efd4e00
 description: 'Found (STD-360): in a home .lotar whose agents block sets stall_timeout_seconds: notanumber on one profile, lotar --format json config show lists no agent_profiles at all, and lotar config validate prints ''Global configuration is valid''. A one-character typo in one profile silently removes all of them, so no job starts. Check: HOME=<tmp> with that .lotar, run lotar config validate and lotar --format json config show. Done: validate names the profile and key and fails, and the other profiles still load (or the load fails loudly).'
 tags:
 - health
@@ -332,3 +339,26 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801","DEV-804","DEV-882","DEV-896","DEV-797","DEV-881","DEV-880","DEV-875","DEV-876","DEV-825","DEV-887","DEV-828","DEV-866"]}'
     new: '{"blocks":["DEV-893"],"related":["DEV-893","DEV-801","DEV-804","DEV-882","DEV-896","DEV-797","DEV-881","DEV-880","DEV-875","DEV-876","DEV-825","DEV-887","DEV-828","DEV-866","DEV-886"]}'
+- at: 2026-11-26T20:27:16.853035+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T20:27:18.252202+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A151b04d5a78db33d1507c60d28a4268be5d6ab364078b51d97f68d775efd4e00
+- at: 2026-11-26T20:27:30.957398+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:27:36.686788+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

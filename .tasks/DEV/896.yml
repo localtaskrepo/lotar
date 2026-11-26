@@ -3,14 +3,15 @@ status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-26T07:28:02.692146+00:00
-modified: 2026-11-26T17:31:06.045482+00:00
+modified: 2026-11-26T20:27:13.526216+00:00
 relationships:
   related:
   - DEV-832
   - DEV-801
   - DEV-883
+  - DEV-886
 comments:
 - date: 2026-11-26T17:30:52.308456+00:00
   author: claude
@@ -42,11 +43,26 @@ comments:
       result: not_run
       reason: the merge runs the full suites (DEV-797)
     next: Review, then merge
+- date: 2026-11-26T20:27:02.651488+00:00
+  author: claude
+  text: |-
+    Review: blocking. Main fixed the cause in DEV-886 (`d2b22c8b1`), and once rebased onto main this branch's new test fails.
+
+    - **Overlap with main:** `d2b22c8b1` (DEV-886, on main after this branch's base `eeb1ad55d`) changed `is_merge_job_candidate` (`crates/lotar-agent/src/services/agent_job_service.rs:6572` on main). Now a `fix` job on a ticket in `Merging` is no merge job: it runs the fix agent, not lotar's merge (test `a_fix_job_on_a_merging_ticket_runs_its_agent`). That covers DEV-832's path, where a fix job landed the branch. With that, the `apply_job_event_as(..., "@merge")` change at `agent_job_service.rs:6248` only matters for a `merge`-profile job on a ticket someone else holds. The ticket doesn't describe that case.
+    - **The test fails on main:** I cherry-picked `ee70967d6` onto main in a scratch worktree and ran `cargo nextest run -p lotar-lib --test integration -E 'test(/dev605/)'`. `a_fix_job_that_lands_the_branch_ends_as_the_merge_does` fails 3 of 3 tries with `Invalid config YAML`, because main's `Repo::new` already defines `agents.fix` and the test (`dev605_merge_without_agent_test.rs:255`) appends a second `fix:` key. Even with valid YAML, its scenario no longer happens after DEV-886: the fix job doesn't merge.
+    - **Docs conflict:** `docs/help/agent.md`, the merge job paragraph, conflicts with DEV-886's rewrite (`git merge-tree --write-tree main HEAD`).
+    - **On HEAD alone** the new test passes (`cargo nextest run -p lotar-lib --test integration -E 'test(/a_fix_job_that_lands_the_branch/)'`). `npm ci` passed.
+    - **To fix:** rebase onto main. Then pick one:
+      - Drop the code change and close the ticket as fixed by DEV-886, pointing to `a_fix_job_on_a_merging_ticket_runs_its_agent`.
+      - Keep `apply_job_event_as` for a `merge`-profile job that completes while another assignee holds the ticket. Then add a test of that case that passes on main, and fold the docs sentence into DEV-886's paragraph.
+    - **Flaky, already known:** `a_check_that_fails_once_then_passes_lands_without_an_agent` passed only on its 3rd try. It's the check-lock wait the fix agent already reported on DEV-801.
+    - No minor tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aee60cd425c0debdbe8c46bc2bb61a03ccb37da31edf6b06fc428e0b4a3de5ee7
 description: 'Found 2026-11-26 on DEV-832: merge failed → assignee @fix, tag merge-retried; the fix job ended and set status Merging → InProgress (02:41Z); lotar''s own merge then failed smoke, the merge agent landed `5d3223431` on main and origin (03:23Z), and its job''s end moved InProgress → Reviewing, @review. A review job then ran on work already on main (branch `agent/DEV-832` holds only a copy of `5d3223431` without the .tasks edit). Check: `lotar task timeline DEV-832` lines from 00:04Z to 07:25Z. Done when: a job that lands the branch on main ends the ticket at Done (or the step after merging), whatever status it ran in, with a test.'
 tags:
 - health
+- review-returned
 history:
 - at: 2026-11-26T07:28:03.095980+00:00
   actor: claude
@@ -105,3 +121,28 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T20:27:02.651488+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:27:03.124683+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-832","DEV-801","DEV-883"]}'
+    new: '{"related":["DEV-832","DEV-801","DEV-883","DEV-886"]}'
+- at: 2026-11-26T20:27:03.481349+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-26T20:27:13.526216+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned

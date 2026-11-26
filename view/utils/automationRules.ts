@@ -789,7 +789,9 @@ function collectUnsupportedActionReasons(action: unknown, event: AutomationEvent
     }
 
     if (record.comment !== undefined && typeof record.comment !== 'string') {
-        reasons.push(`${EVENT_LABELS[event]}: comments with a question are currently YAML-only.`)
+        const kind =
+            isRecord(record.comment) && record.comment.question !== undefined ? 'with a question' : 'written as a map'
+        reasons.push(`${EVENT_LABELS[event]}: comments ${kind} are currently YAML-only.`)
     }
 
     if (record.run) {

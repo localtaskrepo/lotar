@@ -1,11 +1,11 @@
 title: 'Flaky smoke in CI: offers Add to release in the row menu once a release appears (DEV-464) times out waiting for the menu item'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:16:17.993108+00:00
-modified: 2026-11-26T20:00:35.392252+00:00
+modified: 2026-11-26T20:20:39.154386+00:00
 relationships:
   related:
   - DEV-464
@@ -231,6 +231,29 @@ comments:
     - Not rerun: the task-view failure before the fix (the fix agent showed it with animation frames delayed 400 ms), the full suites (the merge runs them) and a GitHub runner.
     - UI screenshots: not needed. No page, component or style changed: the composable only reloads more often and the test only waits.
     - No findings and no tickets filed. DEV-873 (relationships spec, red on main too) stays separate.
+- date: 2026-11-26T20:20:38.885393+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-799` is in `main`.
+
+    - Rebased `agent/DEV-799` onto `main` (`d2b22c8b1a7f`): `9330d47e9fb1`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `9330d47e9fb1`
+    - Amended the pending `.tasks` changes into the merged commit: `97611a47da78`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: 97611a47d
+      what: 'DEV-799 Flaky smoke in CI: offers Add to release in the row menu once a release appears (DEV-464) times out waiting for the menu item'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adfb741c2086c10a924409cd5752026c76392856e3a908ac33e047e23a887365e
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab9da4fd47475753f0b0d0c8242fb2ad47f1fc665533f5957bcb491c2b3c787e4
@@ -469,3 +492,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-464","DEV-615","DEV-725","DEV-801","DEV-873","DEV-811","DEV-874"]}'
     new: '{"related":["DEV-464","DEV-615","DEV-725","DEV-801","DEV-873","DEV-811","DEV-874","DEV-889"]}'
+- at: 2026-11-26T20:20:38.885393+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:20:39.154386+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: mallox
+assignee: '@fix'
 created: 2026-11-26T17:08:01.064005+00:00
-modified: 2026-11-26T20:04:40.528284+00:00
+modified: 2026-11-26T20:27:23.293638+00:00
 comments:
 - date: 2026-11-26T20:04:29.483394+00:00
   author: claude
@@ -19,6 +19,9 @@ comments:
     - **Question:** A (recommended): reviews and triage over ssh now, as this ticket says; fix jobs stay on the Mac. Or B: also fix and research jobs, through a T3 Code server on dyson (more to install and keep running on a machine that may be off).
   report:
     next: 'Owner: pick A or B; then the job builds that route'
+- date: 2026-11-26T20:27:22.542935+00:00
+  author: mallox
+  text: 'Answer: B (Also fix and research jobs, through a T3 Code server on dyson) (answered in INBOX-805)'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acc67bf8b282f21aec9a87cf0dde7958bfe602b82fd437e452b0a7ea25c1de5ac
 description: |-
@@ -150,3 +153,13 @@ history:
   - field: assignee
     old: '@fix'
     new: mallox
+- at: 2026-11-26T20:27:22.542935+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:27:23.293638+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
