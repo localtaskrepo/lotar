@@ -1,4 +1,5 @@
 use crate::config::env_overrides::capture_env_override_snapshot;
+use crate::config::resolution::LayerKeys;
 use crate::config::types::{GlobalConfig, ProjectConfig, ResolvedConfig};
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
@@ -53,6 +54,7 @@ struct GlobalScopeContext<'a> {
     env_resolved: &'a ResolvedConfig,
     env_applied: &'a HashSet<&'static str>,
     global_port_explicit: bool,
+    home_keys: LayerKeys,
 }
 
 impl<'a> GlobalScopeContext<'a> {
@@ -64,11 +66,12 @@ impl<'a> GlobalScopeContext<'a> {
         env_applied: &'a HashSet<&'static str>,
         global_port_explicit: bool,
     ) -> Self {
-        Self { base_config, global_cfg, home_cfg, env_resolved, env_applied, global_port_explicit }
+        let home_keys = if home_cfg.is_some() { crate::config::resolution::home_layer_keys() } else { LayerKeys::default() };
+        Self { base_config, global_cfg, home_cfg, env_resolved, env_applied, global_port_explicit, home_keys }
     }
 
     fn global_label(&self, key: &str) -> &'static str {
-        source_label_for_global(self.base_config, self.global_cfg, self.home_cfg, self.env_resolved, self.env_applied, self.global_port_explicit, key)
+        source_label_for_global(self, key)
     }
 }
 
@@ -148,15 +151,10 @@ pub fn collapse_label_to_scope(label: &str) -> &'static str {
     }
 }
 
-fn source_label_for_global(
-    resolved: &ResolvedConfig,
-    global_cfg: &Option<GlobalConfig>,
-    home_cfg: &Option<GlobalConfig>,
-    env_resolved: &ResolvedConfig,
-    env_applied: &HashSet<&'static str>,
-    global_port_explicit: bool,
-    key: &str,
-) -> &'static str {
+fn source_label_for_global(context: &GlobalScopeContext<'_>, key: &str) -> &'static str {
+    let resolved = context.base_config;
+    let env_resolved = context.env_resolved;
+    let env_applied = context.env_applied;
     // server_port: the winning layer gets the credit. The `--config`
     // override layer outranks env, so it is attributed before the env check;
     // the lower tiers keep the standard value matching, which attributes
@@ -174,8 +172,10 @@ fn source_label_for_global(
     }
 
     let defaults = GlobalConfig::default();
-    let home = home_cfg.as_ref();
-    let global = global_cfg.as_ref();
+    // A key the home file doesn't set holds its default there: no credit (DEV-907).
+    let home_field = config_source_entries().iter().find(|entry| entry.label_key == key).map_or(key, |entry| entry.inspect_key);
+    let home = context.home_cfg.as_ref().filter(|_| context.home_keys.has(home_field));
+    let global = context.global_cfg.as_ref();
 
     macro_rules! scope_field {
         ($field:ident) => {
@@ -207,7 +207,7 @@ fn source_label_for_global(
             {
                 return "home";
             }
-            if global_port_explicit {
+            if context.global_port_explicit {
                 return "global";
             }
             if home.is_some_and(|cfg| cfg.server_port == resolved.server_port) && resolved.server_port != defaults.server_port {
@@ -388,10 +388,6 @@ fn env_value_matches(resolved: &ResolvedConfig, env_resolved: &ResolvedConfig, k
 
 fn source_label_for_project(key: &str, resolved_project: &ResolvedConfig, project_cfg: Option<&ProjectConfig>, context: &GlobalScopeContext<'_>) -> String {
     let base_config = context.base_config;
-    let global_cfg = context.global_cfg;
-    let home_cfg = context.home_cfg;
-    let env_resolved = context.env_resolved;
-    let env_applied = context.env_applied;
 
     macro_rules! project_scope {
         ($key_literal:literal, $has_override:expr, $diff:expr) => {
@@ -535,9 +531,7 @@ fn source_label_for_project(key: &str, resolved_project: &ResolvedConfig, projec
         | "sprints_defaults_capacity_hours"
         | "sprints_defaults_length"
         | "sprints_defaults_overdue_after"
-        | "sprints_notifications_enabled" => {
-            source_label_for_global(base_config, global_cfg, home_cfg, env_resolved, env_applied, context.global_port_explicit, key).to_string()
-        }
+        | "sprints_notifications_enabled" => context.global_label(key).to_string(),
         "branch_type_aliases" => {
             let has_override = project_cfg.and_then(|pc| pc.branch_type_aliases.as_ref()).is_some();
             let diff = resolved_project.branch_type_aliases != base_config.branch_type_aliases;
@@ -619,8 +613,8 @@ fn source_label_for_project(key: &str, resolved_project: &ResolvedConfig, projec
             let diff = resolved_project.agent_worktree != base_config.agent_worktree;
             project_scope!("agent_worktree", has_override, diff)
         }
-        "server_port" => source_label_for_global(base_config, global_cfg, home_cfg, env_resolved, env_applied, context.global_port_explicit, key).to_string(),
-        _ => source_label_for_global(base_config, global_cfg, home_cfg, env_resolved, env_applied, context.global_port_explicit, key).to_string(),
+        "server_port" => context.global_label(key).to_string(),
+        _ => context.global_label(key).to_string(),
     }
 }
 

@@ -521,7 +521,7 @@ fn collect_layer_keys(value: &serde_yaml_ng::Value, prefix: &str, keys: &mut std
     }
 }
 
-fn home_layer_keys() -> LayerKeys {
+pub(crate) fn home_layer_keys() -> LayerKeys {
     if !crate::config::persistence::home_config_honored() {
         return LayerKeys::default();
     }

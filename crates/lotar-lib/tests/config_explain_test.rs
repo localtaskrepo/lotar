@@ -36,3 +36,30 @@ fn config_show_project_explain_labels_env_over_project() {
     let stdout = String::from_utf8_lossy(&output);
     assert!(stdout.contains("reporter: env.reporter@example.com # (env)"), "env outranks project config (DEV-404)\n{stdout}");
 }
+
+/// DEV-907: the YAML shows agent.worktree, and a key the home config
+/// doesn't set isn't credited to it.
+#[test]
+fn config_show_full_with_home_config_shows_worktree_and_labels_unset_keys_default() {
+    let fixtures = TestFixtures::new();
+    let home = tempfile::tempdir().unwrap();
+    std::fs::write(home.path().join(".lotar"), "default:\n  priority: High\nagent:\n  worktree:\n    max_parallel_jobs: 3\n").unwrap();
+
+    let output = crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(fixtures.get_temp_path())
+        .env("HOME", home.path())
+        .env("LOTAR_IGNORE_HOME_CONFIG", "0")
+        .args(["config", "show", "--explain", "--full"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8_lossy(&output);
+    assert!(stdout.contains("priority: High # (home)"), "a key the home config sets is credited to it\n{stdout}");
+    assert!(stdout.contains("strict-members: false # (default)"), "a key the home config doesn't set is not (home)\n{stdout}");
+    assert!(stdout.contains("\n  worktree:\n    enabled: "), "agent.worktree is in the YAML\n{stdout}");
+    assert!(stdout.contains("\n    max_parallel_jobs: 3"), "{stdout}");
+}

@@ -1,11 +1,11 @@
 title: 'T3 runner: read job results through t3_submit_output and milestones through MCP Events'
-status: Reviewing
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T19:54:54.990569+00:00
-modified: 2026-11-26T23:38:37.249071+00:00
+modified: 2026-11-27T00:55:20.499422+00:00
 relationships:
   related:
   - DEV-849
@@ -104,6 +104,7 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2e2b32d886df49058f21c8ffec0c11b99179a7ef8827eafbf638f478e01131b3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A21ab9d8a75352d745b41e79794c66c74598112d86f236b011a4aa7af178a5344
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A62ff6f8adf791bf76d3d0b906e810fd03ee6c984d2439da3a277568864ce0ede
 description: |-
   T3 Code 0.1.12 adds typed turn results (t3_submit_output) and MCP Events webhooks/streams for milestones. lotar's T3 runner could take a structured result instead of parsing the final reply, and get live state instead of polling (related DEV-849). Owner chose to file this 2026-11-25: "the runner asks for a typed result and uses it, takes events for live state, and tests cover both with the fake t3."
 
@@ -365,3 +366,14 @@ history:
   - field: tags
     old: job-paused, review-blocked
     new: job-paused, review-returned
+- at: 2026-11-27T00:55:19.086162+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-27T00:55:20.499422+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A62ff6f8adf791bf76d3d0b906e810fd03ee6c984d2439da3a277568864ce0ede

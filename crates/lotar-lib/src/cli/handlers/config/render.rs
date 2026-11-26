@@ -289,6 +289,31 @@ fn render_resolved_config_yaml(resolved: &ResolvedConfig, sources: &HashMap<Stri
         sources.get("agent.context-extension"),
         options,
     );
+    // agent.worktree: in the JSON output, missing here before DEV-907.
+    let worktree = &resolved.agent_worktree;
+    let mut worktree_body = String::new();
+    let mut worktree_written = false;
+    for (key, value) in [
+        ("enabled", yaml_scalar(&worktree.enabled)),
+        ("dir", yaml_scalar(&worktree.dir)),
+        ("build_root", yaml_scalar(&worktree.build_root)),
+        ("branch_prefix", yaml_scalar(&worktree.branch_prefix)),
+        ("max_parallel_jobs", yaml_scalar(&worktree.max_parallel_jobs)),
+        ("cleanup_on_done", yaml_scalar(&worktree.cleanup_on_done)),
+        ("cleanup_on_failure", yaml_scalar(&worktree.cleanup_on_failure)),
+        ("cleanup_on_cancel", yaml_scalar(&worktree.cleanup_on_cancel)),
+        ("cleanup_delete_branches", yaml_scalar(&worktree.cleanup_delete_branches)),
+        ("cleanup_ignored_files", yaml_scalar(&worktree.cleanup_ignored_files)),
+    ] {
+        worktree_written |= write_scalar_line(&mut worktree_body, 4, key, &value, sources.get(&format!("agent.worktree.{key}")), options);
+    }
+    worktree_written |= write_sequence(&mut worktree_body, 4, "cleanup_paths", &worktree.cleanup_paths, sources.get("agent.worktree.cleanup_paths"), options);
+    worktree_written |= write_sequence(&mut worktree_body, 4, "waiting_run", &worktree.waiting_run, sources.get("agent.worktree.waiting_run"), options);
+    if worktree_written {
+        agent_body.push_str("  worktree:\n");
+        agent_body.push_str(&worktree_body);
+        agent_written = true;
+    }
     if agent_written {
         sections.push(format!("agent:\n{}", agent_body));
     }
