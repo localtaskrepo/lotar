@@ -5083,6 +5083,7 @@ fn drive_session(
         agent: &agent,
         link,
         usage_source: &usage_source,
+        asks_result: matches!(profile.runner.parse(), Ok(AgentRunnerKind::T3)),
     };
     drive_turns(job_id, tasks_dir, session, &mut events, settings, meter, context_messages)
 }
@@ -5101,6 +5102,8 @@ struct TurnSettings<'a> {
     link: Option<&'a str>,
     /// Whom the agent's usage-limit readings are for (DEV-862).
     usage_source: &'a crate::services::provider_usage::Source,
+    /// The turns submit a `{summary}` result (t3, DEV-877) that becomes the job's last message.
+    asks_result: bool,
 }
 
 /// What the job loop asks of a session besides its events.
@@ -5136,7 +5139,11 @@ fn drive_turns(
     context_messages: &mut Vec<crate::services::agent_context_service::AgentContextMessage>,
 ) -> RunEnd {
     use harnessmux::EventBody;
-    let TurnSettings { first, prefixes, budget, stall_timeout_seconds, agent, link, usage_source } = settings;
+    let TurnSettings { first, prefixes, budget, stall_timeout_seconds, agent, link, usage_source, asks_result } = settings;
+    // The turn's final reply and the summary its result holds (DEV-877).
+    let mut final_reply: Option<String> = None;
+    let mut summary: Option<String> = None;
+    let mut completed = false;
     let mut reply = ReplyStream::default();
     // The agent's thinking, by paragraph like its reply (DEV-766).
     let mut thought = ReplyStream::default();
@@ -5270,6 +5277,16 @@ fn drive_turns(
                     }
                     state.record.last_message = Some(text.clone());
                 });
+                final_reply = Some(text);
+            }
+            EventBody::Output { output } => {
+                summary = output.get("summary").and_then(serde_json::Value::as_str).map(str::trim).filter(|text| !text.is_empty()).map(str::to_string);
+            }
+            EventBody::Milestone { name, run, outcome, request, kind } => {
+                let message = t3_state::milestone_message(&name, run.as_deref(), outcome.as_deref(), request.as_deref(), kind.as_deref());
+                update_job(job_id, |state| {
+                    record_and_emit(state, "agent_job_progress", Some(message.clone()));
+                });
             }
             EventBody::ThoughtDelta { text } => {
                 if let Some(part) = thought.push(&text) {
@@ -5361,6 +5378,7 @@ fn drive_turns(
                 };
                 update_job(job_id, |state| state.record.usage.get_or_insert_with(Default::default).add(&usage));
                 waiting = stop_reason == harnessmux::StopReason::WaitingForAnswer;
+                completed = stop_reason == harnessmux::StopReason::EndTurn;
                 exit_code = match stop_reason {
                     harnessmux::StopReason::EndTurn => 0,
                     harnessmux::StopReason::WaitingForAnswer => WAITS_FOR_ANSWER,
@@ -5398,6 +5416,27 @@ fn drive_turns(
         }
         reply = ReplyStream::default();
         thought = ReplyStream::default();
+        if asks_result && std::mem::take(&mut completed) {
+            let reply = final_reply.take();
+            update_job(job_id, |state| match summary.take() {
+                Some(summary) => {
+                    record_and_emit(state, "agent_job_progress", Some(format!("The agent's summary: {summary}")));
+                    state.record.last_message = Some(summary);
+                }
+                None => {
+                    record_and_emit(
+                        state,
+                        "agent_job_progress",
+                        Some("The agent submitted no result with a summary (t3_submit_output); the job's last message is its final reply.".to_string()),
+                    );
+                    if reply.is_some() {
+                        state.record.last_message.clone_from(&reply);
+                    }
+                }
+            });
+        }
+        final_reply = None;
+        summary = None;
         in_turn = false;
         turns += 1;
         update_job(job_id, |state| state.record.question = None);
@@ -8734,8 +8773,16 @@ mod dev520_session_events_tests {
 
     fn drive(events: &mut SessionEvents, tasks_dir: &Path, job_id: &str) -> RunEnd {
         let usage_source = crate::services::provider_usage::Source { provider: "fake".into(), account: None };
-        let settings =
-            TurnSettings { first: 1, prefixes: &[], budget: None, stall_timeout_seconds: None, agent: "fake", link: None, usage_source: &usage_source };
+        let settings = TurnSettings {
+            first: 1,
+            prefixes: &[],
+            budget: None,
+            stall_timeout_seconds: None,
+            agent: "fake",
+            link: None,
+            usage_source: &usage_source,
+            asks_result: false,
+        };
         drive_turns(job_id, tasks_dir, &Idle, events, settings, CostMeter::default(), &mut Vec::new())
     }
 
@@ -8878,8 +8925,16 @@ mod dev520_session_events_tests {
         }
         tx.send(Event { turn: None, ..event(seq + 1, 1, EventBody::SessionEnded { reason: "idle".into() }) }).unwrap();
         let usage_source = crate::services::provider_usage::Source { provider: "fake".into(), account: None };
-        let settings =
-            TurnSettings { first: 1, prefixes: &[], budget: None, stall_timeout_seconds: None, agent: "fake", link: None, usage_source: &usage_source };
+        let settings = TurnSettings {
+            first: 1,
+            prefixes: &[],
+            budget: None,
+            stall_timeout_seconds: None,
+            agent: "fake",
+            link: None,
+            usage_source: &usage_source,
+            asks_result: false,
+        };
         drive_turns("dev644-test", tasks_dir, &Busy, &mut events, settings, CostMeter::default(), &mut Vec::new())
     }
 
@@ -8932,8 +8987,16 @@ mod dev520_session_events_tests {
         tx.send(event(1, 1, EventBody::failed(error))).unwrap();
         tx.send(Event { turn: None, ..event(2, 1, EventBody::SessionEnded { reason: "idle".into() }) }).unwrap();
         let usage_source = crate::services::provider_usage::Source { provider: "fake".into(), account: None };
-        let settings =
-            TurnSettings { first: 1, prefixes: &[], budget: Some(5.0), stall_timeout_seconds: None, agent: "fake", link: None, usage_source: &usage_source };
+        let settings = TurnSettings {
+            first: 1,
+            prefixes: &[],
+            budget: Some(5.0),
+            stall_timeout_seconds: None,
+            agent: "fake",
+            link: None,
+            usage_source: &usage_source,
+            asks_result: false,
+        };
         let end = drive_turns(job_id, dir.path(), &Busy, &mut events, settings, CostMeter::default(), &mut Vec::new());
         let state = super::JOB_REGISTRY.lock().unwrap().jobs.remove(job_id).unwrap();
         assert!(matches!(end, RunEnd::Exited(Some(1))));
@@ -8941,6 +9004,65 @@ mod dev520_session_events_tests {
         let messages = state.events.iter().filter_map(|entry| entry.message.as_deref()).collect::<Vec<_>>();
         assert_eq!(messages, [error, "The agent reported no cost, so the profile's max_budget_usd was not checked."]);
     }
+
+    /// A t3 job's turn: its `{summary}` result is the job's last message, the reply stays in the log; without one the
+    /// reply is, also after harnessmux's notice, and the log says so (DEV-877). Milestones are in the log.
+    fn t3_turn(job_id: &str, output: Option<serde_json::Value>) -> super::AgentJobState {
+        let dir = tempfile::tempdir().unwrap();
+        super::JOB_REGISTRY.lock().unwrap().jobs.insert(job_id.to_string(), super::tests::unit_job_state(job_id));
+        let (tx, rx) = tokio::sync::broadcast::channel(16);
+        let (mut events, _) = SessionEvents::open(Err("no log".into()), || rx);
+        let milestone =
+            EventBody::Milestone { name: "thread.run_settled".into(), run: Some("run:1".into()), outcome: Some("completed".into()), request: None, kind: None };
+        let mut bodies = vec![milestone, EventBody::Message { text: "Fixed it.\n\nAll tests pass.".into() }];
+        match output {
+            Some(output) => bodies.push(EventBody::Output { output }),
+            None => bodies.push(EventBody::Notice { text: "The T3 Code thread's run submitted no result for its output schema".into() }),
+        }
+        bodies.push(finished());
+        for (seq, body) in (1..).zip(bodies) {
+            tx.send(event(seq, 1, body)).unwrap();
+        }
+        let usage_source = crate::services::provider_usage::Source { provider: "fake".into(), account: None };
+        let settings = TurnSettings {
+            first: 1,
+            prefixes: &[],
+            budget: None,
+            stall_timeout_seconds: None,
+            agent: "t3",
+            link: None,
+            usage_source: &usage_source,
+            asks_result: true,
+        };
+        assert!(matches!(drive_turns(job_id, dir.path(), &Idle, &mut events, settings, CostMeter::default(), &mut Vec::new()), RunEnd::Exited(Some(0))));
+        super::JOB_REGISTRY.lock().unwrap().jobs.remove(job_id).unwrap()
+    }
+
+    #[test]
+    fn a_t3_turns_submitted_summary_is_the_jobs_last_message() {
+        let state = t3_turn("job-dev877-summary", Some(serde_json::json!({"summary": " Fixed the parser; DEV-1 is Done. "})));
+        assert_eq!(state.record.last_message.as_deref(), Some("Fixed the parser; DEV-1 is Done."));
+        let logged = state.events.iter().map(|entry| (entry.kind.as_str(), entry.message.as_deref().unwrap_or_default())).collect::<Vec<_>>();
+        assert_eq!(
+            logged,
+            [
+                ("agent_job_progress", "T3 Code milestone thread.run_settled: run run:1, outcome completed"),
+                ("agent_job_message", "Fixed it.\n\nAll tests pass."),
+                ("agent_job_progress", "The agent's summary: Fixed the parser; DEV-1 is Done."),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_t3_turn_without_a_summary_keeps_its_reply_as_the_last_message() {
+        for output in [None, Some(serde_json::json!({"summary": "  "})), Some(serde_json::json!({"status": "Done"}))] {
+            let state = t3_turn("job-dev877-missing", output);
+            assert_eq!(state.record.last_message.as_deref(), Some("Fixed it.\n\nAll tests pass."));
+            let last = state.events.last().and_then(|entry| entry.message.as_deref()).unwrap_or_default();
+            assert!(last.starts_with("The agent submitted no result with a summary"), "{last}");
+        }
+    }
+
     /// DEV-766: tool calls are `agent_job_tool` entries with what the raw ACP update holds, thinking is
     /// `agent_job_thought` by paragraph, and the context window is the job's latest.
     #[test]

@@ -362,9 +362,21 @@ pub fn session_profile(profile: &AgentProfileDetail, env: HashMap<String, String
         env: session_env,
         options: profile.options.clone(),
         provider: profile.provider.clone(),
+        output_schema: matches!(profile.runner.parse(), Ok(AgentRunnerKind::T3)).then(t3_result_schema),
         ..harnessmux::Profile::default()
     };
     Ok(session)
+}
+
+/// The result a t3 job's turns submit with `t3_submit_output` (DEV-877, owner 2026-11-26: "Summary only: {summary}
+/// becomes the job's last message; outcomes still come from the ticket").
+pub fn t3_result_schema() -> serde_json::Value {
+    serde_json::json!({
+        "type": "object",
+        "properties": {"summary": {"type": "string", "description": "What this turn did and how it left the ticket, in a few sentences."}},
+        "required": ["summary"],
+        "additionalProperties": false
+    })
 }
 
 /// The permission rules a session runs with (DEV-509): at workspace no `git push` and no edits outside the session's

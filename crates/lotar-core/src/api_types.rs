@@ -802,13 +802,14 @@ pub struct AgentJobT3Thread {
     /// running, waiting (for an answer), finished, failed, stopped, unknown (a status lotar doesn't
     /// know) or unavailable (no thread recorded, T3 Code doesn't answer, or the thread is gone).
     pub state: String,
-    /// The thread's status as T3 Code names it (`running`, `completed`, …).
+    /// The thread's status as T3 Code names it (`running`, `completed`, …); when a milestone gives the state, the
+    /// settled run's outcome (`completed`, `failed`, `interrupted`, `cancelled`) or none for a question (DEV-877).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub t3_status: Option<String>,
     /// Why the state is unavailable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
-    /// When T3 Code last changed the thread.
+    /// When T3 Code last changed the thread; when a milestone gives the state, when lotar logged it (DEV-877).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<String>,
     /// When lotar asked T3 Code (a cached answer keeps the time it was asked).

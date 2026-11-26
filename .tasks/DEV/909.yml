@@ -1,11 +1,11 @@
 title: 'Timeline: read a job''s conversation inline from its harnessmux event log'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-26T19:31:53.927572+00:00
-modified: 2026-11-27T03:47:39.458506+00:00
+modified: 2026-11-27T05:44:20.788279+00:00
 relationships:
   blocks:
   - DEV-918
@@ -16,6 +16,12 @@ relationships:
   - DEV-867
   - DEV-901
   - DEV-918
+  - DEV-786
+  - DEV-797
+  - DEV-810
+  - DEV-888
+  - DEV-910
+  - DEV-912
 comments:
 - date: 2026-11-26T21:07:08.577168+00:00
   author: automation
@@ -134,6 +140,36 @@ comments:
       result: not_run
       reason: only the smoke spec changed; the merge runs the full suites
     next: Review again
+- date: 2026-11-27T05:44:11.899669+00:00
+  author: claude
+  text: |-
+    Review: passed. `543740995` (HEAD, nothing newer on `agent/DEV-909`) covers every "Done when"; the screenshot set the last review missed is now complete.
+
+    **Read**
+    - `git log main..HEAD`: one commit, `543740995`. Since the last review (`865efba73`) only the `shot` helper in `smoke/tests/ui.task-timeline-conversation.smoke.spec.ts` changed. No app code changed.
+    - Read again: `transcript.rs`, the `record_transcript` calls in `agent_job_service.rs`, the route in `routes/jobs.rs`, `AgentJobTranscript.vue` and the Timeline hook-up.
+      - Only `id`, `after` and `limit` are accepted.
+      - The session name goes through `validate_name`.
+      - Only `<sessions>/<name>.events.jsonl` and its kept copies are read.
+      - Nothing is fetched until "Show conversation" is clicked.
+    - Main's newer commits to the same files (DEV-786, DEV-810, DEV-910, DEV-912, DEV-888) don't change anything this work relies on. Only the known rebase conflict in `view/api/client.ts` is left for the merge.
+
+    **Reran**
+    - `npm ci`: passed.
+    - `cargo nextest run -p lotar-agent transcript`: 5 passed.
+    - `cargo nextest run -p lotar-lib --test integration` on `a_job_records_its_turn…`, transcript, openapi and contract: 73 passed.
+    - `npm run test:ui:agent -- AgentJobTranscript TaskPanel`: 163 passed.
+    - `npm run test:smoke:agent -- smoke/tests/ui.task-timeline-conversation`: passed. It wrote 30 shots.
+    - Prettier and oxlint on the spec and the component: clean.
+    - The worktree is clean afterwards.
+    - Not this change: a wider `dev503` filter hung, because those tests' merge jobs wait on the machine-wide merge check lock (DEV-797) while another merge holds it.
+
+    **Screenshots**
+    - Read the attachments `before-thread-dark-1440` and `after-reused-dark-390`.
+    - Copied my own run's shots to `/tmp/dev909-review2` and read four of them (claude dark 1920, t3 light 390, expired dark 390). No clipping, and readable in light and dark.
+
+    **Minor, not filed again**
+    - [DEV-918](https://lotar.pyxzl.net/task/DEV-918) is still open for the kept-copy name prefix.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7143b46bbd3ddfe5ad20074d6ebde47c173ed5b407d1270ea3e88107f01c75f3
 - attachment: dev909-before-thread.fd9f40c2dae2d70b7b0c5e2368ddefcf.png
@@ -403,3 +439,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-27T05:44:11.899669+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T05:44:12.169534+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-918"],"related":["DEV-849","DEV-850","DEV-782","DEV-867","DEV-901","DEV-918"]}'
+    new: '{"blocks":["DEV-918"],"related":["DEV-849","DEV-850","DEV-782","DEV-867","DEV-901","DEV-918","DEV-786","DEV-797","DEV-810","DEV-888","DEV-910","DEV-912"]}'
+- at: 2026-11-27T05:44:20.788279+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

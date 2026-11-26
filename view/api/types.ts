@@ -2047,11 +2047,11 @@ export interface AgentJobT3Thread {
     link?: string
     environment_id?: string
     state: 'running' | 'waiting' | 'finished' | 'failed' | 'stopped' | 'unknown' | 'unavailable'
-    /** The thread's status as T3 Code names it. */
+    /** The thread's status as T3 Code names it; when a milestone gives the state, the settled run's outcome, or none for a question. */
     t3_status?: string
     /** Why the state is unavailable. */
     reason?: string
-    /** When T3 Code last changed the thread. */
+    /** When T3 Code last changed the thread; when a milestone gives the state, when lotar logged it. */
     updated_at?: string
     /** When lotar asked T3 Code. */
     checked_at: string

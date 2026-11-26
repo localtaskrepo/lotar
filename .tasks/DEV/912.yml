@@ -1,11 +1,11 @@
 title: A t3 job that hits Claude's 5-hour limit fails into retries and an owner question instead of pausing (local LOCA-631, 2026-11-26)
-status: Merging
+status: Done
 priority: High
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T23:29:18.207980+00:00
-modified: 2026-11-27T04:15:12.859749+00:00
+modified: 2026-11-27T05:44:12.170381+00:00
 relationships:
   blocks:
   - DEV-920
@@ -15,6 +15,7 @@ relationships:
   - DEV-855
   - DEV-901
   - DEV-920
+  - DEV-909
 comments:
 - date: 2026-11-27T00:15:04.901603+00:00
   author: claude
@@ -73,6 +74,29 @@ comments:
     - command: npm run smoke
       result: not_run
       reason: the merge runs it (DEV-797)
+- date: 2026-11-27T04:22:54.053165+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-912` is in `main`.
+
+    - Rebased `agent/DEV-912` onto `main` (`e844fd11b282`): `54b2198ade7f`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `54b2198ade7f`
+    - Amended the pending `.tasks` changes into the merged commit: `471746ba122b`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: 471746ba1
+      what: DEV-912 A t3 job that hits Claude's 5-hour limit fails into retries and an owner question instead of pausing (local LOCA-631, 2026-11-26)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad43913606878248e7587ef76a76c59158e8af6e92648c892a41f3c30e985ef08
 description: |-
@@ -149,3 +173,19 @@ history:
   - field: relationships
     old: '{"related":["DEV-584","DEV-833","DEV-855","DEV-901","DEV-920"]}'
     new: '{"blocks":["DEV-920"],"related":["DEV-584","DEV-833","DEV-855","DEV-901","DEV-920"]}'
+- at: 2026-11-27T04:22:54.053165+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T04:22:54.393122+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-27T05:44:12.170381+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-920"],"related":["DEV-584","DEV-833","DEV-855","DEV-901","DEV-920"]}'
+    new: '{"blocks":["DEV-920"],"related":["DEV-584","DEV-833","DEV-855","DEV-901","DEV-920","DEV-909"]}'

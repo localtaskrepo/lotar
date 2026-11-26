@@ -11300,7 +11300,7 @@
           },
           "t3_status": {
             "type": "string",
-            "description": "The thread's status as T3 Code names it (running, completed, failed, ...)."
+            "description": "The thread's status as T3 Code names it (running, completed, failed, ...); when a milestone gives the state, the settled run's outcome (completed, failed, interrupted, cancelled), or none for a question."
           },
           "reason": {
             "type": "string",
@@ -11308,7 +11308,7 @@
           },
           "updated_at": {
             "type": "string",
-            "description": "When T3 Code last changed the thread."
+            "description": "When T3 Code last changed the thread; when a milestone gives the state, when lotar logged it."
           },
           "checked_at": {
             "type": "string",

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T03:13:30.591400+00:00
-modified: 2026-11-27T04:15:20.637583+00:00
+modified: 2026-11-27T04:22:57.415492+00:00
 relationships:
   depends_on:
   - DEV-912
@@ -31,8 +31,6 @@ description: |-
   ## Done when
   - [ ] A test: a job taken over from a taken-over job gets the first job's request (prompt and profile), also after a usage-limit pause in between.
   - [ ] `adopt` takes the request from the limit retry it replaces, else from the earlier job's record or log, else `GO_ON`.
-tags:
-- waits
 history:
 - at: 2026-11-27T03:13:31.016605+00:00
   actor: claude
@@ -78,3 +76,9 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-27T04:22:57.415492+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: waits
+    new: ''
