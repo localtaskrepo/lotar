@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T17:04:45.761529+00:00
-modified: 2026-11-26T21:34:39.655764+00:00
+modified: 2026-11-27T00:40:37.135185+00:00
 relationships:
   blocks:
   - DEV-782
@@ -23,6 +23,7 @@ relationships:
   - DEV-862
   - DEV-882
   - DEV-887
+  - DEV-801
 comments:
 - date: 2026-11-24T19:13:00.928345+00:00
   author: automation
@@ -497,3 +498,9 @@ history:
   - field: tags
     old: health, job-paused, fix-retried, review-returned, review-returned-twice
     new: health
+- at: 2026-11-27T00:40:37.135185+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-782","DEV-778"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778","DEV-805","DEV-804","DEV-835","DEV-837","DEV-862","DEV-882","DEV-887"]}'
+    new: '{"blocks":["DEV-782","DEV-778"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778","DEV-805","DEV-804","DEV-835","DEV-837","DEV-862","DEV-882","DEV-887","DEV-801"]}'

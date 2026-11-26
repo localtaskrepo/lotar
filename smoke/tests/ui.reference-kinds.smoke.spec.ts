@@ -27,7 +27,8 @@ import { SmokeWorkspace } from '../helpers/workspace.js';
 // Repository-only endpoints resolve the repo root by walking up from the tasks
 // directory until a `.git` entry exists (backend `find_repo_root`). This suite
 // reuses the backend's fixture strategy: the workspace is a disposable temp
-// directory under `<repo>/target/smoke-scratch`, so the existing checkout's
+// directory under `<repo>/target/smoke-scratch` (`<repo>/.test-tmp/smoke-scratch`
+// when `target` links outside the checkout), so the existing checkout's
 // `.git` is discovered by the ancestor walk — no git command, no `.git`
 // marker, no interception. Repository paths are expressed relative to the
 // discovered repo root (`target/smoke-scratch/<tmp>/docs/notes.txt`), and the
@@ -45,7 +46,18 @@ const ANCHOR_LINE_TEXT = 'repo file line 03 ANCHOR_LINE_THREE';
 
 const SPEC_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SPEC_DIR, '..', '..');
-const SCRATCH_PARENT = path.join(REPO_ROOT, 'target', 'smoke-scratch');
+const SCRATCH_PARENT = scratchParent();
+
+// A job worktree's `target` links to the build root outside the checkout
+// (DEV-762), where the backend rejects the paths as escaping the repository:
+// there the scratch workspaces go in the checkout's `.test-tmp/` (DEV-906).
+function scratchParent(): string {
+    const target = path.join(REPO_ROOT, 'target');
+    const realRoot = fs.realpathSync(REPO_ROOT);
+    const realTarget = fs.existsSync(target) ? fs.realpathSync(target) : target;
+    const inside = realTarget.startsWith(realRoot + path.sep);
+    return path.join(REPO_ROOT, inside ? 'target' : '.test-tmp', 'smoke-scratch');
+}
 
 // Pure filesystem walk mirroring backend `find_repo_root` (existence of a
 // `.git` entry only). This is not a git command.

@@ -15,7 +15,8 @@
 //!
 //! These tests use no git tooling: `.git` is never created or invoked,
 //! and repo-root discovery happens by ancestry from a workspace placed
-//! under CARGO_TARGET_TMPDIR inside the real checkout. The suite must
+//! under CARGO_TARGET_TMPDIR inside the real checkout (or the checkout's
+//! `.test-tmp/` when `target` links outside it, DEV-906). The suite must
 //! stay compiled (and executing) in every environment, including
 //! Git-denied sandboxes (only source-local `git_required` modules are ever
 //! excluded, and never by compilation).
@@ -32,6 +33,9 @@ use std::path::{Path, PathBuf};
 /// creating any `.git` marker (this one does). No git tooling or commands
 /// are involved; every file lives inside the fixture's own workspace.
 /// Repo-relative reference values are expressed through [`Dev61Fixture::rel`].
+/// A job worktree's `target` links to the build root outside the checkout
+/// (DEV-762); there [`fixture_base`] uses the checkout's `.test-tmp/` instead,
+/// since reference paths are canonicalized against the repository root.
 struct Dev61Fixture {
     _tmp: tempfile::TempDir,
     workspace: PathBuf,
@@ -46,9 +50,23 @@ struct Dev61Fixture {
     _guard_fast: EnvVarGuard,
 }
 
+fn fixture_base() -> PathBuf {
+    let target_tmp = Path::new(env!("CARGO_TARGET_TMPDIR"));
+    let checkout = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let (Ok(real_tmp), Ok(real_checkout)) = (target_tmp.canonicalize(), checkout.canonicalize()) else {
+        return target_tmp.to_path_buf();
+    };
+    if real_tmp.starts_with(&real_checkout) {
+        return target_tmp.to_path_buf();
+    }
+    let base = real_checkout.join(".test-tmp");
+    std::fs::create_dir_all(&base).unwrap();
+    base
+}
+
 fn isolated_workspace() -> Dev61Fixture {
     let _guard_fast = EnvVarGuard::set("LOTAR_TEST_FAST_IO", "1");
-    let tmp = tempfile::tempdir_in(std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))).unwrap();
+    let tmp = tempfile::tempdir_in(fixture_base()).unwrap();
     let workspace = tmp.path().join("main");
     let tasks_dir = workspace.join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();

@@ -3,9 +3,9 @@ status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@review-claude'
+assignee: '@fix-retry'
 created: 2026-11-22T19:22:12.213895+00:00
-modified: 2026-11-26T23:35:20.589293+00:00
+modified: 2026-11-27T00:40:48.529696+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -31,6 +31,8 @@ relationships:
   - DEV-867
   - DEV-906
   - DEV-908
+  - DEV-840
+  - DEV-890
 comments:
 - date: 2026-11-22T22:40:05.875209+00:00
   author: claude
@@ -145,6 +147,30 @@ comments:
 - date: 2026-11-26T21:35:06.638945+00:00
   author: automation
   text: 'Paused, not failed: the job job-20261126T213458.625Z-76 (fix-retry) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T213458.625Z-76 why.'
+- date: 2026-11-27T00:40:36.850113+00:00
+  author: claude
+  text: |-
+    Review: blocking. Half of the fix is already on main: DEV-890 sets `LOTAR_CHECK_LOCK_HELD=1` for the tests.
+
+    Read: the ticket and its 15 comments, DEV-840 and DEV-890 (both Done on main), the diff of `925bc14df`, and the commits to the touched files on main since the branch's base `6d77a20df`. Reran everything on a copy rebased onto main `5f7f70b65`, which applies cleanly.
+
+    **Blocking**
+    - `crates/lotar-lib/tests/common/mod.rs:64-71`: the new `LOTAR_CHECK_LOCK_HELD=1` block duplicates main's `d1061401e` (DEV-890). That commit sets the variable in `reset_lotar_test_environment()`, which `init_lotar_test_environment` already calls on line 63. After the rebase the test process sets the variable twice.
+    - So the claim in comment 14 no longer holds: `the_tests_never_wait_for_the_machines_check_lock` (`dev797_one_merge_checks_at_a_time_test.rs:291`) fails only on the old base. On main it passes without this change. The `dev503` continued-merge timeout was also fixed on main by DEV-890.
+    - Fix: rebase onto main and drop the duplicate block. Keep the test as a guard of DEV-890's default, with its comment naming DEV-890. Make the README line (`crates/lotar-lib/tests/README.md:13`) say the lock default comes from `reset_lotar_test_environment`. In the outcome, credit comment 12's `dev605` fix to DEV-890.
+
+    **Holds**
+    - Queue-worker default (`LOTAR_AGENT_QUEUE_DISABLE_WORKER=1`, comments 1–10): adds to DEV-840's fix (`a18d5ff8e`, read-only queue calls) rather than repeating it. DEV-840 does not cover a late worker recreating `.tasks` from `--tasks-dir`. The worker tests added on main (`dev732`, `dev733`, `dev584`, `dev592`, `dev604`, `dev630`, `dev837`) already opt in with `env_remove`.
+    - Smoke 'Instructions button' (comment 11): only gets a better error message. The test didn't reproduce for me either, so the merge's full smoke run checks "Done when" for it, as the fix agent's next step says.
+
+    **Reran on the rebased copy**
+    - `node scripts/rust-test-runner.mjs --cargo-profile dev -p lotar-lib --test integration -E <dev503, dev660, dev797, cli_agent_check, agent_safety, dev361, dev605, dev732, dev733, dev786, dev860, dev592, dev584, dev604, dev630, dev623, dev837, agent_automation_integration>`: 225/225 passed at load ~12, temp guard clean
+    - `npm run -s lint`: passed
+    - `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts`: 16/16 passed
+    - `npm ci`: ran in both checkouts
+    - Not run: `test:agent` and the full smoke suite (the merge runs them). No UI review: the diff changes no pages.
+
+    Tickets filed: none.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75080ac346701fc3377f56ac792640c8450190058560a4bf13c0ec6cbdc24d02
 description: |-
@@ -161,6 +187,7 @@ tags:
 - flaky
 - fix-retried
 - job-paused
+- review-returned
 custom_fields:
   finding: flaky:tests
 history:
@@ -342,3 +369,28 @@ history:
   - field: assignee
     old: '@fix-retry'
     new: '@review-claude'
+- at: 2026-11-27T00:40:36.850113+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T00:40:37.134547+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906","DEV-908"]}'
+    new: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906","DEV-908","DEV-840","DEV-890"]}'
+- at: 2026-11-27T00:40:37.492815+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: flaky, fix-retried, job-paused
+    new: flaky, fix-retried, job-paused, review-blocked
+- at: 2026-11-27T00:40:48.529696+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review-claude'
+    new: '@fix-retry'
+  - field: tags
+    old: flaky, fix-retried, job-paused, review-blocked
+    new: flaky, fix-retried, job-paused, review-returned

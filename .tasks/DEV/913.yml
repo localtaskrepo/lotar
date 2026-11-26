@@ -1,18 +1,44 @@
 title: Smoke comment says the loaded log closes an Instructions panel opened while loading, which DEV-888 fixes
-status: Todo
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review-light'
 created: 2026-11-26T23:36:28.876091+00:00
-modified: 2026-11-26T23:36:29.746965+00:00
+modified: 2026-11-27T00:41:37.272579+00:00
 relationships:
   related:
   - DEV-875
   - DEV-888
+comments:
+- date: 2026-11-27T00:41:30.804276+00:00
+  author: claude
+  text: |-
+    Smoke comment no longer claims the loaded log closes the Instructions panel.
+
+    - `smoke/tests/ui.agent-jobs.smoke.spec.ts:361`: now says the test checks the button in the loaded log's header, so it waits for that header
+    - Wording holds before and after DEV-888 (still `Merging`, branch `agent/DEV-888` predates DEV-875's comment), so no wait on it
+    - Commit `212d60002`, 2 lines changed, tagged `small-diff`
+  report:
+    commits:
+    - hash: 212d60002
+      what: reword the smoke comment
+    checks:
+    - command: npx prettier --check smoke/tests/ui.agent-jobs.smoke.spec.ts
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: comment-only change, prettier checked
+    - command: smoke ui.agent-jobs
+      result: not_run
+      reason: comment-only change, merge runs smoke
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9bdfff5233fa41857cf5b0bbce4be80150b72e5a1be11133a3ef7cb291b3a540
 description: 'Found: reviewing DEV-888. smoke/tests/ui.agent-jobs.smoke.spec.ts:307-308 on main (cb61901d7, DEV-875) says the loaded log replaces the loading-state Instructions button ''closing a panel opened there''. Once DEV-888 lands, the panel stays open, so the comment describes a bug that no longer exists. Check: read the comment after DEV-888 is on main. Done: the comment says why the test waits for the log header (it checks the header button), without claiming the panel closes.'
 tags:
 - health
+- small-diff
 custom_fields:
   finding: review:smoke-stale-comment
 history:
@@ -27,3 +53,33 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T00:40:52.292481+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T00:40:52.921594+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9bdfff5233fa41857cf5b0bbce4be80150b72e5a1be11133a3ef7cb291b3a540
+- at: 2026-11-27T00:41:30.739518+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, small-diff
+- at: 2026-11-27T00:41:30.804276+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T00:41:37.272579+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review-light'

@@ -1,11 +1,11 @@
 title: 'Two dev503 continued-merge tests time out at 60 s once under load and pass alone: not in the wall-clock group'
-status: InProgress
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review-light'
 created: 2026-11-26T19:27:41.962615+00:00
-modified: 2026-11-27T00:17:05.146874+00:00
+modified: 2026-11-27T00:29:13.494816+00:00
 relationships:
   related:
   - DEV-858
@@ -50,6 +50,31 @@ comments:
     - Not a pass, because the fix agent's own 58/58 run needed a retry (57 s) and the filter adds retries that only hide the lock wait.
 
     Set `review-blocked`.
+- date: 2026-11-27T00:29:05.412031+00:00
+  author: claude
+  text: |-
+    Fixed the wait itself: the dev503 merges no longer wait on the machine's check lock.
+
+    - Review read HEAD `05fdc397a` (its only diff, `.config/nextest.toml`).
+    - Reproduced before the fix: another session's `node` held port 47586, and both continued-merge tests failed at 60 s with `--retries 0`.
+    - Fix: `t3_harness_and` and the harness-to-harness test in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs` set `LOTAR_CHECK_LOCK_HELD=1` (an `EnvVarGuard`), the same variable DEV-801 (`925bc14df`) sets for all tests. Staying in this file avoids a conflict with DEV-801's `tests/common/mod.rs`.
+    - The full dev503 run also caught `a_ticket_hands_its_context_from_harness_to_harness_through_its_states` (66 s, same lock wait), so it got the guard too.
+    - The `wall-clock` filter entries are dropped. `.config/nextest.toml` matches main again.
+    - After the fix, with the lock still held elsewhere: dev503 passed 58/58 in 12.8 s, no retries.
+  report:
+    commits:
+    - hash: 0c95eb011
+      what: dev503 harnesses set LOTAR_CHECK_LOCK_HELD=1; wall-clock entries dropped
+    checks:
+    - command: cargo nextest run --workspace --test integration --retries 0 dev503
+      result: passed
+      reason: 58/58 in 12.8 s while another session's node held port 47586
+    - command: npm run lint
+      result: passed
+    - command: npm test / smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: Review again; once DEV-801 lands, its common/mod.rs sets the same variable and these guards become redundant (harmless)
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abdbc73e5c042eb609474382b70ddcaca9f0f02c95c0b38424a98ca70a7a7c532
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A852f0c8878dc57d4d90273be23977fbcff3ea9aa8982a4e397f789218cf2e4f5
@@ -155,3 +180,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A852f0c8878dc57d4d90273be23977fbcff3ea9aa8982a4e397f789218cf2e4f5
+- at: 2026-11-27T00:29:05.412031+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T00:29:13.494816+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review-light'

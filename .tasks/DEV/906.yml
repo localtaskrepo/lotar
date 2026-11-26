@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T19:25:16.556571+00:00
-modified: 2026-11-27T00:09:14.418668+00:00
+modified: 2026-11-27T00:38:28.849713+00:00
 relationships:
   related:
   - DEV-762
@@ -57,6 +57,22 @@ comments:
     - `rustfmt --edition 2024 --check` on the file and `cargo clippy -p lotar-lib --tests`: clean. I restored the test file afterwards, and `git status` is clean.
     - Minor, not filed: the tests leave an empty, ignored `.test-tmp/` folder in the checkout. Other test files still put workspaces in `CARGO_TARGET_TMPDIR`, but they don't check paths against the repository root and the ticket doesn't ask about them.
     - No owner decision involved, no stray files, no second branch.
+- date: 2026-11-27T00:38:28.849713+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: the check `npm run -s smoke` failed, and again when rerun on its own:\n```\n\e[90m \e[2m❯\e[22m withBrowser helpers/ui.ts:\e[2m92:20\e[22m\e[39m\n\e[90m \e[2m❯\e[22m tests/ui.reference-kinds.smoke.spec.ts:\e[2m304:17\e[22m\e[39m\n\n\e[31m\e[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\e[22m\e[39m\n\n\e[41m\e[1m FAIL \e[22m\e[49m \e[30m\e[46m parallel \e[49m\e[39m tests/ui.reference-kinds.smoke.spec.ts\e[2m > \e[22mUI reference kinds (DEV-61)\e[2m > \e[22mdiscriminates same-basename attachment and repository file references\n\e[31m\e[1mTimeoutError\e[22m: locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator('[data-testid=\"references-add-dialog\"]') to be hidden\n    34 × locator resolved to visible <div role=\"dialog\" aria-modal=\"true\" aria-label=\"Add reference\" data-testid=\"references-add-dialog\" class=\"task-panel-dialog__overlay task-panel__references-dialog task-panel__references-dialog--file\">…</div>\n\e[39m\n\e[36m \e[2m❯\e[22m addRepoFileReference tests/ui.reference-kinds.smoke.spec.ts:\e[2m200:18\e[22m\e[39m\n    \e[90m198|\e[39m     \e[35mawait\e[39m dialog\e[33m.\e[39m\e[34mlocator\e[39m(\e[32m'#task-panel-add-file-input'\e[39m)\e[33m.\e[39m\e[34mfill\e[39m(repoPath)\e[33m;\e[39m\n    \e[90m199|\e[39m     \e[35mawait\e[39m dialog\e[33m.\e[39m\e[34mgetByRole\e[39m(\e[32m'button'\e[39m\e[33m,\e[39m { name\e[33m:\e[39m \e[32m'Add file'\e[39m })\e[33m.\e[39m\e[34mclick\e[39m()\e[33m;\e[39m\n    \e[90m200|\e[39m     \e[35mawait\e[39m dialog\e[33m.\e[39m\e[34mwaitFor\e[39m({ state\e[33m:\e[39m \e[32m'hidden'\e[39m\e[33m,\e[39m timeout\e[33m:\e[39m \e[34m15_000\e[39m })\e[33m;\e[39m\n    \e[90m   |\e[39m                  \e[31m^\e[39m\n    \e[90m201|\e[39m }\n    \e[90m202|\e[39m\n\e[90m \e[2m❯\e[22m tests/ui.reference-kinds.smoke.spec.ts:\e[2m418:21\e[22m\e[39m\n\e[90m \e[2m❯\e[22m helpers/ui.ts:\e[2m112:20\e[22m\e[39m\n\e[90m \e[2m❯\e[22m withBrowser helpers/ui.ts:\e[2m92:20\e[22m\e[39m\n\e[90m \e[2m❯\e[22m tests/ui.reference-kinds.smoke.spec.ts:\e[2m406:17\e[22m\e[39m\n\n\e[31m\e[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\e[22m\e[39m\n\n\n\e[2m Test Files \e[22m \e[1m\e[31m1 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m117 passed\e[39m\e[22m\e[90m (118)\e[39m\n\e[2m      Tests \e[22m \e[1m\e[31m2 failed\e[39m\e[22m\e[2m | \e[22m\e[1m\e[32m411 passed\e[39m\e[22m\e[90m (413)\e[39m\n\e[2m   Start at \e[22m 16:36:35\n\e[2m   Duration \e[22m 113.58s\e[2m (tests 93%, import 6%, setup 1%)\e[22m\n```.\n\n- Rebased `agent/DEV-906` onto `main` (`5f7f70b6513c`): `bd7b48e0b4d4`\n- The check `npm run -s lint:agent` passed\n- The check `npm run -s test:agent` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: failed
+      reason: first run
+    - command: npm run -s smoke
+      result: failed
+      reason: rerun
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A201112dca23f251d4b5095e69820b4cf1300d02be05094b8089eb90a024f14bb
 description: |-
@@ -149,3 +165,7 @@ history:
   - field: relationships
     old: '{"related":["DEV-762","DEV-905","DEV-907","DEV-801"]}'
     new: '{"related":["DEV-762","DEV-905","DEV-907","DEV-801","DEV-579"]}'
+- at: 2026-11-27T00:38:28.849713+00:00
+  actor: automation
+  changes:
+  - field: comment_added

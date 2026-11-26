@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T01:18:52.353749+00:00
-modified: 2026-11-26T23:36:56.052382+00:00
+modified: 2026-11-27T00:41:40.327039+00:00
 relationships:
   related:
   - DEV-875
@@ -100,6 +100,12 @@ comments:
     - **Main since the fix:** `cb61901d7` (DEV-875), `f8fee3ca8` (DEV-880) and `eb9b383f7` (DEV-865) touch the same files. `git merge-tree` with main reports no conflicts.
     - **Minor, filed:** [DEV-913](https://lotar.pyxzl.net/task/DEV-913). On main, the comment at `smoke/tests/ui.agent-jobs.smoke.spec.ts:307-308` (from `cb61901d7`) says the loaded log closes a panel opened while loading. That stops being true once this merges.
     - **Not run:** full `npm run lint`, `npm test`, `npm run smoke` (the merge runs them, DEV-797).
+- date: 2026-11-27T00:41:40.327039+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-888` onto `main` conflicts in `view/__tests__/AgentJobs.spec.ts`; lotar aborted the rebase, `agent/DEV-888` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A038063cbc62a9008d25ebe42791e04e1b9b8bb44d87c11815642b1e7f481e2cf
 - attachment: DEV-888-before.53340ace512ce77337a1963f3be62ff4.png
@@ -334,3 +340,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T00:41:40.327039+00:00
+  actor: automation
+  changes:
+  - field: comment_added

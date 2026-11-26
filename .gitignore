@@ -1,4 +1,6 @@
 /target
+# Test workspaces inside the checkout when target links outside it (DEV-906)
+/.test-tmp/
 node_modules/
 /.parcel-cache/
 /public/*

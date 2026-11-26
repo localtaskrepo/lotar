@@ -1,11 +1,11 @@
 title: 'A merge job that ends while its agent waits on a check still lands: DEV-725 (v0.15.6) went to main with smoke failed, and is Done without push or tag'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T14:05:11.563685+00:00
-modified: 2026-11-26T23:42:20.185910+00:00
+modified: 2026-11-27T00:28:41.751023+00:00
 relationships:
   related:
   - DEV-725
@@ -18,6 +18,8 @@ relationships:
   - DEV-786
   - DEV-835
   - DEV-797
+  - DEV-279
+  - DEV-654
 comments:
 - date: 2026-11-22T18:46:53.150110+00:00
   author: claude
@@ -249,6 +251,34 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-793` onto `main` conflicts in `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-793` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-27T00:28:34.038242+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `5f7f70b65` is on main and origin.
+
+    - **Conflict in `docs/help/agent.md`:** both sides changed the same paragraph. Main changed the opening sentence (a job without a profile on a `Merging` ticket; other profiles stay their own kind). DEV-793 added the sentences about check reports after "doesn't stop the fast-forward." I kept both.
+    - Main moved on twice while the checks ran (`61a229a1e`, then `a86a55cca` and `88a955446`). I rebased each time and reran `npm ci`, lint, tests and smoke; all passed on the final rebase `762ad2496`.
+    - The fast-forward went through. I amended the main checkout's `.tasks` changes into the commit, giving `5f7f70b65`. I pushed with hooks on; it was the only unpushed commit.
+    - No rules or config changed, so I didn't run `lotar trust`.
+    - The finding check doesn't list this ticket's finding. Its 4 remaining problems belong to other tickets (DEV-654, DEV-279, …).
+  report:
+    commits:
+    - hash: 5f7f70b65
+      what: DEV-793 merge gate on reported checks, rebased onto main 88a955446 and pushed
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2622 nextest + 1626 vitest
+    - command: npm run -s smoke
+      result: passed
+      reason: 413 of 413
+    - command: LOTAR_FINDING=comms:merge-lands-while-agent-waits node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
+      reason: finding no longer listed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae4fdf07e45e5d08840b6db8ca5bd9908ae2b2f9ca24ad5c743aefe6e9d75503c
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6d8192ab561e43d0dbaf9c1144ee00f67f5d29b2bc8bf5155fc6cfffcb924d1f
@@ -272,10 +302,6 @@ description: |-
   - A release ticket isn't set Done before its tag is pushed; DEV-725 is reopened or finished (smoke green, pushed, tagged, installed), and the owner or chief of staff is told its real state.
 tags:
 - health
-- review-returned
-- job-paused
-- review-returned-twice
-- fix-retried
 custom_fields:
   finding: comms:merge-lands-while-agent-waits
 history:
@@ -551,3 +577,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T00:28:34.038242+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T00:28:34.328690+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-725","DEV-780","DEV-783","DEV-411","DEV-604","DEV-767","DEV-892","DEV-786","DEV-835","DEV-797"]}'
+    new: '{"related":["DEV-725","DEV-780","DEV-783","DEV-411","DEV-604","DEV-767","DEV-892","DEV-786","DEV-835","DEV-797","DEV-279","DEV-654"]}'
+- at: 2026-11-27T00:28:41.751023+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, review-returned, job-paused, review-returned-twice, fix-retried
+    new: health
