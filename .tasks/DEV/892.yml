@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@review'
 created: 2026-11-26T05:03:35.190384+00:00
-modified: 2026-11-26T19:44:13.174553+00:00
+modified: 2026-11-26T21:17:44.719145+00:00
 relationships:
   depends_on:
   - standards:STD-371
@@ -57,6 +57,9 @@ comments:
       result: not_run
       reason: no UI or CLI change
     next: Review, then merge; after the merge run lotar trust in the main checkout (rules changed)
+- date: 2026-11-26T21:17:44.719145+00:00
+  author: automation
+  text: 'Paused, not failed: the job job-20261126T211740.642Z-62 (review) stopped on a usage limit or a paused queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs shows when it resumes, lotar agent logs job-20261126T211740.642Z-62 why.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae1edf2664a8153d71f5068404bc0570004287503196960c50b7ab49e2e10b3c7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A854085c4248d6f5c9a16429c96ad2b629a5d948136b69a3e98de6af32a725cda
@@ -75,6 +78,7 @@ description: |-
   - A release ticket (title `Release vX.Y.Z` or field `release`) isn't set Done by its merge job until `vX.Y.Z` is on origin, or its merge doesn't run the Done rule. There's a test for it.
 tags:
 - health
+- job-paused
 custom_fields:
   finding: review:release-done-before-tag
 history:
@@ -144,3 +148,13 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-26T21:17:44.682989+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, job-paused
+- at: 2026-11-26T21:17:44.719145+00:00
+  actor: automation
+  changes:
+  - field: comment_added

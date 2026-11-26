@@ -1,11 +1,11 @@
 title: lotar agent queue doesn't count the jobs queued in lotar serve's memory
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T14:02:30.792755+00:00
-modified: 2026-11-26T19:40:51.412262+00:00
+modified: 2026-11-26T21:17:32.466277+00:00
 relationships:
   related:
   - DEV-865
@@ -104,6 +104,29 @@ comments:
     - command: npm run lint / npm test / npm run smoke
       result: not_run
       reason: the merge runs the full suites (DEV-797)
+- date: 2026-11-26T21:17:32.032748+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-871` is in `main`.
+
+    - Rebased `agent/DEV-871` onto `main` (`bec2f45a4186`): `0c9eb0ab0deb`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `0c9eb0ab0deb`
+    - Amended the pending `.tasks` changes into the merged commit: `bd6c94d37593`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: bd6c94d37
+      what: DEV-871 lotar agent queue doesn't count the jobs queued in lotar serve's memory
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A10eb79315e69bb050f3ef09b865df6903f423d6fa2c7100ad862ad363ae7c104
 description: '-'
@@ -252,3 +275,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-26T21:17:32.032748+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-26T21:17:32.466277+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
