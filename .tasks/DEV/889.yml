@@ -3,9 +3,9 @@ status: HelpNeeded
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-26T03:32:05.108189+00:00
-modified: 2026-11-26T18:06:42.769744+00:00
+modified: 2026-11-26T20:00:46.415374+00:00
 relationships:
   related:
   - DEV-860
@@ -17,6 +17,8 @@ relationships:
   - DEV-872
   - DEV-887
   - DEV-904
+  - DEV-799
+  - DEV-894
 comments:
 - date: 2026-11-26T04:58:33.643514+00:00
   author: claude
@@ -39,8 +41,25 @@ comments:
 - date: 2026-11-26T17:08:00.133416+00:00
   author: mallox
   text: 'Answer: drop (Drop all 7 and delete the file) (answered in INBOX-767)'
+- date: 2026-11-26T20:00:34.617366+00:00
+  author: claude
+  text: |-
+    Dropped the 7 approved entries; kept the file: 8 new jobs landed in it today, which you haven't decided on.
+
+    - `queue-b06823c0….json` had 15 pending, not 7. New since 16:46Z: FND-27, DEV-894 (fix, InProgress), DEV-799 (merge, Merging), FND-28 + FND-29 (fix and review), LOCA-631.
+    - Cause: installed lotar is v0.15.7 (released 17:18Z); DEV-887's fix `0cf94860d` landed on `main` at 19:16Z, after it. Agents running `lotar agent run … --tasks-dir .tasks` still write here, and no worker runs these jobs.
+    - Removed DEV-850, DEV-849, DEV-848, DEV-827, STD-336, DEV-872, STD-359 only. Backup: `scratchpad/queue-b06823c0….json.bak`.
+    - Leak stops once a release with `0cf94860d` is installed.
+
+    Question: for the 8 new entries, should I requeue them under each repo's absolute tasks dir once a release with DEV-887 is installed, then delete the file? (I recommend yes; requeueing now would just leak again.)
+  report:
+    checks:
+    - command: queue file read before/after
+      result: passed
+      reason: 15 -> 8 pending
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1c1b94732806b9b77a50613c04a1a582524ec503076e19e24843db18e4f19fa5
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A348c8be0d6af88553ec0fc486e860caa6d139c788491aa5c658ec157106d8578
 description: |-
   Found (DEV-860 review): `~/Library/Caches/lotar/agent-queue/queue-b06823c05bdb7cda4004b1281c7001744d021ba39e3f81993eb5805f188f6f3e.json` (tasks_dir `.tasks`, last written 2026-11-25 22:14Z) holds DEV-850, DEV-849, DEV-848, DEV-827, STD-336, DEV-872 and STD-359. Since DEV-822 the resolver makes the path absolute, so nothing reads that file again.
 
@@ -114,3 +133,33 @@ history:
   - field: relationships
     old: '{"related":["DEV-860","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-887"]}'
     new: '{"related":["DEV-860","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-887","DEV-904"]}'
+- at: 2026-11-26T19:59:50.481105+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-26T19:59:51.844010+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A348c8be0d6af88553ec0fc486e860caa6d139c788491aa5c658ec157106d8578
+- at: 2026-11-26T20:00:34.617366+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:00:35.393025+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-860","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-887","DEV-904"]}'
+    new: '{"related":["DEV-860","DEV-822","DEV-827","DEV-848","DEV-849","DEV-850","DEV-872","DEV-887","DEV-904","DEV-799","DEV-894"]}'
+- at: 2026-11-26T20:00:46.415374+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

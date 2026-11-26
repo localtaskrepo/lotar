@@ -4,7 +4,7 @@
 #![cfg(unix)]
 
 use crate::common::TestFixtures;
-use lotar::api_types::{AgentJobCreateRequest, TaskCreate};
+use lotar::api_types::{AgentJobCreateRequest, TaskCreate, TaskUpdate};
 use lotar::services::agent_job_service::{AgentJobService, AgentOrchestratorMode};
 use lotar::services::task_service::TaskService;
 use std::fs;
@@ -17,8 +17,8 @@ const TICKET: &str = "MRG-1";
 const BRANCH: &str = "agent/MRG-1";
 
 /// A repository whose main checkout holds `.tasks`, with a bare `origin`,
-/// the ticket's branch checked out in a fix worktree, and a merge agent that
-/// writes its prompt to `prompt` when it runs.
+/// the ticket's branch checked out in a fix worktree, and a merge (and fix)
+/// agent that writes its prompt to `prompt` when it runs.
 struct Repo {
     fixtures: TestFixtures,
     /// Holds the worktrees, the remote and the agent outside the checkout.
@@ -52,9 +52,9 @@ impl Repo {
         fs::write(
             fixtures.tasks_root.join("config.yml"),
             format!(
-                "default:\n  project: MRG\nissue:\n  states: [Todo, Merging, Done]\n  priorities: [Low]\n  types: [Feature]\nagent:\n  worktree:\n    enabled: true\n    dir: '{}'\n{merge_config}agents:\n  merge:\n    runner: command\n    command: '{}'\n",
+                "default:\n  project: MRG\nissue:\n  states: [Todo, Merging, Done]\n  priorities: [Low]\n  types: [Feature]\nagent:\n  worktree:\n    enabled: true\n    dir: '{}'\n{merge_config}agents:\n  merge:\n    runner: command\n    command: '{agent}'\n  fix:\n    runner: command\n    command: '{agent}'\n",
                 outside.path().join("worktrees").display(),
-                agent.display()
+                agent = agent.display()
             ),
         )
         .expect("write config");
@@ -106,11 +106,17 @@ impl Repo {
 
     /// [`Self::merge`], with the job's progress lines first.
     fn merge_job(&self) -> (Vec<String>, String, Option<String>) {
+        self.job_of("merge")
+    }
+
+    /// Run a job of `profile` on the ticket to its end; its progress lines,
+    /// status and the agent's prompt, when the agent ran.
+    fn job_of(&self, profile: &str) -> (Vec<String>, String, Option<String>) {
         let job = AgentJobService::start_job_with_tasks_dir(
             AgentJobCreateRequest {
                 ticket_id: TICKET.to_string(),
                 prompt: "Merge the ticket".to_string(),
-                agent: Some("merge".to_string()),
+                agent: Some(profile.to_string()),
                 ..Default::default()
             },
             &self.fixtures.tasks_root,
@@ -241,6 +247,28 @@ fn a_ticket_nothing_was_built_for_is_not_done() {
     assert_eq!(prompt, None, "no agent started");
     let summary = AgentJobService::list_jobs_in(&repo.fixtures.tasks_root).into_iter().find_map(|job| job.summary).unwrap_or_default();
     assert!(summary.contains("nothing was built"), "{summary}");
+}
+
+/// DEV-886: the merge failed so, and its `job_failed` retry assigned `@fix`
+/// while the ticket stays in `Merging`. The fix job runs its agent instead
+/// of lotar's merge, and doesn't fail with the merge's verdict.
+#[test]
+fn a_fix_job_on_a_merging_ticket_runs_its_agent() {
+    let repo = Repo::new(CHECKS);
+    let mut storage = repo.fixtures.create_storage();
+    TaskService::update_with_context(
+        &mut storage,
+        TICKET,
+        TaskUpdate { status: Some("Merging".to_string()), ..Default::default() },
+        lotar::services::task_service::TaskUpdateContext::automation_disabled(),
+    )
+    .expect("set Merging");
+
+    let (progress, status, prompt) = repo.job_of("fix");
+
+    assert!(prompt.is_some(), "the fix agent ran");
+    assert!(!progress.iter().any(|line| line.starts_with("Nothing to merge")), "{progress:?}");
+    assert_eq!(status, "completed");
 }
 
 /// DEV-685: the same ticket, merged by an agent that exits 1. Its empty

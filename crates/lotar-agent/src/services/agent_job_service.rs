@@ -6560,8 +6560,15 @@ fn has_active_merge_job(registry: &JobRegistry) -> bool {
     registry.jobs.values().any(|state| state.record.is_merge_job && matches!(state.record.status, AgentJobStatus::Queued | AgentJobStatus::Running))
 }
 
+/// A job of profile `merge`, or one without a profile on a ticket in
+/// `Merging`. Another profile's job stays its own kind on a Merging ticket:
+/// a merge's `job_failed` retry assigns `@fix` and leaves the status
+/// (DEV-886), and a review can run after the ticket moved on (DEV-566).
 fn is_merge_job_candidate(task: &crate::api_types::TaskDTO, agent_profile: Option<&str>) -> bool {
-    task.status.as_str().eq_ignore_ascii_case("Merging") || is_merge_profile(agent_profile)
+    match agent_profile.map(str::trim).filter(|profile| !profile.is_empty()) {
+        Some(profile) => is_merge_profile(Some(profile)),
+        None => task.status.as_str().eq_ignore_ascii_case("Merging"),
+    }
 }
 
 impl AgentJobService {
@@ -6578,7 +6585,7 @@ impl AgentJobService {
 /// The tag a blocking review sets; a rework removes it.
 const REVIEW_BLOCKED_TAG: &str = "review-blocked";
 
-/// Why a merge job (profile `merge`, or a ticket in `Merging`) can't start
+/// Why a merge job (profile `merge`, or no profile on a ticket in `Merging`) can't start
 /// (DEV-566): its ticket carries a blocking review that no rework has
 /// answered yet.
 pub(crate) fn review_blocks_merge(task: &crate::api_types::TaskDTO, agent_profile: Option<&str>) -> Option<String> {
@@ -7725,6 +7732,18 @@ mod tests {
         assert_eq!(job.status, "failed", "{job:?}");
         let reason = job.summary.or(job.last_message).unwrap_or_default();
         assert!(reason.contains("exited before the job ended, before it started the t3 session"), "{reason}");
+    }
+
+    #[test]
+    fn a_job_on_a_merging_ticket_is_a_merge_job_only_without_another_profile() {
+        let merging = crate::api_types::TaskDTO { status: crate::types::TaskStatus::from("Merging"), ..sample_task() };
+        assert!(is_merge_job_candidate(&merging, Some("merge")));
+        assert!(is_merge_job_candidate(&merging, None), "no profile: the status decides");
+        assert!(is_merge_job_candidate(&merging, Some(" ")), "a blank profile is none");
+        assert!(!is_merge_job_candidate(&merging, Some("fix")), "a merge's retry assigns @fix and leaves Merging (DEV-886)");
+        assert!(!is_merge_job_candidate(&merging, Some("review")));
+        assert!(is_merge_job_candidate(&sample_task(), Some("Merge")));
+        assert!(!is_merge_job_candidate(&sample_task(), None));
     }
 
     #[test]

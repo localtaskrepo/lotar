@@ -5,10 +5,11 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-26T07:08:32.438639+00:00
-modified: 2026-11-26T16:52:13.921961+00:00
+modified: 2026-11-26T20:00:35.393345+00:00
 relationships:
   related:
   - DEV-882
+  - DEV-889
 description: 'Found in review of DEV-882 (4a46916a2). docs/help/agent.md list-jobs line says `created_at` is when a job left the queue. For a job that `lotar serve` holds as queued, the in-memory record (`GET /api/jobs` while it is queued or running) keeps `created_at` = the time it was queued, which equals `queued_at` (agent_job_service.rs start_job_inner: `queued_at = queued_from.or_else(|| should_queue.then(|| created_at.clone()))`). Only the saved log header takes `created_at` from `started_at` (start_job -> init_job_log). Check: hold a job in serve, read GET /api/jobs. Done: the doc describes created_at for both, or the record''s created_at matches the log header''s.'
 history:
 - at: 2026-11-26T07:08:35.462071+00:00
@@ -22,3 +23,9 @@ history:
   - field: status
     old: Todo
     new: InProgress
+- at: 2026-11-26T20:00:35.393345+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-882"]}'
+    new: '{"related":["DEV-882","DEV-889"]}'

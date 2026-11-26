@@ -1,11 +1,11 @@
 title: 'Flaky: a Rust test sometimes leaves a .tmpXXXXXX entry in the test runner''s temp folder, failing a passing run'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-24T17:04:45.761529+00:00
-modified: 2026-11-26T16:57:41.548611+00:00
+modified: 2026-11-26T19:59:11.111547+00:00
 relationships:
   blocks:
   - DEV-782
@@ -18,6 +18,11 @@ relationships:
   - DEV-778
   - DEV-805
   - DEV-804
+  - DEV-835
+  - DEV-837
+  - DEV-862
+  - DEV-882
+  - DEV-887
 comments:
 - date: 2026-11-24T19:13:00.928345+00:00
   author: automation
@@ -178,6 +183,18 @@ comments:
 - date: 2026-11-26T16:57:41.548611+00:00
   author: claude
   text: 'Stalled since 2026-11-26T11:05Z with no lotar job: the live check restarted the review (lotar rule "Answered in the thread: review on Codex"). A second stall at this step goes to mallox (repos.ts --live --report, STD-167).'
+- date: 2026-11-26T19:59:04.568856+00:00
+  author: claude
+  text: |-
+    Review: passed. The queue readers only read, the two worker tests wait for their worker to exit, and nothing was left in 20 of 20 loaded runs.
+
+    - Read: `git diff main...HEAD` at HEAD `14182422c` (6 files), the ticket and all 13 comments, both earlier blocking reviews, `agent_queue_service.rs` on main (`with_locked_queue`, `read_state`, `load_state`), and the main commits to the touched files (DEV-887, DEV-882, DEV-862, DEV-835, DEV-837). The branch is 61 commits behind main; `git merge-tree main HEAD` merges cleanly.
+    - Both findings from the last review are fixed: `list_pending`, `list_parked` and `pending_count` go through `read_queue` (no `create_dir_all`, no write). The legacy `pause` migration still happens in memory in `load_state`, so readers see the same state as before. dev732 and dev733 wait on the worker's pid (`wait_for_worker_exit`), and the `stopped` shortcut is gone.
+    - The worker is spawned with `process_group(0)` by `lotar add`, which exits, so its parent becomes init and `kill -0` can't hang on a zombie. CI runs the Rust tests on VMs, not containers.
+    - Reran: `npm ci` passed. `node --test scripts/tests/rust-test-runner.test.mjs` passed 48/48. `cargo nextest run -p lotar-agent -E 'test(reading_the_queue_leaves)'` passed. With the old `pending_count`, in a scratch worktree I then removed, it fails at `agent_queue_service.rs:1547`.
+    - Leak loop: `TMPDIR=<fresh> cargo nextest run -E 'test(/a_worker_started_from_another_folder|worker_drops_agent_session/)'` ran 10 times at load about 15, then 10 times with 24 `yes` loops (load up to 29). All passed, and nothing was left in any run. `node scripts/rust-test-runner.mjs --agent` on the same tests plus the unit test passed with an empty temp folder.
+    - Findings: none blocking, no minor tickets filed. No stray files, and no second copy of the fix.
+    - Not run: the full `npm run -s test:agent` under load, `npm test` and `npm run smoke` (the merge runs them). Worktree unchanged.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac7f05b3add60383e6fb133c3c983a1c54ea0e9592166ee8c6ff88c3c39d28ff6
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6689f5b3356b418d238db98c339e79d7deaea9dada95c3a9eeb94907d6ecf659
@@ -425,3 +442,22 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-26T19:59:04.568856+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:59:04.990287+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-782","DEV-778"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778","DEV-805","DEV-804"]}'
+    new: '{"blocks":["DEV-782","DEV-778"],"related":["DEV-816","DEV-768","DEV-832","DEV-782","DEV-778","DEV-805","DEV-804","DEV-835","DEV-837","DEV-862","DEV-882","DEV-887"]}'
+- at: 2026-11-26T19:59:11.111547+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

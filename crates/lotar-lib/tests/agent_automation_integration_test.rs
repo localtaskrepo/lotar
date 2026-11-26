@@ -2273,7 +2273,7 @@ fn merge_job_does_not_start_while_review_blocked() {
     let fixtures = TestFixtures::new();
     fixtures.create_config_in_dir(
         &fixtures.tasks_root,
-        "default:\n  project: MRG\nissue:\n  states: [Todo, Merging, Done]\n  priorities: [Low]\n  types: [Feature]\nagents:\n  merge:\n    runner: command\n    command: \"true\"\n  fix:\n    runner: command\n    command: \"true\"\n",
+        "default:\n  project: MRG\nissue:\n  states: [Todo, Merging, Done]\n  priorities: [Low]\n  types: [Feature]\nagents:\n  merge:\n    runner: command\n    command: \"true\"\n",
     );
     let mut storage = fixtures.create_storage();
     let created = TaskService::create(
@@ -2296,24 +2296,6 @@ fn merge_job_does_not_start_while_review_blocked() {
     assert_eq!(
         err.to_string(),
         format!("Validation error: The @merge job didn't start: {} carries tag review-blocked, and no rework has removed it.", created.id)
-    );
-
-    // A job of another profile on a Merging ticket runs as a merge job too.
-    TaskService::update_with_context(
-        &mut storage,
-        &created.id,
-        TaskUpdate { status: Some("Merging".to_string()), ..Default::default() },
-        TaskUpdateContext::automation_disabled(),
-    )
-    .expect("set task to merging");
-    let err = AgentJobService::start_job_with_tasks_dir(
-        AgentJobCreateRequest { ticket_id: created.id.clone(), prompt: "go on".to_string(), agent: Some("fix".to_string()), ..Default::default() },
-        fixtures.tasks_root.as_path(),
-    )
-    .expect_err("a blocked review stops a job on a Merging ticket");
-    assert_eq!(
-        err.to_string(),
-        format!("Validation error: The @fix job didn't start: {} carries tag review-blocked, and no rework has removed it.", created.id)
     );
 }
 

@@ -4822,8 +4822,7 @@ mod pending_outcome_tests {
         assert!(!queued_stage_allows_start(&tasks_dir, &job("merge")), "the blocking review's end rules didn't run");
         assert_eq!(last_comment().as_deref(), Some("The @merge job didn't start: PX-1 carries tag review-blocked, and no rework has removed it."));
         ticket("@fix", "review-blocked");
-        assert!(!queued_stage_allows_start(&tasks_dir, &job("fix")), "a job on a Merging ticket is a merge job");
-        assert_eq!(last_comment().as_deref(), Some("The @fix job didn't start: PX-1 carries tag review-blocked, and no rework has removed it."));
+        assert!(queued_stage_allows_start(&tasks_dir, &job("fix")), "the rework that removes the tag is no merge job (DEV-886)");
         let unprofiled = AgentJobCreateRequest { ticket_id: "PX-1".into(), prompt: "go".into(), ..Default::default() };
         assert!(!queued_stage_allows_start(&tasks_dir, &unprofiled), "nor without a profile");
         assert_eq!(last_comment().as_deref(), Some("The merge job didn't start: PX-1 carries tag review-blocked, and no rework has removed it."));

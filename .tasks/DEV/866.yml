@@ -1,11 +1,11 @@
 title: lotar serve reads the value of --web-ui-path or --allow-host as the port when no port comes before it
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T05:29:21.102795+00:00
-modified: 2026-11-26T19:55:35.954718+00:00
+modified: 2026-11-26T19:55:48.399311+00:00
 relationships:
   related:
   - DEV-789
@@ -180,7 +180,6 @@ description: |-
   - [ ] Every serve option that takes a value keeps its value with a space, also without an earlier port. A test in the preprocess tests covers `--web-ui-path <dir>` and `--allow-host <name>`.
 tags:
 - health
-- review-returned
 custom_fields:
   finding: cli:serve-arg-preprocess
 history:
@@ -309,3 +308,12 @@ history:
   - field: relationships
     old: '{"related":["DEV-789","DEV-804","DEV-897"]}'
     new: '{"related":["DEV-789","DEV-804","DEV-897","DEV-882","DEV-883"]}'
+- at: 2026-11-26T19:55:48.399311+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, review-returned
+    new: health

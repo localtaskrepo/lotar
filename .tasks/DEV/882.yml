@@ -1,11 +1,11 @@
 title: Record memory-gate holds and each job's queued time in the job records
-status: Todo
+status: InProgress
 priority: High
 type: Feature
 reporter: claude
 assignee: '@fix'
 created: 2026-11-25T22:11:53.112006+00:00
-modified: 2026-11-26T19:55:35.955244+00:00
+modified: 2026-11-26T20:04:46.589450+00:00
 relationships:
   related:
   - DEV-827
@@ -24,6 +24,7 @@ relationships:
   - DEV-786
   - DEV-828
   - DEV-866
+  - DEV-840
 comments:
 - date: 2026-11-26T02:14:30.503383+00:00
   author: claude
@@ -115,6 +116,7 @@ comments:
     - Leave DEV-804 to the release session: the release commit is already on origin, so you don't land it.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adf75b0019e9a04d1379a692646fbceb73e18d6a69e7cad88070db40e0a4c5b8a
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9e0c51bcd7facc24ccb67d85538304a8a3e8bbbba88f7c3e962d27f8b997c36a
 description: 'From standards STD-359 proposal F (owner 2026-11-25: all of A-F). The throughput measurement couldn''t count memory-gate hours (holds only go to the server log, DEV-827) and gives queue waits only as a lower bound: the queue keeps no time an entry was queued. Store queued_at per queue entry and job, and each gate hold (start, end, reason) where lotar agent jobs or a stats command can read them.'
 history:
 - at: 2026-11-25T22:11:53.449819+00:00
@@ -298,3 +300,20 @@ history:
   - field: relationships
     old: '{"related":["DEV-827","DEV-894","DEV-797","DEV-804","DEV-884","DEV-883","DEV-870","DEV-881","DEV-880","DEV-875","DEV-876","DEV-825","DEV-887","DEV-786","DEV-828"]}'
     new: '{"related":["DEV-827","DEV-894","DEV-797","DEV-804","DEV-884","DEV-883","DEV-870","DEV-881","DEV-880","DEV-875","DEV-876","DEV-825","DEV-887","DEV-786","DEV-828","DEV-866"]}'
+- at: 2026-11-26T19:59:04.991481+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-827","DEV-894","DEV-797","DEV-804","DEV-884","DEV-883","DEV-870","DEV-881","DEV-880","DEV-875","DEV-876","DEV-825","DEV-887","DEV-786","DEV-828","DEV-866"]}'
+    new: '{"related":["DEV-827","DEV-894","DEV-797","DEV-804","DEV-884","DEV-883","DEV-870","DEV-881","DEV-880","DEV-875","DEV-876","DEV-825","DEV-887","DEV-786","DEV-828","DEV-866","DEV-840"]}'
+- at: 2026-11-26T20:04:44.944840+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T20:04:46.589450+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9e0c51bcd7facc24ccb67d85538304a8a3e8bbbba88f7c3e962d27f8b997c36a

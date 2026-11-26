@@ -1,31 +1,51 @@
 title: Run agent jobs on a second machine over ssh (dyson)
-status: Todo
+status: HelpNeeded
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: mallox
 created: 2026-11-26T17:08:01.064005+00:00
-modified: 2026-11-26T17:08:17.892178+00:00
+modified: 2026-11-26T20:04:40.528284+00:00
+comments:
+- date: 2026-11-26T20:04:29.483394+00:00
+  author: claude
+  text: |-
+    Before I build: which DEV jobs should go to dyson? No code changed yet.
+
+    - An ssh hop only works for profiles that lotar runs itself: `review`, `review-claude`, `review-light`, `triage`, `triage-codex` (runner `claude`/`codex`). `merge` stays on the Mac either way, because it updates the main checkout.
+    - The fix and research jobs (`fix`, `fix-light`, `fix-fable`, `fix-retry`, `research`) run inside T3 Code on the Mac. To move those, dyson would need its own T3 Code server, linked to the Mac's T3 as a "linked environment".
+    - Either way: no tickets on dyson (MCP goes back to the Mac over the job's ssh connection), no signing key there (lotar re-signs the commits on the Mac), and no opgate or credentials there (your rule in LOCA-631). The ticket's "Done when" now spells out route A.
+    - dyson can't run a job today anyway: claude isn't signed in and codex login fails (LOCA-631 #15).
+    - **Question:** A (recommended): reviews and triage over ssh now, as this ticket says; fix jobs stay on the Mac. Or B: also fix and research jobs, through a T3 Code server on dyson (more to install and keep running on a machine that may be off).
+  report:
+    next: 'Owner: pick A or B; then the job builds that route'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acc67bf8b282f21aec9a87cf0dde7958bfe602b82fd437e452b0a7ea25c1de5ac
 description: |-
-  The owner decided on 2026-11-26 (local LOCA-631, INBOX-757) that the home desktop `dyson` (Ubuntu Server, i5-2500K, 32 GB) takes "Lotar jobs with claude/codex signed in on dyson". lotar runs every job on the Mac today.
+  The owner decided on 2026-11-26 (local LOCA-631, INBOX-757) that the home desktop `dyson` (Debian 13, i5-2500K, 32 GB) takes "Lotar jobs with claude/codex signed in on dyson". lotar runs every job on the Mac today. Also from LOCA-631: "Worker now, swarm later" (no tickets, decisions or swarm state on dyson); "No NAS jobs and no NAS credentials on dyson until he says it runs stable"; dyson is optional capacity and may be off.
 
   ## What exists
-  - A profile's `command` and `args` replace the adapter command (`crates/lotar-agent/src/services/agent_runner.rs:53`), so `ssh -T dyson claude-agent-acp` could be the launch line.
+  - A profile's `command` and `args` replace the adapter command (`crates/lotar-agent/src/services/agent_runner.rs:53`), so `ssh -T dyson claude-agent-acp` could be the launch line. That covers the harnessmux runners (`claude`, `codex`: DEV's review, triage, merge profiles). The `t3` profiles (fix, fix-light, fix-fable, fix-retry, research) run inside T3 Code on the Mac; an ssh hop can't reach them. T3 Code has linked environments (a T3 server on another machine) for that.
 
   ## Missing
   - The worktree is created on the Mac (`t3_claude_settings.rs:109`, `disk_gate.rs:534`); it has to exist on the remote host, at the same absolute path.
   - The lotar MCP server is a local stdio command (`agent_runner.rs:303`).
-  - Guard hooks and opgate on the remote host.
+  - Guard hooks on the remote host; commit signing (the signing key stays on the Mac).
   - Process-group cleanup on disconnect (SIGTERM, then SIGKILL); no SSH connection sharing.
   - A job cap per host; when the host is full, jobs wait and never fall back to the Mac.
 
   Prior art: openai/symphony (SPEC.md Appendix A, `elixir/lib/symphony_elixir/ssh.ex`), sortie-ai/sortie (`docs/architecture/27-appendix-a-ssh-worker-extension.md`). Evidence: LOCA-631 comment of 2026-11-26 14:23Z.
 
-  ## Done when
-  - [ ] A profile or runner config names a remote host; jobs for it run there in a worktree on that host.
-  - [ ] The job's MCP tools, hooks and ticket edits work as on the Mac.
-  - [ ] A per-host cap holds jobs; a lost connection ends the remote process group.
-  - [ ] Tests cover launch, cap and disconnect cleanup.
+  ## Done when (route A, ssh for claude/codex runners; pending the owner's pick, see comments)
+  - [ ] Config: `agent.hosts.<name>` with `ssh` (the ssh target) and `max_jobs`; a profile's `host: <name>` sends its jobs there. `host` on a `t3` or `command` profile, or an unknown host name, is refused when the config loads. A profile without `host` runs on the Mac as today.
+  - [ ] Launch: the agent runs as `ssh -T -o ControlMaster=no -o ControlPath=none <target> -- <agent command>` in the worktree path. The profile's own `command`/`args` win over the agent's default and still go through ssh.
+  - [ ] Worktree: before launch lotar pushes the job branch to a clone on the host at the main checkout's absolute path and adds the worktree there at the Mac worktree's absolute path. Host off, unreachable, or the push fails: the job fails with the ssh/git error in its log and the ticket stays where it was; it never runs on the Mac.
+  - [ ] Tickets: the job's lotar MCP server runs on the Mac, reached through a socket forwarded over the job's own ssh connection; a remote job's prompt says to use the MCP tools, not the lotar CLI. No `.tasks` edits on dyson.
+  - [ ] Commits come back: at the job's end lotar fetches the branch from the host, re-signs the job's new commits on the Mac and fast-forwards the Mac branch; leftover uncommitted changes are committed on the host first, as for a local job. Fetch or re-sign fails: the ticket is handed back with the error, the remote worktree is kept.
+  - [ ] Hooks and secrets: dyson's agent settings carry the same guard hooks (installed by LOCA-631 step 6, documented in docs/help); no opgate and no credentials on dyson, so a remote job that needs a secret fails and says so.
+  - [ ] Cap: running jobs per host never exceed its `max_jobs`, on top of the global and project limits; a full host makes the job wait with "waiting for a free slot (N of dyson's max_jobs M running)".
+  - [ ] Disconnect or stop: the remote agent's process group gets SIGTERM, then SIGKILL after 10 s; nothing of the job keeps running on the host.
+  - [ ] Tests with a fake ssh program cover the launch line, the cap wait, the worktree push/fetch and the disconnect cleanup; docs/help describes `agent.hosts` and `host`.
 history:
 - at: 2026-11-26T17:08:01.171137+00:00
   actor: claude
@@ -57,3 +77,76 @@ history:
       - [ ] The job's MCP tools, hooks and ticket edits work as on the Mac.
       - [ ] A per-host cap holds jobs; a lost connection ends the remote process group.
       - [ ] Tests cover launch, cap and disconnect cleanup.
+- at: 2026-11-26T20:01:31.050109+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-26T20:01:31.875291+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acc67bf8b282f21aec9a87cf0dde7958bfe602b82fd437e452b0a7ea25c1de5ac
+- at: 2026-11-26T20:04:20.504567+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      The owner decided on 2026-11-26 (local LOCA-631, INBOX-757) that the home desktop `dyson` (Ubuntu Server, i5-2500K, 32 GB) takes "Lotar jobs with claude/codex signed in on dyson". lotar runs every job on the Mac today.
+
+      ## What exists
+      - A profile's `command` and `args` replace the adapter command (`crates/lotar-agent/src/services/agent_runner.rs:53`), so `ssh -T dyson claude-agent-acp` could be the launch line.
+
+      ## Missing
+      - The worktree is created on the Mac (`t3_claude_settings.rs:109`, `disk_gate.rs:534`); it has to exist on the remote host, at the same absolute path.
+      - The lotar MCP server is a local stdio command (`agent_runner.rs:303`).
+      - Guard hooks and opgate on the remote host.
+      - Process-group cleanup on disconnect (SIGTERM, then SIGKILL); no SSH connection sharing.
+      - A job cap per host; when the host is full, jobs wait and never fall back to the Mac.
+
+      Prior art: openai/symphony (SPEC.md Appendix A, `elixir/lib/symphony_elixir/ssh.ex`), sortie-ai/sortie (`docs/architecture/27-appendix-a-ssh-worker-extension.md`). Evidence: LOCA-631 comment of 2026-11-26 14:23Z.
+
+      ## Done when
+      - [ ] A profile or runner config names a remote host; jobs for it run there in a worktree on that host.
+      - [ ] The job's MCP tools, hooks and ticket edits work as on the Mac.
+      - [ ] A per-host cap holds jobs; a lost connection ends the remote process group.
+      - [ ] Tests cover launch, cap and disconnect cleanup.
+    new: |-
+      The owner decided on 2026-11-26 (local LOCA-631, INBOX-757) that the home desktop `dyson` (Debian 13, i5-2500K, 32 GB) takes "Lotar jobs with claude/codex signed in on dyson". lotar runs every job on the Mac today. Also from LOCA-631: "Worker now, swarm later" (no tickets, decisions or swarm state on dyson); "No NAS jobs and no NAS credentials on dyson until he says it runs stable"; dyson is optional capacity and may be off.
+
+      ## What exists
+      - A profile's `command` and `args` replace the adapter command (`crates/lotar-agent/src/services/agent_runner.rs:53`), so `ssh -T dyson claude-agent-acp` could be the launch line. That covers the harnessmux runners (`claude`, `codex`: DEV's review, triage, merge profiles). The `t3` profiles (fix, fix-light, fix-fable, fix-retry, research) run inside T3 Code on the Mac; an ssh hop can't reach them. T3 Code has linked environments (a T3 server on another machine) for that.
+
+      ## Missing
+      - The worktree is created on the Mac (`t3_claude_settings.rs:109`, `disk_gate.rs:534`); it has to exist on the remote host, at the same absolute path.
+      - The lotar MCP server is a local stdio command (`agent_runner.rs:303`).
+      - Guard hooks on the remote host; commit signing (the signing key stays on the Mac).
+      - Process-group cleanup on disconnect (SIGTERM, then SIGKILL); no SSH connection sharing.
+      - A job cap per host; when the host is full, jobs wait and never fall back to the Mac.
+
+      Prior art: openai/symphony (SPEC.md Appendix A, `elixir/lib/symphony_elixir/ssh.ex`), sortie-ai/sortie (`docs/architecture/27-appendix-a-ssh-worker-extension.md`). Evidence: LOCA-631 comment of 2026-11-26 14:23Z.
+
+      ## Done when (route A, ssh for claude/codex runners; pending the owner's pick, see comments)
+      - [ ] Config: `agent.hosts.<name>` with `ssh` (the ssh target) and `max_jobs`; a profile's `host: <name>` sends its jobs there. `host` on a `t3` or `command` profile, or an unknown host name, is refused when the config loads. A profile without `host` runs on the Mac as today.
+      - [ ] Launch: the agent runs as `ssh -T -o ControlMaster=no -o ControlPath=none <target> -- <agent command>` in the worktree path. The profile's own `command`/`args` win over the agent's default and still go through ssh.
+      - [ ] Worktree: before launch lotar pushes the job branch to a clone on the host at the main checkout's absolute path and adds the worktree there at the Mac worktree's absolute path. Host off, unreachable, or the push fails: the job fails with the ssh/git error in its log and the ticket stays where it was; it never runs on the Mac.
+      - [ ] Tickets: the job's lotar MCP server runs on the Mac, reached through a socket forwarded over the job's own ssh connection; a remote job's prompt says to use the MCP tools, not the lotar CLI. No `.tasks` edits on dyson.
+      - [ ] Commits come back: at the job's end lotar fetches the branch from the host, re-signs the job's new commits on the Mac and fast-forwards the Mac branch; leftover uncommitted changes are committed on the host first, as for a local job. Fetch or re-sign fails: the ticket is handed back with the error, the remote worktree is kept.
+      - [ ] Hooks and secrets: dyson's agent settings carry the same guard hooks (installed by LOCA-631 step 6, documented in docs/help); no opgate and no credentials on dyson, so a remote job that needs a secret fails and says so.
+      - [ ] Cap: running jobs per host never exceed its `max_jobs`, on top of the global and project limits; a full host makes the job wait with "waiting for a free slot (N of dyson's max_jobs M running)".
+      - [ ] Disconnect or stop: the remote agent's process group gets SIGTERM, then SIGKILL after 10 s; nothing of the job keeps running on the host.
+      - [ ] Tests with a fake ssh program cover the launch line, the cap wait, the worktree push/fetch and the disconnect cleanup; docs/help describes `agent.hosts` and `host`.
+- at: 2026-11-26T20:04:29.483394+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T20:04:40.528284+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: HelpNeeded
+  - field: assignee
+    old: '@fix'
+    new: mallox

@@ -1,11 +1,11 @@
 title: lotar trust --status shows a structured run command as a JSON blob with its default fields
-status: HelpNeeded
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-25T08:19:53.997487+00:00
-modified: 2026-11-26T18:06:42.768642+00:00
+modified: 2026-11-26T19:59:34.750755+00:00
 relationships:
   related:
   - DEV-847
@@ -87,8 +87,18 @@ comments:
 - date: 2026-11-26T17:06:16.428953+00:00
   author: mallox
   text: 'Answer: land (Fast-forward main to 6c501d7ed despite the flake) (answered in INBOX-766)'
+- date: 2026-11-26T19:59:28.746526+00:00
+  author: claude
+  text: |-
+    Owner said land despite the smoke flake: no change to the work, ready for the merge.
+
+    - Answer from mallox in INBOX-766: fast-forward main despite the unrelated `ui.relationships` flake (DEV-873)
+    - `agent/DEV-869` is still `6c501d7ed`, and the worktree is clean
+    - Main has moved 10 commits past the branch base (`0f5531f84`), so the merge needs to rebase first. None of those commits touch `crates/lotar-lib/src/cli/handlers/trust.rs` or `docs/help/trust.md` (`git diff --stat` is empty), so I expect a clean rebase
+    - Checks ran on the earlier rebase: `npm ci`, `lint:agent` and `test:agent` passed. Smoke failed only on the known flake
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3b4d368a54d7db27a678ab0f61fa9925f2e34a602ee8c2c0f582aac8564b17d8
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A89f5e47dea5086fcd262030d8410b807f6b5bde2aa107868f6c68782c5ff9fd8
 description: |-
   Found while reviewing DEV-847: a rule with `run: {command: echo, args: [x]}` is listed as `runs {"command":"echo","args":["x"],"env":{},"cwd":null,"ignore_failure":false,"wait":true}`. `run_commands` in `crates/lotar-lib/src/cli/handlers/trust.rs` prints the serialized AutomationRunCommand with every default. Check: `lotar trust --status` in a repo with a structured run rule.
 
@@ -208,3 +218,27 @@ history:
   - field: relationships
     old: '{"related":["DEV-847","DEV-873"]}'
     new: '{"related":["DEV-847","DEV-873","DEV-904"]}'
+- at: 2026-11-26T19:59:13.005573+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: HelpNeeded
+    new: InProgress
+- at: 2026-11-26T19:59:14.346982+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A89f5e47dea5086fcd262030d8410b807f6b5bde2aa107868f6c68782c5ff9fd8
+- at: 2026-11-26T19:59:28.746526+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-26T19:59:34.750755+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
