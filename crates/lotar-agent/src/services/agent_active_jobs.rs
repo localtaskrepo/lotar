@@ -412,21 +412,40 @@ pub fn list(tasks_dir: &Path) -> Vec<ActiveJob> {
     records(tasks_dir).into_iter().filter(|job| process_alive(job.owner_pid)).collect()
 }
 
+/// Whether an orphaned job still runs: a `t3` job's thread keeps running in
+/// T3 Code when its lotar process exits, once it left its worktree setup
+/// (DEV-944). Other runners' agents stop with the process.
+pub fn runs_without_owner(job: &ActiveJob) -> bool {
+    job.runner == "t3" && !job.in_setup
+}
+
+/// [`list`], plus the orphans that still run ([`runs_without_owner`]), each
+/// with whether its owner exited (DEV-944).
+pub fn list_still_running(tasks_dir: &Path) -> Vec<(ActiveJob, bool)> {
+    records(tasks_dir).into_iter().filter_map(still_running).collect()
+}
+
 /// Running jobs of every tasks folder on this machine, oldest first, each
-/// with its tasks folder (`None`: written before DEV-763).
-pub fn list_all() -> Vec<(Option<PathBuf>, ActiveJob)> {
+/// with its tasks folder (`None`: written before DEV-763), with
+/// [`list_still_running`]'s orphans.
+pub fn list_all_still_running() -> Vec<(Option<PathBuf>, ActiveJob, bool)> {
     let Ok(entries) = std::fs::read_dir(crate::services::agent_queue_service::queue_dir()) else {
         return Vec::new();
     };
-    let mut jobs: Vec<(Option<PathBuf>, ActiveJob)> = entries
+    let records = entries
         .flatten()
         .filter(|entry| entry.file_name().to_str().is_some_and(|name| name.starts_with("active-")) && entry.path().is_dir())
         .flat_map(|entry| records_in(&entry.path()))
-        .filter(|record| process_alive(record.job.owner_pid))
-        .map(|record| (record.tasks_dir.map(PathBuf::from), record.job))
-        .collect();
+        .filter_map(|record| still_running(record.job).map(|(job, orphaned)| (record.tasks_dir.map(PathBuf::from), job, orphaned)));
+    let mut jobs: Vec<_> = records.collect();
     jobs.sort_by(|a, b| a.1.started_at.cmp(&b.1.started_at));
     jobs
+}
+
+/// The job with whether its owner exited, unless it no longer runs.
+fn still_running(job: ActiveJob) -> Option<(ActiveJob, bool)> {
+    let orphaned = !process_alive(job.owner_pid);
+    (!orphaned || runs_without_owner(&job)).then_some((job, orphaned))
 }
 
 /// Jobs whose owning process exited before they ended (DEV-378).

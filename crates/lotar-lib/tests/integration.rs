@@ -205,6 +205,7 @@ mod dev892_release_merge_done_test;
 mod dev89_cli_add_transaction_test;
 mod dev92_cli_soft_delete_test;
 mod dev92_soft_deletion_test;
+mod dev944_orphaned_t3_job_listed_test;
 mod dev94_sync_report_contract_test;
 mod dev99_cli_edit_transaction_test;
 mod dual_interface_integration_test;

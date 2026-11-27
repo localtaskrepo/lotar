@@ -327,7 +327,7 @@ impl AgentHandler {
     }
 
     fn list_running(args: &AgentListRunningArgs, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Result<(), String> {
-        let jobs = if args.all { list_running_jobs_everywhere() } else { list_running_jobs(Some(&resolver.path)) };
+        let jobs = if args.all { list_running_jobs_everywhere() } else { list_still_running_jobs(&resolver.path) };
         if matches!(renderer.format, OutputFormat::Json) {
             renderer.emit_json(&serde_json::json!({ "jobs": jobs }));
             return Ok(());
@@ -345,7 +345,7 @@ impl AgentHandler {
             renderer.emit_raw_stdout(format_args!(
                 "{}\t{}\t{}\t{}\t{}\t{}{tasks_dir}",
                 job.pid,
-                job.owner_pid.map_or_else(|| "-".to_string(), |pid| pid.to_string()),
+                job.owner_pid.map_or_else(|| "-".to_string(), |pid| if job.orphaned { format!("{pid} (exited)") } else { pid.to_string() }),
                 job.job_id.as_deref().unwrap_or("-"),
                 job.ticket_id.as_deref().unwrap_or("-"),
                 job.runner.as_deref().unwrap_or("-"),
@@ -1050,6 +1050,10 @@ pub(crate) struct RunningAgentJob {
     pub started_at: Option<String>,
     /// The tasks folder the job belongs to (DEV-763); `None` when unknown.
     pub tasks_dir: Option<String>,
+    /// Its lotar process exited, but its T3 Code thread still runs: a
+    /// worker or server takes it over (DEV-944).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub orphaned: bool,
 }
 
 impl RunningAgentJob {
@@ -1062,6 +1066,7 @@ impl RunningAgentJob {
             runner: Some(job.runner),
             started_at: Some(job.started_at),
             tasks_dir,
+            orphaned: false,
         }
     }
 
@@ -1104,11 +1109,26 @@ fn list_running_jobs(tasks_dir: Option<&std::path::Path>) -> Vec<RunningAgentJob
     with_wrapper_processes(jobs, tasks_dir)
 }
 
-/// Running jobs of every tasks folder on this machine (DEV-763).
-fn list_running_jobs_everywhere() -> Vec<RunningAgentJob> {
-    let jobs = crate::services::agent_active_jobs::list_all()
+/// [`list_running_jobs`] for `agent list-running`: also a `t3` job whose
+/// process exited, as its thread still runs (DEV-944).
+fn list_still_running_jobs(tasks_dir: &std::path::Path) -> Vec<RunningAgentJob> {
+    let shown = tasks_dir.canonicalize().unwrap_or_else(|_| tasks_dir.to_path_buf()).to_string_lossy().into_owned();
+    let jobs = crate::services::agent_active_jobs::list_still_running(tasks_dir)
         .into_iter()
-        .map(|(tasks_dir, job)| RunningAgentJob::from_record(job, tasks_dir.map(|dir| dir.to_string_lossy().into_owned())))
+        .map(|(job, orphaned)| RunningAgentJob { orphaned, ..RunningAgentJob::from_record(job, Some(shown.clone())) })
+        .collect();
+    with_wrapper_processes(jobs, Some(tasks_dir))
+}
+
+/// Running jobs of every tasks folder on this machine (DEV-763), with
+/// [`list_still_running_jobs`]'s `t3` jobs.
+fn list_running_jobs_everywhere() -> Vec<RunningAgentJob> {
+    let jobs = crate::services::agent_active_jobs::list_all_still_running()
+        .into_iter()
+        .map(|(tasks_dir, job, orphaned)| RunningAgentJob {
+            orphaned,
+            ..RunningAgentJob::from_record(job, tasks_dir.map(|dir| dir.to_string_lossy().into_owned()))
+        })
         .collect();
     with_wrapper_processes(jobs, None)
 }
@@ -1153,7 +1173,7 @@ fn list_wrapper_processes(tasks_dir: Option<&std::path::Path>) -> Vec<RunningAge
             }
             let (job_id, ticket_id, runner) = parse_wrapper_metadata(&cmd);
             let tasks_dir = wrapper_tasks_dir(&cmd).map(|dir| dir.to_string_lossy().into_owned());
-            Some(RunningAgentJob { pid: pid.as_u32(), owner_pid: None, job_id, ticket_id, runner, started_at: None, tasks_dir })
+            Some(RunningAgentJob { pid: pid.as_u32(), owner_pid: None, job_id, ticket_id, runner, started_at: None, tasks_dir, orphaned: false })
         })
         .collect()
 }

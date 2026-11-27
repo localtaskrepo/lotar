@@ -39,7 +39,8 @@ fn list_running_all_shows_the_jobs_of_every_tasks_folder() {
 
     agent_active_jobs::register(&first, &job("job-one", "ONE-1", alive, "2026-11-21T10:00:00Z"));
     agent_active_jobs::register(&second, &job("job-two", "TWO-1", alive, "2026-11-21T11:00:00Z"));
-    agent_active_jobs::register(&second, &job("job-dead", "TWO-2", dead, "2026-11-21T09:00:00Z"));
+    // A `command` job's agent stopped with its process (a `t3` one runs on: DEV-944).
+    agent_active_jobs::register(&second, &ActiveJob { runner: "command".into(), ..job("job-dead", "TWO-2", dead, "2026-11-21T09:00:00Z") });
     // A record written before records named their tasks folder.
     let old = queue.join("agent-queue/active-old");
     std::fs::create_dir_all(&old).unwrap();
