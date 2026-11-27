@@ -1,0 +1,133 @@
+title: 'Live stall check restarted a t3 job that was still running: QIS-217 job-1 completed 6 s after the restart'
+status: Reviewing
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@review'
+created: 2026-11-27T23:01:50.414518+00:00
+modified: 2026-11-27T23:09:21.075651+00:00
+comments:
+- date: 2026-11-27T23:09:06.311916+00:00
+  author: claude
+  text: |-
+    Fixed: an orphaned `t3` job now still shows in `list-running`, and `lotar serve` takes orphans over every 30 s.
+
+    - Cause: job-1's lotar process (pid 18981) exited about 22:28 while its T3 thread kept running. `list-running` hid it as an orphan, and the QIS server (running since 10:33) takes orphans over only at start. The worker the live check's restart started took it over at 23:00:14.
+    - `crates/lotar-agent/src/services/agent_active_jobs.rs`: `list_still_running` / `list_all_still_running` also return an orphaned `t3` job that is past its worktree setup. `list_all` is gone (it had one caller).
+    - `agent list-running` (`--all` too) marks such a job `"orphaned": true` in JSON and `<pid> (exited)` in text. The status guards and the queue still count live owners only.
+    - `serve_handler.rs`: `recover_orphaned_jobs` also runs every 30 s, next to the resumed-thread look.
+    - New test `crates/lotar-lib/tests/dev944_orphaned_t3_job_listed_test.rs` failed before the fix. `dev763` now uses a `command` job for its dead record. Docs: `docs/help/agent.md`.
+    - The 30 s serve loop has no test of its own: it would wait 30 s of wall-clock time. The existing serve tests pass.
+    - Limit: a repo with no `lotar serve` and no worker keeps an orphaned t3 job listed until a worker starts, so the live check won't restart it. `standards` `repos.ts` could start a worker when it sees `orphaned: true`. This is a proposal, not done.
+  report:
+    commits:
+    - hash: 3a31268d4
+      what: list-running keeps orphaned t3 jobs; serve takes orphans over every 30 s
+    checks:
+    - command: cargo nextest run --cargo-profile dev -E dev944|dev763|dev279|dev320|dev510 (24 tests)
+      result: passed
+    - command: cargo nextest run --cargo-profile dev -E cli_serve*|dev592|dev305|dev503 (142 tests)
+      result: passed
+    - command: cargo nextest run --cargo-profile dev -p lotar-agent -E agent_active_jobs
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8eec01ee6fdfb7231056bb894f5cfd765419ae979246a5a3605bf3d8a9bd2af
+description: |-
+  Found by claude on 2026-11-27 (QIS-217, lotar 0.16.1).
+
+  ## What happened
+  - `job-20261127T222541.806Z-1` (runner t3, QIS-217) started 22:25:41Z. Its log has events until about 22:28, then nothing until a burst at 23:00:20 (summary), `agent_job_completed` 23:00:21.
+  - At 23:00:14 the standards live check (`repos.ts --live --report`) commented "Stalled since 2026-11-27T22:28Z with no lotar job" and ran "Stalled: restart the fix agent", which started job-2 (23:00:24) as the next turn of the same thread.
+  - The first job's deferred changes (HelpNeeded, mallox) were applied at 23:00:28, after the restart, so the ticket now has a needless second job and a false stall comment.
+
+  ## Check
+  - `lotar --tasks-dir ~/Development/quarter-inch-studio/.tasks agent logs job-20261127T222541.806Z-1`: the gap from 22:28 to 23:00, then completion at 23:00:21.
+  - `lotar task timeline QIS-217`: the stall comment at 23:00:14 before the status change at 23:00:28.
+
+  ## Cause
+  - The lotar process that ran job-1 (pid 18981) exited about 22:28; the job's T3 Code thread kept running. `list-running` hides a job whose owner exited (an orphan), and `lotar serve` takes orphans over only when it starts (the QIS server ran since 10:33). The next worker, started by the live check's restart at 23:00:14, took it over and it completed.
+
+  ## Done when
+  - [ ] `lotar agent list-running` (also `--all`, text and `--format json`) still lists a `t3` job whose lotar process exited before it ended, with `"orphaned": true` in JSON and `(exited)` after its `owner_pid` in text: its thread still runs, so the live check counts the ticket as busy. Test in `crates/lotar-lib/tests/`.
+  - [ ] Other orphans (`command` and session runners, and a `t3` job that died in its worktree setup, before its thread started) are not listed, as before: their agent stopped with the process.
+  - [ ] A running `lotar serve` takes orphans over every 30 s (with its look for resumed T3 threads), not only at start, so an orphan waits at most about 30 s while the server runs. A takeover that fails leaves the record for the next look, as at start.
+  - [ ] `docs/help/agent.md` says both.
+custom_fields:
+  finding: live:stalled-running-job
+history:
+- at: 2026-11-27T23:01:50.826186+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-27T23:01:54.662009+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T23:01:55.337625+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af8eec01ee6fdfb7231056bb894f5cfd765419ae979246a5a3605bf3d8a9bd2af
+- at: 2026-11-27T23:04:38.989234+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found by claude on 2026-11-27 (QIS-217, lotar 0.16.1).
+
+      ## What happened
+      - `job-20261127T222541.806Z-1` (runner t3, QIS-217) started 22:25:41Z. Its log has events until about 22:28, then nothing until a burst at 23:00:20 (summary), `agent_job_completed` 23:00:21.
+      - At 23:00:14 the standards live check (`repos.ts --live --report`) commented "Stalled since 2026-11-27T22:28Z with no lotar job" and ran "Stalled: restart the fix agent", which started job-2 (23:00:24) as the next turn of the same thread.
+      - The first job's deferred changes (HelpNeeded, mallox) were applied at 23:00:28, after the restart, so the ticket now has a needless second job and a false stall comment.
+
+      ## Check
+      - `lotar --tasks-dir ~/Development/quarter-inch-studio/.tasks agent logs job-20261127T222541.806Z-1`: the gap from 22:28 to 23:00, then completion at 23:00:21.
+      - `lotar task timeline QIS-217`: the stall comment at 23:00:14 before the status change at 23:00:28.
+
+      ## Open
+      - Why `agent list-running` (what the live check reads) didn't list job-1 while it ran, or why its events stopped for 30 min. Either way, the live check shouldn't count a job lotar still records as running as a stall.
+
+      ## Done when
+      - [ ] A t3 job that is still running (not yet `agent_job_completed`) never counts as a stall, with a test.
+    new: |-
+      Found by claude on 2026-11-27 (QIS-217, lotar 0.16.1).
+
+      ## What happened
+      - `job-20261127T222541.806Z-1` (runner t3, QIS-217) started 22:25:41Z. Its log has events until about 22:28, then nothing until a burst at 23:00:20 (summary), `agent_job_completed` 23:00:21.
+      - At 23:00:14 the standards live check (`repos.ts --live --report`) commented "Stalled since 2026-11-27T22:28Z with no lotar job" and ran "Stalled: restart the fix agent", which started job-2 (23:00:24) as the next turn of the same thread.
+      - The first job's deferred changes (HelpNeeded, mallox) were applied at 23:00:28, after the restart, so the ticket now has a needless second job and a false stall comment.
+
+      ## Check
+      - `lotar --tasks-dir ~/Development/quarter-inch-studio/.tasks agent logs job-20261127T222541.806Z-1`: the gap from 22:28 to 23:00, then completion at 23:00:21.
+      - `lotar task timeline QIS-217`: the stall comment at 23:00:14 before the status change at 23:00:28.
+
+      ## Cause
+      - The lotar process that ran job-1 (pid 18981) exited about 22:28; the job's T3 Code thread kept running. `list-running` hides a job whose owner exited (an orphan), and `lotar serve` takes orphans over only when it starts (the QIS server ran since 10:33). The next worker, started by the live check's restart at 23:00:14, took it over and it completed.
+
+      ## Done when
+      - [ ] `lotar agent list-running` (also `--all`, text and `--format json`) still lists a `t3` job whose lotar process exited before it ended, with `"orphaned": true` in JSON and `(exited)` after its `owner_pid` in text: its thread still runs, so the live check counts the ticket as busy. Test in `crates/lotar-lib/tests/`.
+      - [ ] Other orphans (`command` and session runners, and a `t3` job that died in its worktree setup, before its thread started) are not listed, as before: their agent stopped with the process.
+      - [ ] A running `lotar serve` takes orphans over every 30 s (with its look for resumed T3 threads), not only at start, so an orphan waits at most about 30 s while the server runs. A takeover that fails leaves the record for the next look, as at start.
+      - [ ] `docs/help/agent.md` says both.
+- at: 2026-11-27T23:09:06.311916+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T23:09:21.075651+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

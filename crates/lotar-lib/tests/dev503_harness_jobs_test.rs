@@ -919,7 +919,8 @@ fn a_ticket_hands_its_context_from_harness_to_harness_through_its_states() {
 /// status `failed` while `failed-<id>` is (the status in `listed-<id>` while that is), and as waiting on a background command (status `waiting`,
 /// `pendingBackgroundTasks`) for as many more shows as the number in `background-<id>`; it logs `show <id>` to `t3-show.log` there.
 /// While `list-threads` is there, `thread list` lists the threads with those statuses, their title (`title` in the
-/// thread's folder), their runtime mode (`auto` while a file `auto` is there, else `full-access`) and whether they are settled. `thread start` (a session in the
+/// thread's folder), their runtime mode (`auto` while a file `auto` is there, else `full-access`) and whether they are settled,
+/// leaving out each thread with a file `hidden-<id>` next to the script, as T3 Code leaves out older settled and archived ones. `thread start` (a session in the
 /// main checkout, before DEV-652) makes a thread in the project and runs it the same way. `auth pairing create` prints
 /// the pairing code `pair-1`.
 const FAKE_T3: &str = r#"#!/bin/sh
@@ -960,6 +961,7 @@ case "$1 $2" in
     for t in "$threads"/*; do
       [ -d "$t" ] || continue
       id=$(basename "$t") status=completed settled=false
+      [ -f "$dir/hidden-$id" ] && continue
       [ -f "$t/pending" ] && status=running
       [ -f "$dir/running-$id" ] && status=running
       [ -f "$dir/failed-$id" ] && status=failed
@@ -1014,7 +1016,7 @@ fn shell_snapshot(dir: &Path, project: &Path) -> serde_json::Value {
         .into_iter()
         .flatten()
         .flatten()
-        .filter(|entry| entry.path().is_dir())
+        .filter(|entry| entry.path().is_dir() && !dir.join(format!("hidden-{}", entry.file_name().to_string_lossy())).exists())
         .map(|entry| {
             let (t, id) = (entry.path(), entry.file_name().to_string_lossy().to_string());
             let mut status =
@@ -1447,6 +1449,34 @@ fn a_failed_jobs_thread_is_settled_once_a_later_job_completes() {
     assert_eq!(settled_threads(root), vec!["thread-0", "thread-1"], "the later job settles the kept thread as it starts, then its own");
     let logs = job_logs(&fixtures);
     assert!(logs.contains("Settled the T3 Code thread https://app.t3.codes/threads/env-test/thread-0"), "the failed job's log says so: {logs}");
+}
+
+/// DEV-941: T3 Code's thread list leaves out older settled and archived threads. A later job's thread it leaves out
+/// counts as settled, so an open ticket's earlier completed kept thread is settled (DEV-747); the unlisted thread itself
+/// is never settled.
+#[test]
+fn a_later_thread_the_list_leaves_out_counts_as_settled() {
+    let (fixtures, _env) = t3_harness("");
+    // Each look runs: none waits out the look interval.
+    let _look = EnvVarGuard::set("LOTAR_AGENT_RESUMED_LOOK_SECONDS", "0");
+    let root = fixtures.get_temp_path();
+    lotar::services::automation_service::AutomationService::set(
+        &fixtures.tasks_root,
+        None,
+        "automation:\n  rules:\n    - name: Ask\n      on:\n        job_completed:\n          set: { status: InProgress, assignee: mallox }\n",
+    )
+    .expect("automation rules");
+    // Without a list, the later job's start doesn't settle the earlier thread (DEV-876).
+    run_t3(&fixtures, "fix").success();
+    run_t3(&fixtures, "review").success();
+    std::fs::write(root.join("list-threads"), "").unwrap();
+    AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
+    assert!(settled_threads(root).is_empty(), "the later thread is listed unsettled: the ticket waits for mallox");
+    std::fs::write(root.join("hidden-thread-1"), "").unwrap();
+    AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
+    assert_eq!(settled_threads(root), vec!["thread-0"], "the unlisted later thread counts as settled, and isn't settled itself");
+    AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
+    assert_eq!(settled_threads(root), vec!["thread-0"], "a later look settles nothing more");
 }
 
 /// DEV-747: a thread whose job ended while its ticket was HelpNeeded stays active until the ticket is done, however it
