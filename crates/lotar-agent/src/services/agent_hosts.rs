@@ -429,9 +429,10 @@ fn probe_key(name: &str, host: &AgentHostConfig) -> String {
 
 /// What the host last answered to `check`; asks it again in the background
 /// once that answer is older than a minute.
-pub(crate) fn cached_probe(name: &str, host: &AgentHostConfig, check: Option<Check>) -> Probe {
-    let Some(check) = check else {
-        return Probe::Refused("no t3 CLI on this Mac".to_string());
+pub(crate) fn cached_probe(name: &str, host: &AgentHostConfig, check: Result<Check, String>) -> Probe {
+    let check = match check {
+        Ok(check) => check,
+        Err(why) => return Probe::Refused(why),
     };
     let Ok(mut probes) = PROBES.lock() else {
         return Probe::Unknown;
@@ -623,7 +624,7 @@ pub(crate) fn place(
     agent: Option<&str>,
     taken: &HashMap<String, usize>,
     jobs: impl FnOnce() -> Vec<crate::services::agent_log_service::SavedJob>,
-    check: impl FnOnce(&AgentProfileDetail) -> Option<Check>,
+    check: impl FnOnce(&AgentProfileDetail) -> Result<Check, String>,
 ) -> Option<Result<String, String>> {
     let (profile, detail, name, host) = profile_host(tasks_dir, ticket_id, agent)?;
     let others = crate::services::agent_active_jobs::list(tasks_dir);

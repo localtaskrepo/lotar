@@ -1,11 +1,11 @@
 title: 'Server: an automation run command that runs lotar comment on another ticket hangs until the 300 s limit, and the owner''s inbox answers aren''t relayed'
-status: Merging
+status: Done
 priority: High
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T21:11:09.195177+00:00
-modified: 2026-11-27T14:52:16.310473+00:00
+modified: 2026-11-27T15:00:58.790660+00:00
 relationships:
   depends_on:
   - DEV-812
@@ -166,6 +166,30 @@ comments:
 - date: 2026-11-27T14:52:15.989250+00:00
   author: automation
   text: Waited 4 min for the machine's check lock, held by lotar's merge checks of DEV-932 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-932 (pid 61697), since 14:28 UTC; the merge agent starts now.
+- date: 2026-11-27T15:00:51.787321+00:00
+  author: claude
+  text: |-
+    Merged and pushed: DEV-808 is on main at `3063322d9`.
+
+    - Rebased onto main `906eafc66`. The one conflict was in `crates/lotar-core/src/utils/git.rs`, the one the review expected. I kept main's `apply_global_excludes`, `excludes_file` and `default_excludes_file`, added the branch's `kill_tree` and `descendants`, and dropped the `output()` that main removed.
+    - `npm ci` passed. `cargo nextest run --workspace -E 'test(dev278)'` passed 5/5.
+    - `npm run -s lint:agent`, `npm run -s test:agent` and `npm run -s smoke` (415 tests) passed on the rebased tree.
+    - `git merge --ff-only` landed it on main. The main checkout's `.tasks` changes are amended into `3063322d9`.
+    - Pushed `906eafc66..3063322d9`. No rule or config files changed, so no `lotar trust` was needed.
+  report:
+    commits:
+    - hash: dc0ccad33
+      what: timeout comment on the ticket of a timed-out run
+    - hash: 3063322d9
+      what: kill the process groups a timed-out run's children started
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: 'none: merged and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A802f16b984a97e31b9f3796a54cdc37a2bf74d7da732e9e59834d045069ff063
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae2a42a50f17c7dda6a6f5b7cb09ae216a1ec5a60a06db0bc33b6a6bb4724b0c6
@@ -183,8 +207,6 @@ description: |-
   - [x] A run that times out also stops the process groups its command's children started, such as a nested `lotar` call's run: no `sh` or `git` is left behind. Test: dev278 `run_timeout_stops_nested_process_groups` hangs before the change and passes after.
   - [x] The nested comment returns within seconds while git hangs. lotar's own git calls never hung it (checked 2026-11-25); the git that hung is `git()` in standards' `scripts/repos.ts`: STD-369. Checked 2026-11-25 with STD-369 (`04f56128`): the relay takes 11 s with every git call hanging.
   - [ ] npm run lint, npm test, npm run smoke pass (passed for the first commit; the merge runs them for the second).
-tags:
-- fix-retried
 history:
 - at: 2026-11-22T21:11:09.477794+00:00
   actor: claude
@@ -600,3 +622,16 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-812","standards:STD-369"],"related":["DEV-732","DEV-757","DEV-815","DEV-812","DEV-822","DEV-823","DEV-810","DEV-872","DEV-876","DEV-842","DEV-897","DEV-935"]}'
     new: '{"depends_on":["DEV-812","standards:STD-369"],"related":["DEV-732","DEV-757","DEV-815","DEV-812","DEV-822","DEV-823","DEV-810","DEV-872","DEV-876","DEV-842","DEV-897","DEV-935","DEV-932"]}'
+- at: 2026-11-27T15:00:51.787321+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T15:00:58.790660+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: fix-retried
+    new: ''

@@ -15,7 +15,8 @@
 //! branch fetched, fast-forwarded into the Mac worktree and its new commits
 //! signed again here. Then the host's worktree goes. A thread that waits for
 //! an answer brings its commits so far back the same way and keeps its
-//! worktree and MCP connection there for the answer.
+//! worktree and MCP connection there for the answer; a headless agent's turn
+//! is over then, so all of it comes back (DEV-931).
 
 use crate::config::types::AgentHostConfig;
 use crate::services::agent_hosts::{self, Check, Probe, Ssh, quote, stop_child};
@@ -176,10 +177,10 @@ impl Hosted {
         checkout: &Checkout<'_>,
         settings: &ThreadSettings,
         mcp: Option<McpServer>,
-        check: Option<Check>,
+        check: Result<Check, String>,
     ) -> Result<(Self, Vec<String>), String> {
         let Checkout { repo_root, worktree, branch } = *checkout;
-        let check = check.ok_or("no t3 CLI on this Mac to compare versions with")?;
+        let check = check?;
         let thread = matches!(check, Check::T3(_));
         match check.run(host) {
             Probe::Ready => {}
@@ -355,16 +356,16 @@ impl Hosted {
         self.bridge.as_ref().and_then(Bridge::lost)
     }
 
-    /// A thread that already runs on the host in a worktree an earlier job
-    /// set up, taken over after lotar restarted: no MCP connection, and its
-    /// commits come back when it ends.
-    pub fn attach(name: &str, host: &AgentHostConfig, checkout: &Checkout<'_>) -> Result<Self, String> {
+    /// A thread (`thread`) or headless agent (DEV-931) that already runs on
+    /// the host in a worktree an earlier job set up, taken over after lotar
+    /// restarted: no MCP connection, and its commits come back when it ends.
+    pub fn attach(name: &str, host: &AgentHostConfig, checkout: &Checkout<'_>, thread: bool) -> Result<Self, String> {
         let Checkout { repo_root, worktree, branch } = *checkout;
         Ok(Self {
             name: name.to_string(),
             host: host.clone(),
             ssh: Ssh::new(&host.ssh),
-            thread: true,
+            thread,
             repo_root: repo_root.to_path_buf(),
             worktree: worktree.to_path_buf(),
             branch: branch.to_string(),
@@ -764,7 +765,7 @@ T3CODE_HOME="{root}/host-t3" PATH="{root}/host-bin:$PATH" exec sh -c "$cmd"
             lotar_mcp: false,
         };
         let checkout = Checkout { repo_root: &repo, worktree: &worktree, branch: "agent/DEV-1" };
-        Hosted::set_up("job-1", "dyson", &dyson(), &checkout, &settings, None, Some(Check::T3(fixture.local.clone())))
+        Hosted::set_up("job-1", "dyson", &dyson(), &checkout, &settings, None, Ok(Check::T3(fixture.local.clone())))
     }
 
     #[test]
@@ -774,15 +775,14 @@ T3CODE_HOME="{root}/host-t3" PATH="{root}/host-bin:$PATH" exec sh -c "$cmd"
         let settings = ThreadSettings { deny: vec!["mcp__claude_ai_Gmail".to_string()], env: BTreeMap::new(), lotar_mcp: false };
         let checkout = Checkout { repo_root: &repo, worktree: &worktree, branch: "agent/DEV-1" };
         script(&fixture.root.join("host-bin/t3"), &format!("#!/bin/sh\ntouch {}/t3-called\n", fixture.root.display()));
-        let (hosted, _) =
-            Hosted::set_up("job-1", "dyson", &dyson(), &checkout, &settings, None, Some(Check::Programs(vec!["sh".to_string()]))).expect("set up");
+        let (hosted, _) = Hosted::set_up("job-1", "dyson", &dyson(), &checkout, &settings, None, Ok(Check::Programs(vec!["sh".to_string()]))).expect("set up");
         assert!(!hosted.thread);
         let host_tree = fixture.root.join("host/wt");
         assert_eq!(run_git(&host_tree, &["rev-parse", "HEAD"]), run_git(&worktree, &["rev-parse", "HEAD"]));
         assert!(!host_tree.join(SETTINGS_FILE).exists() && !host_tree.join(".mcp.json").exists());
         assert!(!fixture.root.join("t3-called").exists(), "no `t3 project add` for a headless agent");
 
-        let refused = Hosted::set_up("job-2", "dyson", &dyson(), &checkout, &settings, None, Some(Check::Programs(vec!["no-such-agent".to_string()])));
+        let refused = Hosted::set_up("job-2", "dyson", &dyson(), &checkout, &settings, None, Ok(Check::Programs(vec!["no-such-agent".to_string()])));
         assert_eq!(refused.err().as_deref(), Some("no-such-agent is not on its PATH"));
     }
 
@@ -790,8 +790,7 @@ T3CODE_HOME="{root}/host-t3" PATH="{root}/host-bin:$PATH" exec sh -c "$cmd"
         let (repo, worktree) = (fixture.root.join("mac/repo"), fixture.root.join("mac/wt"));
         let settings = ThreadSettings { deny: Vec::new(), env: BTreeMap::new(), lotar_mcp: false };
         let checkout = Checkout { repo_root: &repo, worktree: &worktree, branch: "agent/DEV-1" };
-        let (hosted, _) =
-            Hosted::set_up("job-1", "dyson", &dyson(), &checkout, &settings, None, Some(Check::Programs(vec!["sh".to_string()]))).expect("set up");
+        let (hosted, _) = Hosted::set_up("job-1", "dyson", &dyson(), &checkout, &settings, None, Ok(Check::Programs(vec!["sh".to_string()]))).expect("set up");
         let mut table = crate::services::agent_runner::agent_table().expect("table");
         let mut spec = table.get("claude").expect("claude").clone();
         if !command.is_empty() {
@@ -976,7 +975,7 @@ T3CODE_HOME="{root}/host-t3" PATH="{root}/host-bin:$PATH" exec sh -c "$cmd"
         commit_on_host(&fixture, "answered.txt");
         let (repo, worktree) = (fixture.root.join("mac/repo"), fixture.root.join("mac/wt"));
         let checkout = Checkout { repo_root: &repo, worktree: &worktree, branch: "agent/DEV-1" };
-        let mut attached = Hosted::attach("dyson", &dyson(), &checkout).expect("attach");
+        let mut attached = Hosted::attach("dyson", &dyson(), &checkout, true).expect("attach");
         let notes = attached.bring_back("DEV-1", true).expect("bring back");
         assert!(notes.iter().any(|note| note.contains("Brought 1 commits back from dyson")), "{notes:?}");
         assert!(worktree.join("answered.txt").is_file());
@@ -1040,8 +1039,7 @@ T3CODE_HOME="{root}/host-t3" PATH="{root}/host-bin:$PATH" exec sh -c "$cmd"
         let settings = ThreadSettings { deny: Vec::new(), env: BTreeMap::new(), lotar_mcp: true };
         let checkout = Checkout { repo_root: &repo, worktree: &worktree, branch: "agent/DEV-1" };
         let server = McpServer { program: PathBuf::from("true"), env: BTreeMap::new(), on_lost: Box::new(|_| {}) };
-        let (hosted, _) =
-            Hosted::set_up(job_id, "dyson", &dyson(), &checkout, &settings, Some(server), Some(Check::T3(fixture.local.clone()))).expect("set up");
+        let (hosted, _) = Hosted::set_up(job_id, "dyson", &dyson(), &checkout, &settings, Some(server), Ok(Check::T3(fixture.local.clone()))).expect("set up");
         let bridge = hosted.bridge.as_ref().expect("an MCP connection");
         let (local, remote) = (bridge.local.clone(), PathBuf::from(&bridge.remote));
         assert!(local.exists() && remote.exists(), "the forward is open");
@@ -1207,5 +1205,81 @@ T3CODE_HOME="{root}/host-t3" PATH="{root}/host-bin:$PATH" exec sh -c "$cmd"
     fn a_ticket_reassigned_while_its_thread_waits_ends_the_wait_before_a_later_job() {
         let patch = crate::api_types::TaskUpdate { assignee: Some("sam".to_string()), ..Default::default() };
         a_dropped_question_ends_the_wait(patch, "job-dev929-reassigned", "thread-reassigned");
+    }
+
+    /// DEV-931: a headless agent's job taken over after lotar restarted goes
+    /// on over ssh in the host's worktree, and its commits come back.
+    #[test]
+    fn a_headless_job_taken_over_after_a_restart_runs_on_the_host_and_brings_its_commits_back() {
+        use crate::services::agent_job_service::{JOB_REGISTRY, RunEnd, finish_on_host, host_agent_table, resumed_on_host, tests::unit_job_state};
+        let fixture = fixture();
+        let (repo, worktree) = (fixture.root.join("mac/repo"), fixture.root.join("mac/wt"));
+        let settings = ThreadSettings { deny: Vec::new(), env: BTreeMap::new(), lotar_mcp: false };
+        let checkout = Checkout { repo_root: &repo, worktree: &worktree, branch: "agent/DEV-1" };
+        let (hosted, _) =
+            Hosted::set_up("job-dev931-old", "dyson", &dyson(), &checkout, &settings, None, Ok(Check::Programs(vec!["sh".to_string()]))).expect("set up");
+        // lotar restarts: the agent goes on there.
+        drop(hosted);
+        commit_on_host(&fixture, "work.txt");
+        std::fs::write(fixture.root.join("host/wt/left.txt"), "uncommitted\n").expect("leftover");
+
+        let job_id = "job-dev931-takeover";
+        let mut state = unit_job_state(job_id);
+        state.record.worktree_path = Some(worktree.to_string_lossy().into_owned());
+        state.record.worktree_branch = Some("agent/DEV-1".to_string());
+        JOB_REGISTRY.lock().expect("registry").jobs.insert(job_id.to_string(), state);
+        let mut config = crate::config::types::ResolvedConfig::from_global(crate::config::types::GlobalConfig::default());
+        config.agent_hosts.insert("dyson".to_string(), dyson());
+        let hosted = resumed_on_host(job_id, "DEV-1", Some("dyson"), &repo.join(".tasks"), &config, false).expect("on dyson");
+        assert!(!hosted.thread);
+
+        let profile = crate::config::types::AgentProfileDetail { runner: "claude".to_string(), ..Default::default() };
+        let table = host_agent_table(&hosted, crate::services::agent_runner::agent_table().expect("table"), "claude", &profile).expect("table");
+        let line = table.get("claude").expect("claude").command.clone();
+        assert!(line.contains(&"dyson".to_string()) && line.last().is_some_and(|script| script.contains("exec env")), "{line:?}");
+
+        let end = finish_on_host(job_id, "DEV-1", hosted, RunEnd::Exited(Some(0)), "session");
+        assert!(matches!(end, RunEnd::Exited(Some(0))));
+        assert!(worktree.join("work.txt").is_file() && worktree.join("left.txt").is_file(), "its commits and leftovers came back");
+        assert!(!fixture.root.join("host/wt").exists(), "the host's worktree went");
+        JOB_REGISTRY.lock().expect("registry").jobs.remove(job_id);
+    }
+
+    /// DEV-931: a headless agent that asks a question has ended its turn:
+    /// its leftovers are committed there, all comes back, nothing waits.
+    #[test]
+    fn a_headless_agent_that_asks_brings_everything_back() {
+        use crate::services::agent_job_service::{RunEnd, WAITING_ON_HOST, finish_on_host};
+        let fixture = fixture();
+        let (repo, worktree) = (fixture.root.join("mac/repo"), fixture.root.join("mac/wt"));
+        let settings = ThreadSettings { deny: Vec::new(), env: BTreeMap::new(), lotar_mcp: false };
+        let checkout = Checkout { repo_root: &repo, worktree: &worktree, branch: "agent/DEV-1" };
+        let (hosted, _) =
+            Hosted::set_up("job-dev931-asks", "dyson", &dyson(), &checkout, &settings, None, Ok(Check::Programs(vec!["sh".to_string()]))).expect("set up");
+        commit_on_host(&fixture, "asked.txt");
+        std::fs::write(fixture.root.join("host/wt/draft.txt"), "uncommitted\n").expect("draft");
+
+        let end = finish_on_host("job-dev931-asks", "DEV-1", hosted, RunEnd::WaitingForAnswer("Which one?".to_string()), "session");
+        let RunEnd::WaitingForAnswer(message) = end else { panic!("it waits for the answer") };
+        assert!(message.starts_with("Which one?") && message.contains("its commits, with what it left uncommitted there, are on this Mac"), "{message}");
+        assert!(worktree.join("asked.txt").is_file() && worktree.join("draft.txt").is_file());
+        assert!(run_git(&worktree, &["cat-file", "commit", "HEAD"]).contains("gpgsig"), "signed here");
+        assert!(!fixture.root.join("host/wt").exists(), "the host's worktree went");
+        assert!(!WAITING_ON_HOST.lock().expect("lock").contains_key("DEV-1"), "nothing waits on the host");
+
+        let (_, notes) = Hosted::set_up("job-dev931-answered", "dyson", &dyson(), &checkout, &settings, None, Ok(Check::Programs(vec!["sh".to_string()])))
+            .expect("the answered job may run there");
+        assert!(!notes.iter().any(|note| note.starts_with("Removed")), "{notes:?}");
+    }
+
+    /// DEV-931: a profile the host can't take says what is missing.
+    #[test]
+    fn a_host_check_names_what_is_missing() {
+        use crate::services::agent_job_service::host_check;
+        let profile = |runner: &str| crate::config::types::AgentProfileDetail { runner: runner.to_string(), ..Default::default() };
+        assert_eq!(host_check(&profile("command")).err().as_deref(), Some("a command job doesn't run on an agent host"));
+        assert!(matches!(host_check(&profile("claude")), Ok(Check::Programs(_))));
+        let refused = agent_hosts::cached_probe("dyson", &dyson(), Err("no codex agent command to run there".to_string()));
+        assert_eq!(refused, Probe::Refused("no codex agent command to run there".to_string()));
     }
 }
