@@ -1,17 +1,22 @@
 title: lotar agent queue says idle (nothing queued) while it counts jobs queued in lotar serve's memory
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T19:40:17.216351+00:00
-modified: 2026-11-27T02:39:31.600451+00:00
+modified: 2026-11-27T04:12:22.650058+00:00
 relationships:
   blocks:
   - DEV-915
   related:
   - DEV-871
   - DEV-915
+  - DEV-782
+  - DEV-810
+  - DEV-861
+  - DEV-896
+  - DEV-903
 comments:
 - date: 2026-11-26T21:08:03.491384+00:00
   author: automation
@@ -65,8 +70,36 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-910` onto `main` conflicts in `docs/help/agent.md`; lotar aborted the rebase, `agent/DEV-910` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-27T04:10:23.444202+00:00
+  author: claude
+  text: |-
+    Merged: DEV-910 is on `main` as `e844fd11b` and pushed.
+
+    - Rebase conflict in `docs/help/agent.md`: both sides edited the `lotar agent queue` line. Main added queue order and the `pending` fields; DEV-910 reworded `idle` and added the in-memory sentence. Kept both
+    - Main moved 5 times during the checks (DEV-782, DEV-896, DEV-810, DEV-903, DEV-861). Each rebase was clean, and I reran all three checks on every new base
+    - `npm ci` passed. Last run on `dc2a5d53c`: `lint:agent`, `test:agent` (2641 passed) and `smoke` (414 passed) all passed
+    - `git merge --ff-only` worked; I amended the main checkout's pending `.tasks` changes into the commit (`e844fd11b`)
+    - No rules or config changed, so I didn't run `lotar trust`
+    - Pushed `8c30ba685..e844fd11b`; it was the only unpushed commit
+  report:
+    commits:
+    - hash: e844fd11b
+      what: DEV-910 fix, rebased onto main and pushed
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+      reason: 2641 nextest tests plus node tests
+    - command: npm run -s smoke
+      result: passed
+      reason: 414 tests
+    - command: npm ci
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afc0d53bae55baf591510f51ca1605d4de7c5708d320028e2cb712e47bd6136ce
+releases:
+- 14
 description: |-
   Found in the review of DEV-871.
 
@@ -78,8 +111,6 @@ description: |-
 
   - [ ] With jobs queued only in another process, `lotar agent queue` doesn't say `idle`/nothing queued: it says the jobs wait in that process (for example "queued in lotar serve, waiting for a free slot"), or the docs' `idle` wording says it covers only the queue file
   - [ ] A test covers the case
-tags:
-- job-paused
 history:
 - at: 2026-11-26T19:40:18.139003+00:00
   actor: claude
@@ -159,3 +190,27 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T04:10:23.444202+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T04:10:23.728601+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-915"],"related":["DEV-871","DEV-915"]}'
+    new: '{"blocks":["DEV-915"],"related":["DEV-871","DEV-915","DEV-782","DEV-810","DEV-861","DEV-896","DEV-903"]}'
+- at: 2026-11-27T04:10:30.649506+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: job-paused
+    new: ''
+- at: 2026-11-27T04:12:22.650058+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

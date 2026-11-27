@@ -1,11 +1,11 @@
 title: 'agent-team: Prerequisites rule keeps the ticket Blocked, so lotar automation run tells it again on every run'
-status: InProgress
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-26T17:27:28.763305+00:00
-modified: 2026-11-27T04:03:36.748347+00:00
+modified: 2026-11-27T04:10:25.071166+00:00
 relationships:
   depends_on:
   - DEV-796
@@ -21,6 +21,34 @@ comments:
     - Fixing it here would copy DEV-796's whole template into this branch, so this ticket now depends on DEV-796 and is tagged `waits`.
     - When DEV-796 is Done: add `set: status: InProgress` to the rule's `unblocked` action and the run-twice test from "Done when".
     - No running DEV-796 thread to tell (checked `t3_thread_list`). If its fix job adds the `set` itself, this ticket closes with no change.
+- date: 2026-11-27T04:10:15.130444+00:00
+  author: claude
+  text: |-
+    Fixed: agent-team's "Prerequisites done" rule now moves the ticket to InProgress, so a second run finds nothing.
+
+    - Branch fast-forwarded to main (DEV-796 landed); the rule there still had no `set`.
+    - `agent-team.yml`: the `unblocked` action sets `status: InProgress`; `remove tags [waits]` and `tell_agent` stay.
+    - New test `shipped_agent_team_template_continues_a_waiting_ticket_once` in `agent_automation_integration_test.rs`: it inits from the template, runs `lotar config validate`, then runs `lotar automation run "Prerequisites done: continue the waiting ticket"` twice. The ticket is InProgress while its job waits in the queue, the queue holds 1 `implement` job, and the second run says "none match" and adds no comment.
+    - Deviation: the test doesn't check for a "told no agent … yet" comment. A command-runner job from the CLI goes to the queue file without that comment. The test checks instead that the second run adds no comment.
+    - `docs/help/templates.md`: the Prerequisites bullet says the ticket goes back to InProgress.
+    - Finding, not changed: DEV's own rule of the same name in `.tasks/DEV/automation.yml` (line 1025) also has no `set`, so a scheduled run can tell a Blocked DEV ticket again. That's the owner's config.
+  report:
+    commits:
+    - hash: 1d2f71d10
+      what: agent-team rule sets InProgress on unblocked; run-twice test; templates.md
+    checks:
+    - command: cargo nextest run --test integration shipped_agent_team
+      result: passed
+      reason: 3 tests; the new one fails without the fix
+    - command: cargo nextest run --test integration -E 'test(cli_init_behavior_test) | test(/template/)'
+      result: passed
+      reason: 35 tests
+    - command: npm run lint
+      result: passed
+    - command: npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    next: Merge agent lands agent/DEV-902
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2d1de45ca813895e721f5f0dfbce0dedb4b74fa2f6b6424e61f6fe4f89e6a087
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae5d32d07d75eefa7b9b282fad00b618f216e2fadddf23234aa919e93eb16659f
@@ -109,3 +137,16 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae5d32d07d75eefa7b9b282fad00b618f216e2fadddf23234aa919e93eb16659f
+- at: 2026-11-27T04:10:15.130444+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T04:10:25.071166+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

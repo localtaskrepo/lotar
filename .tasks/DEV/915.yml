@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T00:04:01.449016+00:00
-modified: 2026-11-27T02:39:28.997479+00:00
+modified: 2026-11-27T04:10:31.335009+00:00
 relationships:
   depends_on:
   - DEV-910
@@ -32,8 +32,6 @@ description: |-
   ## Done when
 
   - [ ] The first four doc lines sit above `combined_stats` again; `held_in_memory` keeps only its own three
-tags:
-- waits
 history:
 - at: 2026-11-27T00:04:02.861555+00:00
   actor: claude
@@ -79,3 +77,9 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-27T04:10:31.335009+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: waits
+    new: ''

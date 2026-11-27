@@ -1660,6 +1660,47 @@ fn a_t3_jobs_retry_after_a_usage_limit_continues_its_thread() {
     assert!(job_logs(&fixtures).contains("in the same T3 Code thread"), "{}", job_logs(&fixtures));
 }
 
+/// DEV-912 (local LOCA-631): a job that took over a thread T3 Code ran again (DEV-626) had no request to retry, so a
+/// usage limit that stopped its run failed it, into the failure rules, where a job lotar started paused. It now pauses
+/// as well, after the work it did, and its retry continues the thread.
+#[test]
+fn a_taken_over_t3_job_that_hits_a_usage_limit_pauses_and_its_retry_continues_the_thread() {
+    let (fixtures, _env) = t3_harness_with(&[("fix", "", "    continue_within_minutes: 0\n")]);
+    let root = fixtures.get_temp_path();
+    let tasks_dir = fixtures.tasks_root.clone();
+    let _queue = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", root.join("queue").to_str().unwrap());
+    let _no_worker = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+    let _wait = EnvVarGuard::set("LOTAR_AGENT_USAGE_LIMIT_WAIT_SECONDS", "1");
+    run_t3(&fixtures, "fix").success();
+    // T3 Code runs the job's thread again; lotar takes it over, then the run stops on Claude's 5-hour limit.
+    std::fs::write(root.join("list-threads"), "").unwrap();
+    std::fs::write(root.join("running-thread-0"), "").unwrap();
+    AgentJobService::adopt_resumed_t3_threads(&tasks_dir);
+    let job = lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").expect("a job takes the thread over");
+    std::fs::write(root.join("limit-thread-0"), "Claude API rate limit reached. Try again later.").unwrap();
+    std::fs::write(root.join("failed-thread-0"), "").unwrap();
+    std::fs::remove_file(root.join("running-thread-0")).unwrap();
+    wait_for_jobs_to_end(&tasks_dir);
+    let ended = AgentJobService::get_job(&job.job_id).expect("the taken-over job");
+    assert_eq!(ended.status, "paused", "{ended:?}\n{}", job_logs(&fixtures));
+    assert!(!job_logs(&fixtures).contains("agent_job_failed"), "no job failed: {}", job_logs(&fixtures));
+    let pending = AgentQueueService::list_pending(&tasks_dir).unwrap();
+    let retry = pending.iter().find(|entry| entry.ticket_id == "TEST-1").unwrap_or_else(|| panic!("the job is queued again: {pending:?}"));
+    assert_eq!((retry.agent.as_str(), retry.session), ("fix", Some(lotar::config::types::AgentSession::Continue)), "{retry:?}");
+    assert!(retry.not_before.is_some(), "the retry waits for the reset: {retry:?}");
+    assert_eq!(retry.prompt, "Work on it", "the retry asks what the thread's first job asked");
+
+    std::fs::remove_file(root.join("failed-thread-0")).unwrap();
+    std::fs::remove_file(root.join("limit-thread-0")).unwrap();
+    std::fs::remove_file(root.join("list-threads")).unwrap();
+    AgentQueueService::run_worker(&tasks_dir).unwrap();
+    wait_for_jobs_to_end(&tasks_dir);
+    assert_eq!(mcp_calls(root, "t3_thread_launch").len(), 1, "one thread for the ticket");
+    let sends = mcp_calls(root, "t3_thread_send");
+    assert_eq!(sends.len(), 1, "{sends:?}");
+    assert_eq!(sends[0]["threadId"], "thread-0", "the retry's turn goes to the taken-over thread");
+}
+
 /// DEV-600: a queue entry held by an earlier job's T3 Code thread waited without a word, retrying every few hundred
 /// milliseconds. Its ticket now gets one comment that says which thread holds it and what lets it go on.
 #[test]

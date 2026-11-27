@@ -1,14 +1,27 @@
 title: 'A takeover of a taken-over T3 job loses the original request: its retry asks only ''Go on with the ticket''s work in this thread'''
-status: Todo
+status: Blocked
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T03:13:30.591400+00:00
-modified: 2026-11-27T03:13:31.400337+00:00
+modified: 2026-11-27T04:15:20.637583+00:00
 relationships:
+  depends_on:
+  - DEV-912
   related:
   - DEV-912
+comments:
+- date: 2026-11-27T04:15:13.565659+00:00
+  author: claude
+  text: |-
+    Waits for DEV-912 to land on main: the code this ticket fixes isn't there yet.
+
+    - `adopt`'s `earlier_request` and `GO_ON` (`crates/lotar-agent/src/services/agent_job_service/resumed.rs`) come from DEV-912's commit `ad7f33724`, on `agent/DEV-912` only; DEV-912 is Merging.
+    - Building on an unmerged commit would conflict with its merge, so no code yet.
+    - Next: once DEV-912 is Done, rebase `agent/DEV-920` onto main, then take the request from the replaced limit retry, else the earlier job's record or log, else `GO_ON`, with the test from "Done when".
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A102957e71acb447fb921535ef72d6677575feaa9e48a008cb057c55367da89de
 description: |-
   ## Found (review of DEV-912, 2026-11-26)
   - DEV-912's `adopt` (`crates/lotar-agent/src/services/agent_job_service/resumed.rs`, `earlier_request`) reads the request from the earlier job's `run_inputs` log line. A taken-over job writes none: local `job-20261126T204940.803Z-13` (a takeover) has 0 `run_inputs` lines, `job-20261126T204500.272Z-3` has 1.
@@ -18,6 +31,8 @@ description: |-
   ## Done when
   - [ ] A test: a job taken over from a taken-over job gets the first job's request (prompt and profile), also after a usage-limit pause in between.
   - [ ] `adopt` takes the request from the limit retry it replaces, else from the earlier job's record or log, else `GO_ON`.
+tags:
+- waits
 history:
 - at: 2026-11-27T03:13:31.016605+00:00
   actor: claude
@@ -30,3 +45,36 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T04:14:49.153079+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T04:14:49.809930+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A102957e71acb447fb921535ef72d6677575feaa9e48a008cb057c55367da89de
+- at: 2026-11-27T04:15:12.860222+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-912"]}'
+    new: '{"depends_on":["DEV-912"],"related":["DEV-912"]}'
+- at: 2026-11-27T04:15:13.501976+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-27T04:15:13.565659+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T04:15:20.637583+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

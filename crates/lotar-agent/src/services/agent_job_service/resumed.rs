@@ -321,6 +321,19 @@ fn comment(tasks_dir: &Path, ticket_id: &str, text: &str) {
     let _ = TaskService::add_comment_with_context(&mut Storage::new(tasks_dir), ticket_id, text, CommentContext::automation());
 }
 
+/// The request of a taken-over job whose earlier job's log has no user
+/// request (a job taken over itself, a log of an older build).
+const GO_ON: &str = "Go on with the ticket's work in this thread, where it stopped.";
+
+/// The user request the job `job_id` started with, from its log's prompt.
+fn earlier_request(workspace_root: &Path, logs_dir: Option<&str>, job_id: &str) -> Option<String> {
+    let inputs = crate::services::agent_log_service::AgentLogService::load_run_inputs(workspace_root, logs_dir?, job_id).ok()??;
+    let section = inputs.sections.iter().find(|section| section.heading == "User request")?;
+    let text: String = inputs.prompt.chars().skip(section.start).take(section.length).collect();
+    let request = text.trim().strip_prefix("User request:")?.trim();
+    (!request.is_empty()).then(|| request.to_string())
+}
+
 /// Take the thread over as a new job of its job's profile: the ticket goes
 /// back to that profile, the `job_started` rules run, and the job follows the
 /// thread's run and ends like any job. The new job's id, or why not.
@@ -360,6 +373,16 @@ fn adopt(
     let job_id = make_job_id();
     let started_at = time::now_rfc3339();
     let workspace_root = tasks_dir.parent().map(Path::to_path_buf).unwrap_or_else(|| tasks_dir.to_path_buf());
+    let agent_logs_dir = crate::services::agent_log_service::effective_logs_dir(tasks_dir, config.agent_logs_dir.as_deref());
+    // The job pauses like any other on a usage limit and runs again then
+    // (DEV-912): without a request it failed into the failure rules.
+    let request = crate::api_types::AgentJobCreateRequest {
+        ticket_id: ticket_id.to_string(),
+        prompt: earlier_request(&workspace_root, agent_logs_dir.as_deref(), &resumed.job_id).unwrap_or_else(|| GO_ON.to_string()),
+        runner: resumed.agent.is_none().then(|| AgentRunnerKind::T3.as_str().to_string()),
+        agent: resumed.agent.clone(),
+        ..Default::default()
+    };
     {
         let mut registry = JOB_REGISTRY.lock().map_err(|_| "the job registry is unavailable".to_string())?;
         registry.active_by_ticket.insert(ticket_id.to_string(), job_id.clone());
@@ -372,7 +395,7 @@ fn adopt(
                     ticket_id: ticket_id.to_string(),
                     tasks_dir: tasks_dir.to_path_buf(),
                     workspace_root,
-                    agent_logs_dir: crate::services::agent_log_service::effective_logs_dir(tasks_dir, config.agent_logs_dir.as_deref()),
+                    agent_logs_dir,
                     runner: AgentRunnerKind::T3.as_str().to_string(),
                     agent_profile: resumed.agent.clone(),
                     status: AgentJobStatus::Queued,
@@ -402,7 +425,7 @@ fn adopt(
                 main_head_at_start: None,
                 checks_since: None,
                 assignee_at_start: None,
-                request: None,
+                request: Some(request),
                 commit_retry: None,
                 carried_outcome: None,
                 after_limit: false,

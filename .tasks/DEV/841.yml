@@ -1,17 +1,18 @@
 title: lotar agent worktree cleanup doesn't sweep a project's own build_root
-status: InProgress
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-24T17:20:58.415465+00:00
-modified: 2026-11-27T02:38:20.993445+00:00
+modified: 2026-11-27T04:14:45.701198+00:00
 relationships:
   depends_on:
   - DEV-778
   related:
   - DEV-778
   - DEV-905
+  - DEV-919
 comments:
 - date: 2026-11-24T19:17:54.385564+00:00
   author: automation
@@ -27,9 +28,37 @@ comments:
 - date: 2026-11-24T22:23:10.962358+00:00
   author: automation
   text: 'The @fix job waits for its open prerequisites: DEV-778. It starts once they are done.'
+- date: 2026-11-27T04:14:32.992813+00:00
+  author: claude
+  text: |-
+    Done: `lotar agent worktree cleanup` now sweeps each project's own build root too.
+
+    - DEV-778 is on main; branch fast-forwarded to `e844fd11b`, untagged `waits`
+    - New `sweep_build_roots` in `crates/lotar-agent/src/services/agent_job_service.rs`: build roots of all configs, deduplicated after canonicalizing; every config's `agent.worktree.dir` counts as "being added". `sweep_build_root` wraps it, so its keep rules stay as in DEV-778
+    - `worktree_cleanup` in `crates/lotar-lib/src/cli/handlers/agent.rs` passes the global config plus each project with a `config.yml`; an unreadable project config falls back to the base config (`config_for_project`) or is skipped on error; `--dry-run` sweeps nothing
+    - Test `agent_safety_test::cleanup_sweeps_a_build_root_set_only_for_a_project`: an orphan in a project-only root goes, a listed worktree's build stays, `--dry-run` keeps everything
+    - Docs: `docs/help/agent.md` build_root paragraph
+    - Told the DEV-919 thread, which works on the build root too
+  report:
+    commits:
+    - hash: ecb19aa2b
+      what: cleanup sweeps the global and every project's build root
+    checks:
+    - command: cargo nextest run --cargo-profile dev -E 'test(/build_root|leftover_builds|parked_builds|dev153|worktree_cleanup/)'
+      result: passed
+      reason: 8 tests; new test fails without the fix
+    - command: cargo clippy -p lotar-agent -p lotar-lib --all-targets
+      result: passed
+    - command: rustfmt --check, prettier --check on changed files
+      result: passed
+    - command: npm run lint, npm test, npm run smoke
+      result: not_run
+      reason: the merge runs them (DEV-797)
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A44d0364e44e95130a1b473670bcf8e9bd10004deb2ba5f7d03d6fddab04b573d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac4c18a97c8b2f8f8d4f765fd3ee7b97c0634731fb1521c1f15e6bd4f0a361127
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A237469a2d13990eb54ae5ad310e701763f2ce308c2182e50589c70015883809a
 description: |-
   Found in the DEV-778 review. `AgentHandler` worktree cleanup (`crates/lotar-lib/src/cli/handlers/agent.rs` ~665) calls `sweep_build_root(&repo_root, config, None)` once with the global config only. A project that sets `agent_worktree_build_root` itself (allowed: `dev153_worktree_settings_test::build_root_is_settable`) gets its root swept only through a removed worktree's `target` link, so the last worktree's leftover in that root stays.
 
@@ -49,7 +78,6 @@ description: |-
   - [ ] Test: a project-only `agent_worktree_build_root` with an orphan `<root>/<repo>/<ticket>` folder and no worktree: `lotar agent worktree cleanup` deletes it; a folder of a listed worktree stays
 tags:
 - job-paused
-- waits
 history:
 - at: 2026-11-24T17:20:58.705536+00:00
   actor: claude
@@ -153,3 +181,33 @@ history:
   - field: status
     old: Blocked
     new: InProgress
+- at: 2026-11-27T04:10:31.312275+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A237469a2d13990eb54ae5ad310e701763f2ce308c2182e50589c70015883809a
+- at: 2026-11-27T04:14:32.932759+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: job-paused, waits
+    new: job-paused
+- at: 2026-11-27T04:14:32.992813+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T04:14:33.281969+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-778"],"related":["DEV-778","DEV-905"]}'
+    new: '{"depends_on":["DEV-778"],"related":["DEV-778","DEV-905","DEV-919"]}'
+- at: 2026-11-27T04:14:45.701198+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

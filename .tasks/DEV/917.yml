@@ -1,11 +1,11 @@
 title: 'Done ticket''s failed T3 thread isn''t settled by the look: harnessmux settle refuses any status but completed'
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-27T00:16:20.412681+00:00
-modified: 2026-11-27T03:35:19.955811+00:00
+modified: 2026-11-27T04:22:08.310836+00:00
 relationships:
   depends_on:
   - DEV-810
@@ -22,6 +22,37 @@ comments:
     - Added "## Done when" with the route per status: `completed` through harnessmux as now, other ended statuses through `t3_thread_api::settle_thread`.
     - No code changed yet; no commits on `agent/DEV-917`.
     - Next: once DEV-810 is on main, rebase `agent/DEV-917` onto main, write the failing test (fake `thread show` reads `listed-<id>`), then the fix and docs.
+- date: 2026-11-27T04:21:57.250758+00:00
+  author: claude
+  text: |-
+    Fixed: a done ticket's failed, interrupted, cancelled or idle thread is now settled through T3 Code's internal API, `cee8ea772`.
+
+    - Rebased onto main with DEV-810 (`ca8ed67a5`).
+    - **Failing test first:** the fake `t3 thread show` now reports the status in `listed-<id>`. The DEV-876 test (`left: []`) and DEV-810's title test (`left: ["thread-0"]`, thread-9 `failed` missing) failed with the old code.
+    - **Fix** in `kept.rs` `settle_ticket`: the list's status picks the route. `completed` still goes through harnessmux, which checks `thread show` first. Any other ended status goes through `t3_thread_api::settle_thread` (`thread.settle`), with or without a job log or session. Followed, running and waiting threads are left alone, as before. A failure is noted once per process as `was not settled: <reason>`.
+    - **Fake server:** `thread.settle` over `/ws` is now logged as `ws_settle` and marks the thread settled; `settled_threads` counts it. This made two older tests show what happens live: the later job settles the kept thread-0 as it starts (DEV-876), before its own. Their expected order is now `["thread-0", "thread-1"]`.
+    - **Docs:** `docs/help/agent.md` says which route each status takes.
+    - Diff 44+/17-, so no `small-diff` tag; removed the `waits` tag.
+  report:
+    commits:
+    - hash: cee8ea772
+      what: settle ended non-completed threads of done tickets through thread.settle; fake t3 show honours listed-<id>
+    checks:
+    - command: cargo nextest run --test integration -E 'test(/a_done_tickets_ended_threads_are_settled_whatever_their_outcome|a_done_tickets_job_thread_without_a_job_log_is_settled_by_its_title/)' (before the fix)
+      result: failed
+      reason: as expected, left [] / [thread-0]
+    - command: cargo nextest run --test integration -E 'test(/dev503_harness_jobs_test|dev626_resumed_t3_threads_test/)'
+      result: passed
+      reason: 75 of 75
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: Review, then merge
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A54c0a5c8da360b963fc88ee14eda15831f9d7b811da77dae836ce9d5a30930fd
 description: |-
@@ -113,3 +144,22 @@ history:
   - field: tags
     old: waits
     new: ''
+- at: 2026-11-27T04:17:30.594260+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-27T04:21:57.250758+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T04:22:08.310836+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

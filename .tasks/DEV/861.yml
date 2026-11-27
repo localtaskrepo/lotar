@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T02:10:53.247813+00:00
-modified: 2026-11-27T03:57:18.501861+00:00
+modified: 2026-11-27T04:12:22.598758+00:00
 relationships:
   blocks:
   - DEV-916
@@ -18,6 +18,7 @@ relationships:
   - DEV-810
   - DEV-863
   - DEV-896
+  - DEV-910
 comments:
 - date: 2026-11-25T13:39:50.915818+00:00
   author: automation
@@ -144,6 +145,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A94ea07def20418c9793ca25d560c20faad7ae65fad4e857094a2004dddaa36b9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A16b4af229751557f78791d905466d6edb5963f8e5da82fe9bf603438c56fd0ef
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aee04bdf043a3a4837a3d6ca86f89cdab589c09c41fd9d82e8783b4f912920104
+releases:
+- 14
 description: |-
   Found 2026-11-24 18:10 PST: 12 orphaned processes under /var/folders/*/T/lotar-rust-temp-*/.lotar-test-scratch/, from 4 test runs whose cargo test process had exited (oldest from 2026-11-22 18:18, DEV-767's job worktree). Each run left a 'lotar --tasks-dir <scratch>/.tasks agent worker' (ppid 1) plus its job shell, a 'sh -c ... while [ ! -f <scratch>/release ]; do sleep 0.05; done' loop that forks sleep about 20 times a second until reboot. Tests that start a worker or a job with a release file must stop the worker and remove or release the loops on drop, also when the test fails or times out. Killed by the chief of staff with the owner's OK (2026-11-22, 'Kill and file').
 
@@ -358,3 +361,14 @@ history:
   - field: tags
     old: fix-retried, review-returned
     new: ''
+- at: 2026-11-27T04:10:23.727290+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-916"],"related":["DEV-767","DEV-897","DEV-916","DEV-796","DEV-579","DEV-810","DEV-863","DEV-896"]}'
+    new: '{"blocks":["DEV-916"],"related":["DEV-767","DEV-897","DEV-916","DEV-796","DEV-579","DEV-810","DEV-863","DEV-896","DEV-910"]}'
+- at: 2026-11-27T04:12:22.598758+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

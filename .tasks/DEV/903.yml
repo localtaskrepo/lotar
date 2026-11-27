@@ -1,11 +1,11 @@
 title: Release v0.16.0
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: claude
 created: 2026-11-26T17:48:57.525302+00:00
-modified: 2026-11-27T03:53:28.735503+00:00
+modified: 2026-11-27T04:12:16.603925+00:00
 relationships:
   related:
   - DEV-881
@@ -14,6 +14,7 @@ relationships:
   - DEV-810
   - DEV-863
   - DEV-901
+  - DEV-910
 comments:
 - date: 2026-11-27T03:18:00.478143+00:00
   author: claude
@@ -24,6 +25,9 @@ comments:
 - date: 2026-11-27T03:53:28.735503+00:00
   author: claude
   text: 'Step 3: Quality Assurance run 45935893424 for e1bedb96f succeeded. Step 4: signed tag v0.16.0 on e1bedb96f pushed (owner''s OK 2026-11-26: "Yes go ahead"); release record 0.16.0 marked released.'
+- date: 2026-11-27T04:12:16.544742+00:00
+  author: claude
+  text: 'Step 5: Release run 45936753862 succeeded, every job green; v0.16.0 is Latest on GitHub. Step 6: brew upgrade lotar, lotar --version prints 0.16.0, codesign shows Developer ID Application: Ravi Gairola (3HKD37M482), Identifier=net.pyxzl.lotar, TeamIdentifier=3HKD37M482. Step 7: no ticket depends on this release, so closing it hands nothing to @fix.'
 releases:
 - 13
 description: |-
@@ -91,3 +95,19 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-27T04:10:23.728369+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-881","DEV-905","DEV-850","DEV-810","DEV-863","DEV-901"]}'
+    new: '{"related":["DEV-881","DEV-905","DEV-850","DEV-810","DEV-863","DEV-901","DEV-910"]}'
+- at: 2026-11-27T04:12:16.544742+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T04:12:16.603925+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

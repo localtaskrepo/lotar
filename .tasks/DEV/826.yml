@@ -1,11 +1,11 @@
 title: 'Agents page: a question of a job in another process shows in a box after a reload, but not live'
-status: Blocked
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-23T04:27:39.844205+00:00
-modified: 2026-11-27T02:55:11.866287+00:00
+modified: 2026-11-27T04:12:47.074699+00:00
 relationships:
   depends_on:
   - DEV-782
@@ -22,8 +22,34 @@ comments:
     - Live fix once it lands: `LogFollower::api_event` in `crates/lotar-agent/src/services/agent_job_service/follow.rs` passes the current event (as a `JobLogEntry`) in the `SavedJob` events instead of `Vec::new()`, so `logged_question` gives the same title-only question; the next event clears it, as after a reload
     - Test: a `follow.rs` test that an `agent_job_question` line yields `question.title` = its message, no options, and the next line `question: null`
     - No code changed in this job; nothing committed
+- date: 2026-11-27T04:12:37.730866+00:00
+  author: claude
+  text: |-
+    Live question of a job in another process now shows in the box, as after a reload.
+
+    - DEV-782 is on main (`5ae578620`), so `logged_question` exists
+    - `LogFollower::api_event` in `crates/lotar-agent/src/services/agent_job_service/follow.rs` passes the current event as the job's last log entry instead of no events: an `agent_job_question` line gets `question` = its message as title, no options, empty `request`; the next line sends `question: null`
+    - The page already takes `payload.question` (`view/pages/AgentJobs.vue:794`), so no UI change; `docs/help/agent.md` already describes this
+    - New test `a_followed_question_carries_its_title_and_the_next_line_clears_it`: failed before the fix, passes now
+  report:
+    commits:
+    - hash: b99923f6c
+      what: followed events carry the job's title-only question
+    checks:
+    - command: 'cargo nextest run -p lotar-agent follow:: dev782'
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: Merge agent lands agent/DEV-826
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A407a18347417b166c014fede135d875b0cb8589e4b34f67cb90e149629e91c1d
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70dc96c449dc460249eeff37f9c1ba6ca9f3f54735e771c93bcdfde19aaa3cce
 description: |-
   Found while reviewing DEV-782.
 
@@ -94,3 +120,27 @@ history:
   - field: tags
     old: ui, agent, waits
     new: ui, agent
+- at: 2026-11-27T04:10:35.322532+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-27T04:10:36.716933+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70dc96c449dc460249eeff37f9c1ba6ca9f3f54735e771c93bcdfde19aaa3cce
+- at: 2026-11-27T04:12:37.730866+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T04:12:47.074699+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

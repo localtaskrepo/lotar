@@ -1,14 +1,49 @@
 title: A review's scratch worktree that builds into the ticket worktree's target/ breaks the next merge's lotar-agent build
-status: Todo
+status: Reviewing
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-27T03:08:35.727731+00:00
-modified: 2026-11-27T03:08:36.755919+00:00
+modified: 2026-11-27T04:17:28.307513+00:00
 relationships:
   related:
   - DEV-896
+  - DEV-841
+comments:
+- date: 2026-11-27T04:17:13.015891+00:00
+  author: claude
+  text: |-
+    Fixed: a build no longer reuses another checkout's `LOTAR_DOCS_DIR` / `LOTAR_WEB_EMBED_DIR`.
+
+    - Cause: cargo hashes path packages the same in every checkout, and `rerun-if-changed=../../docs/...` is relative, so a copy's build-script output stays fresh in the other checkout's `target/`.
+    - `rerun-if-env-changed=CARGO_MANIFEST_DIR` doesn't help: cargo checks its own env, where that var isn't set (tried in a scratch workspace).
+    - Fix: new `.cargo/config.toml` sets `LOTAR_CHECKOUT_DIR = { value = "", relative = true }` (the checkout root). `crates/lotar-agent/build.rs`, `crates/lotar-lib/build.rs` and `crates/lotar-web-assets/build.rs` emit `rerun-if-env-changed=LOTAR_CHECKOUT_DIR`. A packaged crate has no config, so the var stays unset there.
+    - Test: `crates/lotar-lib/tests/build_script_checkout_test.rs` checks the config and the three scripts, and that `REPO_ROOT` and `LOTAR_DOCS_DIR` point at this checkout.
+    - Repro with the real crates: a copy of the repo built into this `target/` and was then deleted. Without the fix, `cargo check -p lotar-agent` failed with `couldn't read …/copy/crates/lotar-agent/../../docs/help/agent-instructions.md`. With the fix it built clean.
+    - The ticket's `grep -rl review-scratch target/debug/build/*/*/run/stdout` found nothing in this worktree.
+    - 47 lines changed, so no `small-diff` tag.
+  report:
+    commits:
+    - hash: 2ec689b70
+      what: build scripts rerun when the checkout changes
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(build_script_checkout_test)'
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: 'manual repro: copy builds into this target/, copy deleted, cargo check -p lotar-agent'
+      result: passed
+      reason: fails without the fix with the ticket's error, clean with it
+    - command: npm test
+      result: not_run
+      reason: merge runs the full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs it
+    next: Review, then merge
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A59bae2bfdd713fed611d6e91d60bb2e917e5e0922b6052e35a0f3afbcbeb8d42
 description: 'Found on DEV-896''s merge (2026-11-26): `npm run -s test:agent` failed twice. `include_str!` couldn''t read `/private/tmp/dev896-review-scratch/.../docs/help/agent-instructions.md`. The review had built a deleted scratch worktree into DEV-896''s `target/`. The build-script run `target/debug/build/lotar-agent/<hash>/run/stdout` kept `LOTAR_DOCS_DIR` pointing there, because `rerun-if-changed=../../docs/...` is relative and stays the same. Check: `grep -rl review-scratch target/debug/build/*/*/run/stdout` in a ticket worktree. Done when: a build in one checkout can''t reuse another checkout''s `LOTAR_DOCS_DIR`, for example `crates/lotar-agent/build.rs` and `crates/lotar-lib/build.rs` also rerun when `CARGO_MANIFEST_DIR` changes, with a test.'
 tags:
 - health
@@ -26,3 +61,33 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T04:12:51.049792+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T04:12:51.728832+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A59bae2bfdd713fed611d6e91d60bb2e917e5e0922b6052e35a0f3afbcbeb8d42
+- at: 2026-11-27T04:14:33.282371+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-896"]}'
+    new: '{"related":["DEV-896","DEV-841"]}'
+- at: 2026-11-27T04:17:13.015891+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T04:17:28.307513+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
