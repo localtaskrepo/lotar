@@ -2998,7 +2998,7 @@ case "$profile" in
     echo "$n" > "{count}"
     if [ "$n" = 1 ]; then
       # The test comments as a person while this review runs.
-      while [ ! -f "{go}" ]; do sleep 0.1; done
+      while [ ! -f "{go}" ] && {alive}; do sleep 0.1; done
       "{lotar}" comment "$LOTAR_TICKET_ID" "Review: blocking, feature.txt lacks a test" >/dev/null || exit 3
       "{lotar}" task edit "$LOTAR_TICKET_ID" --tag review-blocked >/dev/null || exit 3
     fi ;;
@@ -3010,6 +3010,7 @@ exit 0
                 count = reviews.to_string_lossy(),
                 go = go.to_string_lossy(),
                 lotar = crate::common::lotar_bin().display(),
+                alive = crate::common::while_this_test_runs(),
             ),
         );
 

@@ -1,11 +1,11 @@
 title: Smoke 'Instructions button' keeps DEV-801's failure diagnostic for a flake DEV-875 already fixed
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-27T10:20:52.236519+00:00
-modified: 2026-11-27T10:24:18.784406+00:00
+modified: 2026-11-27T11:41:43.004854+00:00
 relationships:
   depends_on:
   - DEV-801
@@ -23,15 +23,40 @@ comments:
     - `smoke/tests/ui.agent-jobs.smoke.spec.ts` on main `8ee989166` has no try/catch around `settings.waitFor`; it's in `agent/DEV-801` `8577170c4` only (`git diff main...agent/DEV-801`)
     - Editing DEV-801's worktree during its merge would race the merge agent, so I left it alone
     - Once DEV-801 is on main: drop the try/catch and its comment, run `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts`, credit DEV-875 for DEV-801 comment 11
+- date: 2026-11-27T11:41:32.245952+00:00
+  author: claude
+  text: |-
+    Removed DEV-801's diagnostic from the 'Instructions button' smoke test; DEV-801 now credits DEV-875 for comment 11.
+
+    - DEV-801 landed on main as `0ec35832b`; fast-forwarded this branch to it
+    - `smoke/tests/ui.agent-jobs.smoke.spec.ts`: the try/catch around `settings.waitFor` and its "Seen once…" comment are gone; it's a plain wait again
+    - DEV-801's merge ran the full `npm run -s smoke` three times with the diagnostic in place and passed each time (its comment 23), so it never fired after DEV-875
+    - Credit: comment on DEV-801 naming DEV-875 (`cb61901d7`) and DEV-888 as the fix for its comment 11
+    - First smoke try failed 17/17 only because the worktree had no `target/debug/lotar`; passed after `npm run -s build:smoke`
+    - No guidance change
+  report:
+    commits:
+    - hash: 3e21157a6
+      what: drop the try/catch diagnostic and its comment around settings.waitFor
+    checks:
+    - command: npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts
+      result: passed
+      reason: 17/17 after npm run -s build:smoke
+    - command: npm run -s lint
+      result: passed
+    - command: npm run -s smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: Merge runs the full smoke suite; if 'Instructions button' fails there, reopen with that failure
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab7f77e63bce99126e80231f5f3b0c27ac0fa98c35f4bdc688935963707dea1a2
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6c71231383698f113295c8bdacd74cacb1854eb4a1a061481db1c888220d518a
 description: |-
   Found: in the review of DEV-801, `smoke/tests/ui.agent-jobs.smoke.spec.ts` ('shows the prompt and settings a finished job ran with behind its Instructions button') gets a try/catch around `settings.waitFor` that dumps toggle and panel state, with the comment "Seen once under the full suite's load (DEV-801), never alone". The flake it targets (DEV-801 comment 11, DEV-832 merge 2026-11-25) predates DEV-875 (`cb61901d7`, test waits for the loaded log's header) and DEV-888 (the panel stays open across the remount), which found and fixed its cause.
   Check: `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts` and the full `npm run -s smoke` once the diagnostic is gone.
   Done: the diagnostic and its comment are removed (or, if the test fails again in a full suite after DEV-875, kept with a comment naming that failure); DEV-801's outcome credits DEV-875 for comment 11.
 tags:
 - health
-- waits
 custom_fields:
   finding: review:dev801-smoke-diagnostic
 history:
@@ -79,3 +104,33 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-27T11:24:24.628914+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, waits
+    new: health
+- at: 2026-11-27T11:38:29.147370+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-27T11:38:30.554589+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6c71231383698f113295c8bdacd74cacb1854eb4a1a061481db1c888220d518a
+- at: 2026-11-27T11:41:32.245952+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T11:41:43.004854+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

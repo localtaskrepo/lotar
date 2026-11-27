@@ -1,11 +1,11 @@
 title: Flaky tests
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:22:12.213895+00:00
-modified: 2026-11-27T10:24:09.976273+00:00
+modified: 2026-11-27T11:41:31.907240+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -42,6 +42,8 @@ relationships:
   - DEV-875
   - DEV-888
   - DEV-913
+  - DEV-841
+  - DEV-916
 comments:
 - date: 2026-11-22T22:40:05.875209+00:00
   author: claude
@@ -272,6 +274,59 @@ comments:
     - `npm run -s lint`: passed
     - `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts`: 17/17 passed. The first try failed 17/17 because this worktree had no web build. It passed after `npm run -s build:web` and a rebuild
     - Not run: `test:agent` and the full smoke suite (the merge runs them). No UI review: the diff changes no pages
+- date: 2026-11-27T11:24:02.691528+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-801` is in `main`.
+
+    - Rebased `agent/DEV-801` onto `main` (`4de9925ef3ec`): `8577170c499a`
+    - Waited 15 min for the machine's check lock, held by lotar's merge checks of DEV-841 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-841 (pid 61697), since 10:14 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-801` onto `main` (`2cbbf322af07`): `9d6feb4439d0`
+    - Waited 20 min for the machine's check lock, held by the merge agent of STD-380 (job job-20261127T092614.853Z-4, pid 36150), since 09:26 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-801` onto `main` (`2279429049db`): `44d8123dc350`
+    - Waited 8 min for the machine's check lock, held by lotar's merge checks of DEV-916 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-916 (pid 61697), since 10:25 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `44d8123dc350`
+    - Amended the pending `.tasks` changes into the merged commit: `0ec35832b5dd`
+    - Pushed 4 commits to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[flaky:tests]`
+  report:
+    commits:
+    - hash: 8ee989166
+      what: DEV-841 lotar agent worktree cleanup doesn't sweep a project's own build_root
+    - hash: 2cbbf322a
+      what: 'DEV-902 agent-team: Prerequisites rule keeps the ticket Blocked, so lotar automation run tells it again on every run'
+    - hash: '227942904'
+      what: DEV-901 Run agent jobs on a second machine over ssh (dyson)
+    - hash: 0ec35832b
+      what: DEV-801 Flaky tests
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
+- date: 2026-11-27T11:41:31.907240+00:00
+  author: claude
+  text: |-
+    Credit correction: comment 11's smoke flake ('Instructions button') was fixed by DEV-875 and DEV-888, not by this ticket.
+
+    - DEV-875 (`cb61901d7`): the test waits for the loaded log's header before it clicks Instructions
+    - DEV-888: the panel stays open when the log remounts
+    - This ticket's try/catch diagnostic for it is removed in DEV-930 (`3e21157a6`); comments 14 and 19 overstate what this branch did for comment 11
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75080ac346701fc3377f56ac792640c8450190058560a4bf13c0ec6cbdc24d02
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A30b4d0255c9ae0259ed6230fb5853f0a8c697bf8ecc35349d0db7cc2c2db09fd
@@ -288,9 +343,6 @@ description: |-
   - Every test reported in the comments passes in the full suites under load (DEV-797's lock in place), or is fixed as a bug, each named in the outcome.
 tags:
 - flaky
-- fix-retried
-- job-paused
-- review-returned
 custom_fields:
   finding: flaky:tests
 history:
@@ -618,3 +670,26 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906","DEV-908","DEV-840","DEV-890","DEV-921","DEV-922","DEV-861","DEV-930","DEV-875","DEV-888","DEV-913"]}'
     new: '{"depends_on":["DEV-797"],"blocks":["DEV-930"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906","DEV-908","DEV-840","DEV-890","DEV-921","DEV-922","DEV-861","DEV-930","DEV-875","DEV-888","DEV-913"]}'
+- at: 2026-11-27T11:24:02.691528+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T11:24:03.041156+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"blocks":["DEV-930"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906","DEV-908","DEV-840","DEV-890","DEV-921","DEV-922","DEV-861","DEV-930","DEV-875","DEV-888","DEV-913"]}'
+    new: '{"depends_on":["DEV-797"],"blocks":["DEV-930"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906","DEV-908","DEV-840","DEV-890","DEV-921","DEV-922","DEV-861","DEV-930","DEV-875","DEV-888","DEV-913","DEV-841","DEV-916"]}'
+- at: 2026-11-27T11:24:04.283982+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: flaky, fix-retried, job-paused, review-returned
+    new: flaky
+- at: 2026-11-27T11:41:31.907240+00:00
+  actor: claude
+  changes:
+  - field: comment_added

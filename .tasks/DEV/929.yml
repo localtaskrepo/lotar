@@ -1,16 +1,17 @@
 title: 'Agent hosts: a waiting dyson thread a new job didn''t take over keeps waiting there, and its MCP forward stays open'
-status: Blocked
+status: Reviewing
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T10:16:41.486933+00:00
-modified: 2026-11-27T10:54:33.186685+00:00
+modified: 2026-11-27T11:38:27.344761+00:00
 relationships:
   depends_on:
   - DEV-901
   related:
   - DEV-901
+  - DEV-797
 comments:
 - date: 2026-11-27T10:22:38.218814+00:00
   author: claude
@@ -20,8 +21,54 @@ comments:
     - `WAITING_ON_HOST`, `collect_waiting_on_host` and `Hosted::bring_back` exist only on `agent/DEV-901` (`49a3fa827`), status Merging; `git grep` on `main` (`8ee989166`) finds none of them.
     - Added a checkbox "Done when" to the description, depends-on DEV-901, tag `waits`. No code changed, no commits.
     - Next: once DEV-901 is on main, rebase `agent/DEV-929` onto it and do the fix plus fake-ssh test.
+- date: 2026-11-27T11:35:10.648915+00:00
+  author: claude
+  text: |-
+    Fixed: a new job stops the thread that waits on dyson, and a closed ticket closes its MCP forward.
+
+    - Rebased `agent/DEV-929` onto main (`0ec35832b`, has DEV-901).
+    - `collect_waiting_on_host` (`crates/lotar-agent/src/services/agent_job_service.rs`): brings the commits back first (bridge closes, worktree removed only when clean, as before). Then it stops the waiting thread via `t3_thread_api::stop_thread`. A failed stop goes to the job log and a ticket comment; the new job runs anyway.
+    - `WAITING_ON_HOST` entries now keep the job id, the thread and the ticket's status/assignee as the question left them (`note_question_on_host`, after `hand_back_waiting_job`).
+    - `close_dropped_waits_on_host` runs on each look (`resumed::look`, every 30 s in `lotar serve` and the queue worker). It closes the bridge and drops the entry when the ticket is done or its status or assignee changed. The host worktree stays. It removes the entry only if the job id still matches, so a new job or takeover that came first wins.
+    - Tests (`hosted.rs`): the fake ssh now logs commands and fakes `-R` and `-L`; a fake T3 server runs on the "host". New: `a_new_job_stops_the_thread_that_waits_on_the_host`, `a_thread_that_cant_be_stopped_is_named_on_the_ticket`, `a_ticket_closed_while_its_thread_waits_closes_the_mcp_connection`.
+    - `docs/help/agent.md` (Commits bullet under agent hosts) says the same.
+    - Left as is: a waiting job that was cancelled before its end recorded the question keeps its bridge until a new job or lotar's exit.
+  report:
+    commits:
+    - hash: 7d47c9d2f
+      what: stop the waiting host thread on a new job; close a waiting job's MCP forward when its ticket is done or its question dropped
+    checks:
+    - command: cargo nextest run -p lotar-agent --lib agent_job_service
+      result: passed
+      reason: 137 tests, incl. 3 new fake-ssh tests in hosted.rs
+    - command: cargo nextest run --test integration dev626
+      result: passed
+      reason: 13 tests (the look now also closes dropped waits)
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it (DEV-797)
+    next: 'Merge agent: rebase on main, run the merge checks, fast-forward'
+- date: 2026-11-27T11:38:11.691727+00:00
+  author: claude
+  text: |-
+    Review: blocking. The 30-second close forgets the waiting thread, so a new job that starts after it never stops the thread on dyson.
+
+    - Reviewed `7d47c9d2f` against main `0ec35832b`: `agent_job_service.rs`, `hosted.rs`, `resumed.rs`, `docs/help/agent.md`. The ticket branch and HEAD are the same commit.
+    - **Blocking:** `close_dropped_waits_on_host` (`crates/lotar-agent/src/services/agent_job_service.rs:4409`, close at `:4437`) removes the whole `WAITING_ON_HOST` entry, thread id included, as soon as the ticket's status or assignee changes. It closes only the bridge.
+    - The usual way to answer by ticket changes exactly those two fields: comment, then set the status or assignee back so a new job starts. That new job reaches `collect_waiting_on_host` (`:4369`) only in `run_job`. A queued job (Mac full, or memory, disk or hold gates) gets there only once a slot frees. A look that runs first (`resumed.rs:68`, every 30 s) drops the entry, and then `take_waiting_on_host` finds nothing. The thread on dyson is never stopped, which is the ticket's original bug and goes against Done when #1. The same race exists for a job that starts at once, but the window is small.
+    - Fix: when the look drops a question, also stop the thread, as `collect_waiting_on_host` does (a failed stop goes to the job log and a ticket comment). Or keep the thread and its ssh route so a later new job can still stop it. Add a test: question dropped by a reassignment, look runs, new job comes later, and the thread still gets stopped.
+    - Rework scope too: a waiting job cancelled before `note_question_on_host` ran (`:4728`) keeps its entry with `question: None`, so the look never closes its bridge. The fix agent named this case in its comment. Closing the bridge when `question` is still `None` after the job ended would cover it.
+    - Matches the ticket: the commits come back before the stop (the test checks the order in `ssh.log`). A failed stop goes to the job log and a ticket comment, and the bridge still closes. The job-id check lets a new job or takeover that came first win. The `stop_thread` call matches the cancelled host job's (`:4299`). Docs agree.
+    - Reran: `npm ci` ok; `cargo nextest run -p lotar-agent --lib agent_job_service` 137 passed; `cargo nextest run --test integration dev626` 13 passed; `cargo clippy -p lotar-agent --all-targets -- -D warnings` clean. The worktree is unchanged afterwards. Full suites not run: the merge runs them (DEV-797).
+    - No UI changes, no stray files, no second branch. No tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d2e62d982215986aed328bbaa591da39294156cb58b013d72219b1068dbb561
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af37effbe0d34fe08e5d043fb7402bfa58480661953e75ddf34acf58f3bd8c798
 description: |-
   Found in the DEV-901 review (2026-11-27, branch `agent/DEV-901` at `49a3fa827`).
 
@@ -35,6 +82,8 @@ description: |-
   - [ ] A waiting host job's bridge (`ssh -R` process and local socket) closes and its `WAITING_ON_HOST` entry goes when its ticket reaches a done status (Done, WontDo, or any status the project marks done) or its question is dropped (ticket no longer waiting / reassigned away from the question's assignee), without waiting for another job or lotar's exit.
   - [ ] A new job or takeover that comes first still wins: it takes the entry, and the later close finds nothing to do.
   - [ ] A fake-ssh test covers both: a new job stops the waiting thread; a ticket closed while waiting closes the bridge.
+tags:
+- review-returned
 history:
 - at: 2026-11-27T10:16:43.304930+00:00
   actor: claude
@@ -104,3 +153,52 @@ history:
   - field: tags
     old: waits
     new: ''
+- at: 2026-11-27T11:24:27.870994+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-27T11:24:29.719552+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af37effbe0d34fe08e5d043fb7402bfa58480661953e75ddf34acf58f3bd8c798
+- at: 2026-11-27T11:35:10.648915+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T11:35:22.114201+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T11:38:11.691727+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T11:38:11.996240+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-901"],"related":["DEV-901"]}'
+    new: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-797"]}'
+- at: 2026-11-27T11:38:12.367249+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: review-blocked
+- at: 2026-11-27T11:38:27.344761+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-blocked
+    new: review-returned
