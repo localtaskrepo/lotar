@@ -1,11 +1,11 @@
 title: 'Kept T3 Code threads of done tickets stay unsettled: 56 completed job threads in the sidebar on 0.15.6'
-status: Merging
+status: Done
 priority: High
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T21:19:09.010490+00:00
-modified: 2026-11-27T03:26:18.842832+00:00
+modified: 2026-11-27T03:43:36.653348+00:00
 relationships:
   depends_on:
   - local:LOCA-601
@@ -26,6 +26,7 @@ relationships:
   - DEV-876
   - DEV-908
   - DEV-917
+  - DEV-921
 comments:
 - date: 2026-11-22T21:22:50.394391+00:00
   author: claude
@@ -571,6 +572,29 @@ comments:
     - [DEV-917](https://lotar.pyxzl.net/task/DEV-917): the look settles through `harnessmux::backend::t3::settle`, which refuses any thread whose `thread show` status isn't `completed` (`ended its last run with status 'failed'`). So a failed thread of a done ticket, found by title or by DEV-876's rule, is logged once as not settled and stays in the sidebar, although `docs/help/agent.md` says it is settled. The tests miss this because the fake t3 changes only the list status. This gap came from DEV-876 on main; DEV-810's "Done when" only asked for `completed` threads.
 
     **Not run:** `npm test` and `npm run smoke` (the merge runs them). The before/after count of unsettled threads waits for the release and the owner's OK.
+- date: 2026-11-27T03:35:16.484242+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-810` is in `main`.
+
+    - Rebased `agent/DEV-810` onto `main` (`80fae087df83`): `b3a3aa747c4b`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `b3a3aa747c4b`
+    - Amended the pending `.tasks` changes into the merged commit: `ca8ed67a50e5`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: ca8ed67a5
+      what: 'DEV-810 Kept T3 Code threads of done tickets stay unsettled: 56 completed job threads in the sidebar on 0.15.6'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A5dfa5bb04fb5c4ca2b8a8a0eee8e470c889eb5d9c328cc3c4c9e036bfddf5ad7
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abb164102892b3f03b3326e4202fca268d1a5f85ada93acdc3de07959a92a3f46
@@ -590,6 +614,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A031b0d341593563131407ad4e61a142dc25461ebf4358f69dfdff0696637e2a9
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8d1ba4d5235e800af0430f866e38c8eb7a54217a812e25223442350396163e9f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A203e8c6c32d413b7f02fbd4bd166d640c726e4be39315dedd938736acc6b3a79
+releases:
+- 13
 description: |-
   Found 2026-11-22 13:30 PST (chief of staff, owner: 't3 still has a lot of open threads. We're on the new version of lotar so I hope this can be cleaned up now?'). T3 Code lists 88 unsettled threads, 56 of them completed full-access job threads ('<ID> fix: ...', '<ID> review: ...'), many of done tickets: STD-298, STD-291, STD-276, DEV-747, DEV-752, HARN-10, LOCA-535 among them (staff briefing 'Threads to settle' lists 42). DEV-747's look (crates/lotar-agent/src/services/agent_job_service/kept.rs, in v0.15.6) should settle them every 30 s in lotar serve and the queue worker, but no log says 'Settled' or 'was not settled'. Suspects: threads() finds threads only from job logs (job_log_dirs) and lotar agent list-jobs shows no jobs for STD-298 any more, so pruned job logs leave a thread unknown; settle_ticket needs a harnessmux session record (resumed::session_of), else 'no harnessmux session holds it'. The chief of staff can't settle them by hand: its thread runs in auto mode, and T3 refuses t3_thread_organize on full-access threads (runtime_mode_escalation_denied). Done when: a failing test first; lotar settles the completed job threads of done tickets also when the job's log or session record is gone (find them from T3's thread list, e.g. thread title or harnessmux metadata), and logs each settle or refusal where repos.ts or the briefing can see it; after the release the current backlog is settled (count before and after). The release needs the owner's OK.
 
@@ -609,12 +635,6 @@ description: |-
   - [ ] `docs/help/agent.md` says so.
   - [ ] `npm run lint`, `npm test`, `npm run smoke` pass.
   - [ ] After the release (owner's OK): count unsettled completed job threads of done tickets before and after (2026-11-22 before: lotar 8, standards 2 completed full-access unsettled threads, many on open tickets).
-tags:
-- review-returned
-- job-paused
-- fix-retried
-- retry-fix
-- review-returned-twice
 history:
 - at: 2026-11-22T21:19:09.309565+00:00
   actor: claude
@@ -1214,3 +1234,27 @@ history:
   - field: relationships
     old: '{"depends_on":["local:LOCA-601","DEV-872"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849","DEV-774","DEV-836","DEV-876","DEV-908","DEV-917"]}'
     new: '{"depends_on":["local:LOCA-601","DEV-872"],"blocks":["DEV-917"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849","DEV-774","DEV-836","DEV-876","DEV-908","DEV-917"]}'
+- at: 2026-11-27T03:35:16.484242+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T03:35:16.771129+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: review-returned, job-paused, fix-retried, retry-fix, review-returned-twice
+    new: ''
+- at: 2026-11-27T03:38:42.207164+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["local:LOCA-601","DEV-872"],"blocks":["DEV-917"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849","DEV-774","DEV-836","DEV-876","DEV-908","DEV-917"]}'
+    new: '{"depends_on":["local:LOCA-601","DEV-872"],"blocks":["DEV-917"],"related":["DEV-747","DEV-752","DEV-808","DEV-809","DEV-611","DEV-833","DEV-778","DEV-849","DEV-774","DEV-836","DEV-876","DEV-908","DEV-917","DEV-921"]}'
+- at: 2026-11-27T03:43:36.653348+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#13'

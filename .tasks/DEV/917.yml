@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T00:16:20.412681+00:00
-modified: 2026-11-27T03:26:30.012568+00:00
+modified: 2026-11-27T03:35:19.955811+00:00
 relationships:
   depends_on:
   - DEV-810
@@ -37,8 +37,6 @@ description: |-
   - [ ] Which wins: the list's status picks the route. `completed` keeps going through `harnessmux::backend::t3::settle` (its `thread show` check stays); any other ended status goes through the internal API. A thread that still runs or waits, or one a session follows, is left alone, as now.
   - [ ] A settle that fails is noted once per process, `The T3 Code thread <link> was not settled: <reason>`, and the thread stays; the look tries again next time.
   - [ ] `docs/help/agent.md` says which route each status takes.
-tags:
-- waits
 history:
 - at: 2026-11-27T00:16:21.866418+00:00
   actor: claude
@@ -109,3 +107,9 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-27T03:35:19.955811+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: waits
+    new: ''
