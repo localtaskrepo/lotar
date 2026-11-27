@@ -1,16 +1,18 @@
 title: 'Two dev503 continued-merge tests time out at 60 s once under load and pass alone: not in the wall-clock group'
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T19:27:41.962615+00:00
-modified: 2026-11-27T03:35:48.415033+00:00
+modified: 2026-11-27T08:50:35.645667+00:00
 relationships:
   related:
   - DEV-858
   - DEV-801
   - DEV-810
+  - DEV-912
+  - TEST-1
 comments:
 - date: 2026-11-26T21:04:01.768789+00:00
   author: claude
@@ -84,6 +86,49 @@ comments:
     - Reran `cargo nextest run --workspace --test integration --retries 0 -E 'test(/dev503_harness_jobs_test/)'`: 58/58 passed in 11.5 s, no retries.
     - The sibling ticket DEV-801 sets the same variable in `tests/common/mod.rs`, so the two changes overlap but don't conflict. Once DEV-801 lands, these three lines are redundant but harmless.
     - No stray files; the tree is clean. No minor findings, so no tickets filed.
+- date: 2026-11-27T08:50:34.616089+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-908` is in `main`.
+
+    - Rebased `agent/DEV-908` onto `main` (`e844fd11b282`): `a2a8cf80008c`
+    - Waited 35 s for the machine's check lock, held by lotar's merge checks of DEV-912 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-912 (pid 61697), since 04:15 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-908` onto `main` (`471746ba122b`): `eee3dde2d532`
+    - Waited 247 min for the machine's check lock, held by lotar's merge checks of STD-378 in /Users/mallox/Development/.lotar-worktrees/standards/STD-378 (pid 76228), since 04:24 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-908` onto `main` (`d26418c28629`): `4d5d4e23bd06`
+    - Waited 0 s for the machine's check lock, held by the merge agent of TEST-1 (job job-20261127T083813.125Z-1, pid 34690), since 08:38 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `4d5d4e23bd06`
+    - Amended the pending `.tasks` changes into the merged commit: `8f8365754bea`
+    - Pushed 3 commits to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[nextest:dev503-continued-merge-flake]`
+  report:
+    commits:
+    - hash: 471746ba1
+      what: DEV-912 A t3 job that hits Claude's 5-hour limit fails into retries and an owner question instead of pausing (local LOCA-631, 2026-11-26)
+    - hash: d26418c28
+      what: 'DEV-877 T3 runner: read job results through t3_submit_output and milestones through MCP Events'
+    - hash: 8f8365754
+      what: 'DEV-908 Two dev503 continued-merge tests time out at 60 s once under load and pass alone: not in the wall-clock group'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abdbc73e5c042eb609474382b70ddcaca9f0f02c95c0b38424a98ca70a7a7c532
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A852f0c8878dc57d4d90273be23977fbcff3ea9aa8982a4e397f789218cf2e4f5
@@ -91,8 +136,6 @@ description: 'Found in the DEV-858 review on main 0cf94860d plus the DEV-858 tes
 tags:
 - health
 - small-diff
-- job-paused
-- review-returned
 custom_fields:
   finding: nextest:dev503-continued-merge-flake
 history:
@@ -215,3 +258,22 @@ history:
   - field: assignee
     old: '@review-light'
     new: '@merge'
+- at: 2026-11-27T08:50:34.616089+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T08:50:34.904524+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-858","DEV-801","DEV-810"]}'
+    new: '{"related":["DEV-858","DEV-801","DEV-810","DEV-912","TEST-1"]}'
+- at: 2026-11-27T08:50:35.645667+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: health, small-diff, job-paused, review-returned
+    new: health, small-diff

@@ -993,7 +993,7 @@ automation:
             "$HOME/Development/standards/scripts/repos.ts" --inbox "$1"' sh ${{ticket.id}} "The merge agent's job
             ${{agent.job_id}} failed again (lotar agent logs ${{agent.job_id}}). The fix is on branch
             ${{agent.worktree_branch}}. Retry with @fix, or will you merge it yourself?" ${{agent.job_id}}
-    # A job that stops on its provider's usage or rate limit, or on a paused queue (commit signing, a full disk), pauses
+    # A job that stops on its provider's usage or rate limit, or on a paused queue (commit signing, a full disk, a login), pauses
     # instead of failing (lotar DEV-584; t3 jobs since 0.15.6): no job_failed rule runs, the ticket keeps its status and
     # assignee, and the job reruns on the same profile once the limit resets or the pause ends. So nobody is asked; one
     # comment says so (STD-246). Tag job-paused keeps a pause that repeats, or a later job's, quiet until the ticket is done.
@@ -1006,8 +1006,31 @@ automation:
             tags: [job-paused]
           comment: >-
             Paused, not failed: the job ${{agent.job_id}} (${{agent.profile}}) stopped on a usage limit or a paused
-            queue and runs again by itself, on a usage limit at its reset. Nobody needs to act; lotar agent list-jobs
-            shows when it resumes, lotar agent logs ${{agent.job_id}} why.
+            queue and runs again by itself, on a usage limit at its reset, on an expired login once mallox signs in
+            (a ticket of its own asks him). Nobody needs to act here; lotar agent list-jobs shows when it resumes,
+            lotar agent logs ${{agent.job_id}} why.
+    # An expired provider login pauses that provider's jobs (lotar DEV-835, 0.15.7): they wait until he signs in, so it
+    # asks mallox in a ticket of its own in the repo's default project, related to the paused one, whose retry is queued
+    # and moves it on. Only the job that opened the pause matches job.pause, and the finding keeps one open ticket per
+    # provider: a later pause comments on it. Without this rule only lotar agent list-jobs shows the pause (STD-370).
+    - name: "Login expired: ask the owner to sign in"
+      when:
+        job: { pause: auth }
+      on:
+        job_paused:
+          run: >-
+            env LOTAR_DEFAULT_REPORTER=automation sh -c 'out=$(lotar --format json add "$2" --type Chore --status
+            HelpNeeded --assignee mallox --tag owner --related "$1" --finding "login-expired:$3" -D "$4"); id=$(echo
+            "$out" | sed -n "s/.*\"task_id\":\"\([^\"]*\)\".*/\1/p"); if [ -z "$id" ]; then lotar comment "$1" -m
+            "Filing the sign-in ticket for mallox failed: lotar add named no ticket."; exit 1; fi; case "$out" in
+            *\"created\":true*) lotar comment "$id" --question "$5" --option "done: Signed in" --set "done:status=Done"
+            --set "done:assignee=" ;; esac; node "$HOME/Development/standards/scripts/repos.ts" --inbox "$id"' sh
+            ${{ticket.id}} "Sign in to ${{agent.provider}} again: its agent jobs wait" ${{agent.provider}} "The
+            ${{agent.provider}} login fails, so lotar paused that provider's agent jobs (job ${{agent.job_id}} on
+            ${{ticket.id}}, lotar agent logs ${{agent.job_id}}). Sign in again (claude auth login, codex login): the
+            next try, every 10 minutes, resumes them. Then close this ticket." "The ${{agent.provider}} login fails
+            and its agent jobs wait. Sign in again (claude auth login, codex login), then answer: the next try resumes
+            them."
     # Not "and tagged": on updated every field condition needs that field to change in the same update.
     - name: "Retries: clear the tags when done"
       when:
@@ -1341,30 +1364,4 @@ automation:
           run:
             command: lotar
             args: [agent, worktree, run, "${{ticket.id}}", --, cargo, clean, --workspace]
-            ignore_failure: true
-    # A provider's expired login pauses that provider's jobs (DEV-835): only the job that opened the pause matches
-    # job.pause, so the owner gets one ticket per pause in his inbox, not one per held ticket. Its own ticket, not the
-    # paused one: that one's retry is queued and moves it on when it completes.
-    - name: "Login expired: ask the owner to sign in"
-      when:
-        job: { pause: auth }
-      on:
-        job_paused:
-          run:
-            command: lotar
-            args:
-              - add
-              - "Sign in to ${{agent.provider}} again: its agent jobs wait"
-              - --project
-              - DEV
-              - --type
-              - Chore
-              - --status
-              - HelpNeeded
-              - --assignee
-              - mallox
-              - --tag
-              - owner
-              - -D
-              - "The ${{agent.provider}} login fails, so lotar paused that provider's jobs (job ${{agent.job_id}} on ${{ticket.id}}). Sign in again (claude auth login, codex login); the next try resumes them, every 10 minutes. Then close this ticket."
             ignore_failure: true
