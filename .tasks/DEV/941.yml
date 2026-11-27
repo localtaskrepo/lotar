@@ -1,0 +1,269 @@
+title: 'lotar''s T3 thread look lists every settled thread every 30 s: about 14 Electron starts a minute, growing with each job'
+status: Merging
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-27T22:24:41.944938+00:00
+modified: 2026-11-27T22:42:53.261299+00:00
+relationships:
+  blocks:
+  - DEV-942
+  - DEV-943
+  related:
+  - DEV-626
+  - DEV-810
+  - DEV-836
+  - DEV-876
+  - DEV-747
+  - DEV-901
+  - DEV-934
+  - DEV-942
+  - DEV-943
+comments:
+- date: 2026-11-27T22:26:42.443797+00:00
+  author: claude
+  text: 'On 2026-11-27 the owner archived the 2,241 top-level threads that had been settled for more than 7 days (list: ~/.t3/archived-2026-11-27-ids.txt). After that, `t3 thread list --project` returns 625 threads and 676 KB for lotar (was 1,633 and 1.6 MB), 260 for standards and 252 for local. One call still takes 0.3 to 0.4 s, mostly the Electron start, so the cost per look stays and the fix here is still needed. Within a week the lists grow back, since about 170 threads are added a day.'
+- date: 2026-11-27T22:38:09.630512+00:00
+  author: claude
+  text: |-
+    lotar now lists T3 threads over T3 Code's internal WebSocket, not by starting `t3 thread list` for every look.
+
+    - `crates/lotar-agent/src/services/t3_thread_api.rs`: `list_threads` reads the `orchestration.subscribeShell` snapshot (`omitOlderSettled`). The bearer comes from one `t3 auth session issue --scope orchestration:read --ttl 60m`, cached per process and reissued about once an hour. The output has the CLI's JSON shape (status, settled, hosted link).
+    - `/mcp` rejects an issued bearer with 401 `invalid_mcp_credential`, so the WebSocket is the only route that needs no Electron start. Live probe: 38 threads, 116 KB, 1.6 s.
+    - `agent_job_service/resumed.rs`: if the API fails, lotar falls back to `t3 thread list` and logs that once. Host jobs (DEV-901) still list over ssh with the CLI.
+    - `agent_job_service/kept.rs`: a thread the list leaves out (an older settled or archived one) counts as settled for the DEV-747 cut.
+    - Tests: the dev503 fake server answers `subscribeShell`, and the dev626 fake refuses it, so the CLI fallback path stays covered. Added 4 unit tests.
+    - A stale `target/debug/lotar` (DEV-934) failed one dev503 test until `cargo build --workspace --bins` rebuilt it.
+    - No guidance correction.
+  report:
+    commits:
+    - hash: c316658fd
+      what: list T3 threads over the internal WebSocket with a cached session, CLI fallback
+    checks:
+    - command: cargo nextest run -p lotar-agent
+      result: passed
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(/dev626|dev503|dev510|dev584|dev810|dev836|dev876|dev901|hosted|t3/)'
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm run test:agent
+      result: not_run
+      reason: full suites run at merge (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: runs at merge
+    next: 'After release, count Electron starts per minute (ps for t3) with jobs running: expect about one session issue an hour, not about 14 starts a minute'
+- date: 2026-11-27T22:42:32.361172+00:00
+  author: claude
+  text: |-
+    Review: passed. `c316658fd` does what "Done when" asks; two minor follow-ups filed.
+
+    - **Read:** the diff of `main..HEAD` (one commit, based on main's tip `4d569cdf3`, no newer main commits to the touched files), the ticket and both comments, AGENTS.md, and T3 Code's own source (the extracted app bundle) for `t3_thread_list`, `listedThreadStatus`, `threadSettlement`, `hostedThreadLink` and the CLI's `resolveProject`.
+    - **Matches T3 Code:** the status derivation (`activityRunStatus`, then `failed`, then `waiting` for an awaited task, a subagent or a background task), `settled` from `settledOverride`, the hosted link encoding and the deepest-project match all agree with T3 Code's code. A live snapshot from the fix agent's probe has every field lotar reads.
+    - **Session:** one `t3 auth session issue --scope orchestration:read --ttl 60m` per T3 home, reissued after 55 min. A refused WebSocket drops it. All the flags exist in `t3 auth session issue --help`.
+    - **Fallback:** if the API fails, lotar uses `t3 thread list` and logs that once. Host jobs (DEV-901) are still listed over ssh. `settle_now` and `settle_superseded` go through the same `resumed::list_threads`.
+    - **Tests:** the DEV-626/810/836/876 tests changed only their fake servers and the expected link (now T3 Code's hosted link). Their assertions are otherwise unchanged.
+    - **Reran:** `npm ci` (ok), `cargo build --workspace --bins`, `cargo nextest run -E 'test(t3_thread_api) | test(/dev503_harness_jobs_test::|dev626_resumed_t3_threads_test::/)'` (91 passed), `npm run lint` (passed). The worktree is unchanged.
+    - **Minor, filed:** [DEV-942](https://lotar.pyxzl.net/task/DEV-942): when no T3 project contains the repo, the WebSocket list returns an empty success instead of falling back to the CLI. [DEV-943](https://lotar.pyxzl.net/task/DEV-943): no test covers the new rule that a missing thread counts as settled (`kept.rs:145`).
+    - **Still open, after release:** measure `t3_thread_list` calls and new `auth_sessions` rows per hour. The full suites and smoke run at merge.
+references:
+- file: crates/lotar-agent/src/services/agent_job_service/resumed.rs
+- file: crates/lotar-agent/src/services/agent_job_service/kept.rs
+- file: crates/lotar-agent/src/services/t3_thread_api.rs
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa7272a298d193cf07f46339460902a9eb559a0c5386d3f34db39e34e8a785eb8
+description: |-
+  Every lotar server lists all of its project's T3 Code threads every 30 seconds, settled ones included, so the cost of each look grows with every job thread ever run. Measured on 2026-11-27 in a performance check from a standards thread. The owner picked "lotar perf ticket" on 2026-11-27, after reading the numbers below.
+
+  ## Measured (2026-11-27)
+
+  - `resumed::look` runs `t3 thread list --project <repo> --json` at most every `LOOK_EVERY` (30 s) per tasks dir. `kept::settle_now` (a job ends) and `kept::settle_superseded` (a job starts) call it again. With 6 `lotar serve` processes, the T3 server's trace shows about 14 CLI sessions a minute, 7,544 `t3_thread_list` calls in 88 minutes.
+  - Each call starts the T3 Code Electron binary as node: 0.4 to 0.6 s, 0.32 s CPU and 230 MB peak memory (`/usr/bin/time -l`). That happens about 14 times a minute on a Mac that is often short of memory (swap at 86% on 2026-11-25, see the reliability evidence in standards).
+  - The CLI pages through every unarchived thread of the project. For lotar that is 1,633 threads, 1.6 MB of JSON and up to 17 MCP pages per call, and all 1,633 are settled. standards has 832 (829 settled), local 657 (656 settled).
+  - `look_at_threads` uses only threads whose status is `running` or `waiting`. `kept` uses only threads that aren't settled yet. Nearly all of the data is thrown away.
+  - Each CLI call also mints a bearer session ("t3 thread cli") that T3 Code never deletes. There are 644k rows in `auth_sessions` now (230 MB). That part is T3 Code's own bug and is being reported upstream; fewer calls from lotar also shrink it.
+
+  ## Fix
+
+  - Ask T3 Code only for the threads lotar can act on. T3's MCP tool `t3_thread_list` already takes `settled: false` and `statuses: [...]`; the CLI's `thread list` has neither flag. Options, cheapest first:
+    - call the MCP endpoint (or the internal WebSocket API that `t3_thread_api.rs` already uses) with `settled: false`, through one session per look instead of a new CLI process per call;
+    - or, if that turns out fragile, keep the CLI and look less often when no `t3` job ended in the last hour.
+  - One list per look serves `resumed`, `kept::settle` and `unlogged` (it already does). `settle_now` and `settle_superseded` can use the same filtered list.
+  - Keep the behaviour of DEV-626, DEV-810, DEV-836 and DEV-876 (takeover, kept threads, superseded threads); their tests must still pass.
+
+  ## Done when
+
+  Found 2026-11-27: `/mcp` takes only an MCP client credential, which T3 Code mints in-process for its own CLI; a bearer from `t3 auth session issue` gets 401 there. The internal WebSocket's `orchestration.subscribeShell` with `omitOlderSettled` takes that bearer and sends every unsettled thread of all projects plus the recently settled ones (38 threads, 116 KB on 2026-11-27, against 1.6 MB for lotar's 1,633 by CLI).
+
+  - [ ] `resumed::look`, `kept::settle_now` and `kept::settle_superseded` get the project's threads from `orchestration.subscribeShell` (`omitOlderSettled: true`): every unsettled thread, no settled ones paged through. Each listed thread has the same fields the CLI gave (status as T3 Code's MCP list derives it, `latestRunId`, hosted link, `settled` from `settledOverride`, title, `runtimeMode`).
+  - [ ] The bearer session (`orchestration:read`) is issued once per process and reused until shortly before its TTL (1 h) ends: at most one `t3` start and one new `auth_sessions` row per process an hour for looks, not one per look. A refused WebSocket drops the session, and the next look issues a new one.
+  - [ ] When the WebSocket route fails (server not running, refused, T3 Code changed the API), the look falls back to `t3 thread list` as before, and the process logs the reason once. A failed CLI too: no list, the next look tries again (as now).
+  - [ ] A kept thread the list doesn't show counts as settled or archived, as T3 Code left it out: the "later job's thread settled" rule (DEV-747) treats it as settled; nothing is settled or stopped that isn't listed unsettled.
+  - [ ] Host jobs' threads (DEV-901) are still listed by `t3 thread list` on the host over ssh (on the host, not this Mac).
+  - [ ] The tests of DEV-626, DEV-810, DEV-836, DEV-876 pass unchanged; unit tests cover the snapshot parsing (project match, status, settled, link) and the WebSocket round trip against a fake server.
+  - [ ] Measured after release: `t3_thread_list` calls and new "t3 thread cli" rows in `auth_sessions` per hour, before and after, in a comment.
+tags:
+- agent
+- backend
+history:
+- at: 2026-11-27T22:24:42.352511+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-626","DEV-810","DEV-836","DEV-876"]}'
+- at: 2026-11-27T22:24:42.731191+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-27T22:24:47.424174+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:crates/lotar-agent/src/services/agent_job_service/resumed.rs
+- at: 2026-11-27T22:24:47.478150+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:crates/lotar-agent/src/services/agent_job_service/kept.rs
+- at: 2026-11-27T22:24:47.499205+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T22:24:47.528388+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: file:crates/lotar-agent/src/services/t3_thread_api.rs
+- at: 2026-11-27T22:24:48.149099+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Aa7272a298d193cf07f46339460902a9eb559a0c5386d3f34db39e34e8a785eb8
+- at: 2026-11-27T22:26:42.443797+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T22:28:32.799855+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Every lotar server lists all of its project's T3 Code threads every 30 seconds, settled ones included, so the cost of each look grows with every job thread ever run. Measured on 2026-11-27 in a performance check from a standards thread. The owner picked "lotar perf ticket" on 2026-11-27, after reading the numbers below.
+
+      ## Measured (2026-11-27)
+
+      - `resumed::look` runs `t3 thread list --project <repo> --json` at most every `LOOK_EVERY` (30 s) per tasks dir. `kept::settle_now` (a job ends) and `kept::settle_superseded` (a job starts) call it again. With 6 `lotar serve` processes, the T3 server's trace shows about 14 CLI sessions a minute, 7,544 `t3_thread_list` calls in 88 minutes.
+      - Each call starts the T3 Code Electron binary as node: 0.4 to 0.6 s, 0.32 s CPU and 230 MB peak memory (`/usr/bin/time -l`). That happens about 14 times a minute on a Mac that is often short of memory (swap at 86% on 2026-11-25, see the reliability evidence in standards).
+      - The CLI pages through every unarchived thread of the project. For lotar that is 1,633 threads, 1.6 MB of JSON and up to 17 MCP pages per call, and all 1,633 are settled. standards has 832 (829 settled), local 657 (656 settled).
+      - `look_at_threads` uses only threads whose status is `running` or `waiting`. `kept` uses only threads that aren't settled yet. Nearly all of the data is thrown away.
+      - Each CLI call also mints a bearer session ("t3 thread cli") that T3 Code never deletes. There are 644k rows in `auth_sessions` now (230 MB). That part is T3 Code's own bug and is being reported upstream; fewer calls from lotar also shrink it.
+
+      ## Fix
+
+      - Ask T3 Code only for the threads lotar can act on. T3's MCP tool `t3_thread_list` already takes `settled: false` and `statuses: [...]`; the CLI's `thread list` has neither flag. Options, cheapest first:
+        - call the MCP endpoint (or the internal WebSocket API that `t3_thread_api.rs` already uses) with `settled: false`, through one session per look instead of a new CLI process per call;
+        - or, if that turns out fragile, keep the CLI and look less often when no `t3` job ended in the last hour.
+      - One list per look serves `resumed`, `kept::settle` and `unlogged` (it already does). `settle_now` and `settle_superseded` can use the same filtered list.
+      - Keep the behaviour of DEV-626, DEV-810, DEV-836 and DEV-876 (takeover, kept threads, superseded threads); their tests must still pass.
+
+      ## Done when
+
+      - [ ] A look's T3 request returns only unsettled threads (or only running and waiting ones, plus the kept ones), and doesn't page through settled ones.
+      - [ ] No new Electron process per look, or a measured reason why the CLI stays.
+      - [ ] Measured after release: `t3_thread_list` calls and new "t3 thread cli" rows in `auth_sessions` per hour, before and after, in a comment.
+    new: |-
+      Every lotar server lists all of its project's T3 Code threads every 30 seconds, settled ones included, so the cost of each look grows with every job thread ever run. Measured on 2026-11-27 in a performance check from a standards thread. The owner picked "lotar perf ticket" on 2026-11-27, after reading the numbers below.
+
+      ## Measured (2026-11-27)
+
+      - `resumed::look` runs `t3 thread list --project <repo> --json` at most every `LOOK_EVERY` (30 s) per tasks dir. `kept::settle_now` (a job ends) and `kept::settle_superseded` (a job starts) call it again. With 6 `lotar serve` processes, the T3 server's trace shows about 14 CLI sessions a minute, 7,544 `t3_thread_list` calls in 88 minutes.
+      - Each call starts the T3 Code Electron binary as node: 0.4 to 0.6 s, 0.32 s CPU and 230 MB peak memory (`/usr/bin/time -l`). That happens about 14 times a minute on a Mac that is often short of memory (swap at 86% on 2026-11-25, see the reliability evidence in standards).
+      - The CLI pages through every unarchived thread of the project. For lotar that is 1,633 threads, 1.6 MB of JSON and up to 17 MCP pages per call, and all 1,633 are settled. standards has 832 (829 settled), local 657 (656 settled).
+      - `look_at_threads` uses only threads whose status is `running` or `waiting`. `kept` uses only threads that aren't settled yet. Nearly all of the data is thrown away.
+      - Each CLI call also mints a bearer session ("t3 thread cli") that T3 Code never deletes. There are 644k rows in `auth_sessions` now (230 MB). That part is T3 Code's own bug and is being reported upstream; fewer calls from lotar also shrink it.
+
+      ## Fix
+
+      - Ask T3 Code only for the threads lotar can act on. T3's MCP tool `t3_thread_list` already takes `settled: false` and `statuses: [...]`; the CLI's `thread list` has neither flag. Options, cheapest first:
+        - call the MCP endpoint (or the internal WebSocket API that `t3_thread_api.rs` already uses) with `settled: false`, through one session per look instead of a new CLI process per call;
+        - or, if that turns out fragile, keep the CLI and look less often when no `t3` job ended in the last hour.
+      - One list per look serves `resumed`, `kept::settle` and `unlogged` (it already does). `settle_now` and `settle_superseded` can use the same filtered list.
+      - Keep the behaviour of DEV-626, DEV-810, DEV-836 and DEV-876 (takeover, kept threads, superseded threads); their tests must still pass.
+
+      ## Done when
+
+      Found 2026-11-27: `/mcp` takes only an MCP client credential, which T3 Code mints in-process for its own CLI; a bearer from `t3 auth session issue` gets 401 there. The internal WebSocket's `orchestration.subscribeShell` with `omitOlderSettled` takes that bearer and sends every unsettled thread of all projects plus the recently settled ones (38 threads, 116 KB on 2026-11-27, against 1.6 MB for lotar's 1,633 by CLI).
+
+      - [ ] `resumed::look`, `kept::settle_now` and `kept::settle_superseded` get the project's threads from `orchestration.subscribeShell` (`omitOlderSettled: true`): every unsettled thread, no settled ones paged through. Each listed thread has the same fields the CLI gave (status as T3 Code's MCP list derives it, `latestRunId`, hosted link, `settled` from `settledOverride`, title, `runtimeMode`).
+      - [ ] The bearer session (`orchestration:read`) is issued once per process and reused until shortly before its TTL (1 h) ends: at most one `t3` start and one new `auth_sessions` row per process an hour for looks, not one per look. A refused WebSocket drops the session, and the next look issues a new one.
+      - [ ] When the WebSocket route fails (server not running, refused, T3 Code changed the API), the look falls back to `t3 thread list` as before, and the process logs the reason once. A failed CLI too: no list, the next look tries again (as now).
+      - [ ] A kept thread the list doesn't show counts as settled or archived, as T3 Code left it out: the "later job's thread settled" rule (DEV-747) treats it as settled; nothing is settled or stopped that isn't listed unsettled.
+      - [ ] Host jobs' threads (DEV-901) are still listed by `t3 thread list` on the host over ssh (on the host, not this Mac).
+      - [ ] The tests of DEV-626, DEV-810, DEV-836, DEV-876 pass unchanged; unit tests cover the snapshot parsing (project match, status, settled, link) and the WebSocket round trip against a fake server.
+      - [ ] Measured after release: `t3_thread_list` calls and new "t3 thread cli" rows in `auth_sessions` per hour, before and after, in a comment.
+- at: 2026-11-27T22:28:33.381618+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-626","DEV-810","DEV-836","DEV-876"]}'
+    new: '{"related":["DEV-626","DEV-810","DEV-836","DEV-876","DEV-747","DEV-901"]}'
+- at: 2026-11-27T22:38:09.630512+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T22:38:09.936641+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-626","DEV-810","DEV-836","DEV-876","DEV-747","DEV-901"]}'
+    new: '{"related":["DEV-626","DEV-810","DEV-836","DEV-876","DEV-747","DEV-901","DEV-934"]}'
+- at: 2026-11-27T22:38:25.976970+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T22:42:20.213254+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-626","DEV-810","DEV-836","DEV-876","DEV-747","DEV-901","DEV-934"]}'
+    new: '{"related":["DEV-626","DEV-810","DEV-836","DEV-876","DEV-747","DEV-901","DEV-934","DEV-942"]}'
+- at: 2026-11-27T22:42:21.516778+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-626","DEV-810","DEV-836","DEV-876","DEV-747","DEV-901","DEV-934","DEV-942"]}'
+    new: '{"related":["DEV-626","DEV-810","DEV-836","DEV-876","DEV-747","DEV-901","DEV-934","DEV-942","DEV-943"]}'
+- at: 2026-11-27T22:42:32.361172+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T22:42:40.709776+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-27T22:42:43.694044+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-626","DEV-810","DEV-836","DEV-876","DEV-747","DEV-901","DEV-934","DEV-942","DEV-943"]}'
+    new: '{"blocks":["DEV-942"],"related":["DEV-626","DEV-810","DEV-836","DEV-876","DEV-747","DEV-901","DEV-934","DEV-942","DEV-943"]}'
+- at: 2026-11-27T22:42:53.261299+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-942"],"related":["DEV-626","DEV-810","DEV-836","DEV-876","DEV-747","DEV-901","DEV-934","DEV-942","DEV-943"]}'
+    new: '{"blocks":["DEV-942","DEV-943"],"related":["DEV-626","DEV-810","DEV-836","DEV-876","DEV-747","DEV-901","DEV-934","DEV-942","DEV-943"]}'

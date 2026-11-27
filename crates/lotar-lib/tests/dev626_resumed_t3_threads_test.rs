@@ -110,7 +110,7 @@ impl Harness {
     }
 
     /// Start a fake of T3 Code's server: its `/ws` answers each command with success and logs its payload in
-    /// `commands`.
+    /// `commands`; it refuses the thread list, so lotar falls back to `t3 thread list`.
     fn serve_t3(&self) {
         use std::io::Write as _;
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -123,6 +123,12 @@ impl Harness {
                 let Ok(mut socket) = stream.map_err(|_| ()).and_then(|stream| tungstenite::accept(stream).map_err(|_| ())) else { continue };
                 if let Ok(tungstenite::Message::Text(text)) = socket.read() {
                     let request: serde_json::Value = serde_json::from_str(text.as_str()).unwrap();
+                    if request["tag"] == "orchestration.subscribeShell" {
+                        // No thread list here: lotar lists the threads with the fake `t3 thread list`.
+                        let refused = serde_json::json!({"_tag": "Exit", "requestId": request["id"], "exit": {"_tag": "Failure", "cause": [{"_tag": "Fail", "error": {"message": "no list"}}]}});
+                        let _ = socket.send(tungstenite::Message::text(refused.to_string()));
+                        continue;
+                    }
                     let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&log).unwrap();
                     writeln!(file, "{}", request["payload"]).unwrap();
                     let answer = serde_json::json!({"_tag": "Exit", "requestId": request["id"], "exit": {"_tag": "Success", "value": {"sequence": 1}}});

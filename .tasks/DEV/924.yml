@@ -1,11 +1,10 @@
 title: Release v0.16.1
-status: Blocked
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@fix'
 created: 2026-11-27T04:12:22.007541+00:00
-modified: 2026-11-27T17:43:56.557653+00:00
+modified: 2026-11-27T18:34:03.107148+00:00
 relationships:
   depends_on:
   - DEV-938
@@ -13,6 +12,7 @@ relationships:
   - DEV-937
   - DEV-938
   - DEV-901
+  - DEV-940
 comments:
 - date: 2026-11-27T17:17:33.897340+00:00
   author: claude
@@ -112,6 +112,38 @@ comments:
 - date: 2026-11-27T17:43:56.557653+00:00
   author: automation
   text: 'Automation rule ''Comments: the owner''s comment reaches the agent'' told no agent on DEV-924 yet. DEV-924 waits for DEV-938.'
+- date: 2026-11-27T18:13:59.411364+00:00
+  author: claude
+  text: |-
+    Steps 3–4 done: QA is green and v0.16.1 is tagged and pushed on `6735fd504` (DEV-938's fix), as triage answered.
+
+    - Step 3: Quality Assurance run `46046866969` succeeded for `6735fd504`. `Cargo.toml` has `0.16.1` there.
+    - Step 4: `git tag -s v0.16.1 -m v0.16.1 6735fd504` and `git push origin v0.16.1`, then `lotar release release 0.16.1`. DEV-938 was added to the release.
+- date: 2026-11-27T18:33:43.595543+00:00
+  author: claude
+  text: |-
+    Steps 5–7 done: v0.16.1 is published, installed here, and this ticket is Done.
+
+    - Step 5: every job of Release run `46047881651` succeeded (builds, macOS notarize, npm, crates, deb/rpm, Docker, Homebrew, Scoop). GitHub's latest release is `v0.16.1`.
+    - Step 6: `brew upgrade lotar`, then `lotar --version` prints `lotar 0.16.1`. `codesign -dvv` shows `Developer ID Application: Ravi Gairola (3HKD37M482)`.
+    - Step 7: no ticket waits for this release (`lotar task relationships DEV-924` has no dependents), so no one gets handed to @fix.
+- date: 2026-11-27T18:33:55.928385+00:00
+  author: claude
+  text: |-
+    Step 8 done: next release ticket DEV-940 ("Release v0.16.2") and its record are open.
+
+    - `lotar add "Release v0.16.2" --type Chore --assignee mallox` with this ticket's description → DEV-940.
+    - `lotar release create 0.16.2` and `lotar release add 0.16.2 DEV-940`.
+    - v0.16.1 is shipped from `6735fd504`, tag `v0.16.1`.
+  report:
+    checks:
+    - command: gh run list --workflow "Quality Assurance" --commit 6735fd504
+      result: passed
+    - command: Release run 46047881651
+      result: passed
+    - command: lotar --version
+      result: passed
+      reason: lotar 0.16.1
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A74dac8958ad2432482ba2e9ec2455024221bcdded1ad7f3feb5c03ae66698252
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ade6dbf389dc69876e337b9f9d4698816bbbb2a44e49123e78fea9b413c337906
@@ -253,3 +285,35 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T18:06:08.889326+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-27T18:13:59.411364+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T18:33:43.595543+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T18:33:55.928385+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T18:33:56.198114+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-938"],"related":["DEV-937","DEV-938","DEV-901"]}'
+    new: '{"depends_on":["DEV-938"],"related":["DEV-937","DEV-938","DEV-901","DEV-940"]}'
+- at: 2026-11-27T18:34:03.107148+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

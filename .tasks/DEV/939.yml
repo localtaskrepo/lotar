@@ -1,0 +1,72 @@
+title: 'CI failing on the default branch: .github/workflows/ci.yml'
+status: Done
+priority: High
+type: Chore
+reporter: claude
+created: 2026-11-27T18:06:24.466645+00:00
+modified: 2026-11-27T18:14:18.651449+00:00
+relationships:
+  related:
+  - DEV-665
+  - DEV-938
+comments:
+- date: 2026-11-27T18:14:07.215249+00:00
+  author: claude
+  text: |-
+    CI on main is green again: DEV-938's fix landed, so this ticket needed no change.
+
+    - Latest Quality Assurance run on main `46046866969` (commit `6735fd504`, DEV-938) passed all jobs; the earlier red runs failed in Windows arm64 build (`std::os::unix` in `hosted.rs`) and Rust tests (hosted test git identity), both fixed by DEV-938
+    - `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `ci-red:.github/workflows/ci.yml`
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A640f34ce8e475f0450decb14167a033193e15efb3dd2fb65e4f98775275b6b96
+description: |-
+  Quality Assurance failing on main (gh run list -R localtaskrepo/lotar -b main -w ci.yml)
+
+  Filed by the daily repo-health run (`repos.ts --report`, finding `ci-red:.github/workflows/ci.yml`).
+
+  ## Check
+
+  `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` lists `[ci-red:.github/workflows/ci.yml]` while the problem is there.
+
+  ## Done when
+
+  The workflow's latest run on the default branch is green.
+tags:
+- health
+custom_fields:
+  finding: ci-red:.github/workflows/ci.yml
+history:
+- at: 2026-11-27T18:06:28.667083+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-27T18:06:34.669935+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T18:06:35.779256+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A640f34ce8e475f0450decb14167a033193e15efb3dd2fb65e4f98775275b6b96
+- at: 2026-11-27T18:14:07.215249+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T18:14:07.511035+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-665"]}'
+    new: '{"related":["DEV-665","DEV-938"]}'
+- at: 2026-11-27T18:14:18.651449+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

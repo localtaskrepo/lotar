@@ -1002,8 +1002,42 @@ printf '{"thread":{"threadId":"%s","link":"https://t3.test/%s","status":"%s","ac
 /// there; else it marks the thread settled. `t3_thread_read` gives the thread's latest run the error in `limit-<id>` while
 /// that file is there. Each tool call is logged to `t3-mcp.log` (`<tool> <arguments>`). A WebSocket on `/ws` takes T3 Code's
 /// internal rename command (DEV-619), logs it there as `ws_rename <payload>` and answers success; a `thread.settle`
-/// command it logs as `ws_settle <payload>` and marks the thread settled; while `ws-refuse` is
-/// there, `/ws` answers 404. Returns the origin.
+/// command it logs as `ws_settle <payload>` and marks the thread settled; `orchestration.subscribeShell` (DEV-941) it
+/// logs as `ws_list` and answers with a snapshot of the threads the fake `thread list` lists ([`shell_snapshot`]),
+/// failing as long as `list-threads` isn't there; while `ws-refuse` is there, `/ws` answers 404. Returns the origin.
+/// What the fake T3 Code server's shell snapshot holds: the project at `project`, a project nested in it, and the
+/// threads in `dir`, with the status, title, runtime mode and settled state the fake `thread list` gives them, and one
+/// settled thread of the nested project.
+fn shell_snapshot(dir: &Path, project: &Path) -> serde_json::Value {
+    let read = |path: PathBuf| std::fs::read_to_string(path).ok().map(|text| text.trim().to_string());
+    let mut threads: Vec<serde_json::Value> = std::fs::read_dir(dir.join("t3-threads"))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|entry| entry.path().is_dir())
+        .map(|entry| {
+            let (t, id) = (entry.path(), entry.file_name().to_string_lossy().to_string());
+            let mut status =
+                if t.join("pending").exists() || dir.join(format!("running-{id}")).exists() { "running".to_string() } else { "completed".to_string() };
+            if dir.join(format!("failed-{id}")).exists() {
+                status = "failed".to_string();
+            }
+            if let Some(listed) = read(dir.join(format!("listed-{id}"))) {
+                status = listed;
+            }
+            serde_json::json!({
+                "id": id, "projectId": "p1", "title": read(t.join("title")).unwrap_or_default(), "status": status,
+                "activityRunStatus": null, "latestRunId": read(t.join("latest")), "pendingBackgroundTasks": [],
+                "runtimeMode": if t.join("auto").exists() { "auto" } else { "full-access" },
+                "settledOverride": if t.join("settled").exists() { serde_json::json!("settled") } else { serde_json::Value::Null },
+                "lineage": {"relationshipToParent": null},
+            })
+        })
+        .collect();
+    threads.push(serde_json::json!({"id": "nested-0", "projectId": "p2", "title": "TEST-1 Elsewhere", "status": "completed", "runtimeMode": "full-access", "lineage": {}}));
+    serde_json::json!({"projects": [{"id": "p1", "workspaceRoot": project}, {"id": "p2", "workspaceRoot": project.join("nested")}], "threads": threads})
+}
+
 fn fake_t3_server(dir: &Path, project: &Path) -> String {
     use std::collections::{HashMap, HashSet};
     use std::io::{BufRead as _, Read as _, Write as _};
@@ -1023,6 +1057,20 @@ fn fake_t3_server(dir: &Path, project: &Path) -> String {
                     let request: serde_json::Value = serde_json::from_str(text.as_str()).unwrap();
                     let mut log = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("t3-mcp.log")).unwrap();
                     let payload = &request["payload"];
+                    if request["tag"] == "orchestration.subscribeShell" {
+                        writeln!(log, "ws_list {payload}").unwrap();
+                        let answer = match dir.join("list-threads").exists() {
+                            true => {
+                                serde_json::json!({"_tag": "Chunk", "requestId": request["id"], "values": [{"kind": "snapshot", "snapshot": shell_snapshot(&dir, &project)}]})
+                            }
+                            false => {
+                                serde_json::json!({"_tag": "Exit", "requestId": request["id"], "exit": {"_tag": "Failure", "cause": [{"_tag": "Fail", "error": {"message": "no list"}}]}})
+                            }
+                        };
+                        let _ = socket.send(tungstenite::Message::text(answer.to_string()));
+                        let _ = socket.read();
+                        continue;
+                    }
                     if payload["type"] == "thread.settle" {
                         let _ = std::fs::write(threads.join(payload["threadId"].as_str().unwrap_or_default()).join("settled"), "");
                         writeln!(log, "ws_settle {payload}").unwrap();
@@ -1189,6 +1237,7 @@ fn t3_harness_and(profiles: &[(&str, &str, &str)], more_agents: &str) -> (TestFi
     std::fs::create_dir_all(t3_home.join("userdata")).unwrap();
     let origin = fake_t3_server(&root, &root);
     std::fs::write(t3_home.join("userdata/server-runtime.json"), format!(r#"{{"version":1,"origin":"{origin}"}}"#)).unwrap();
+    std::fs::write(t3_home.join("userdata/environment-id"), "env-test\n").unwrap();
     let home = root.join("harnessmux");
     std::fs::create_dir_all(home.join("config")).unwrap();
     std::fs::write(
@@ -1397,7 +1446,7 @@ fn a_failed_jobs_thread_is_settled_once_a_later_job_completes() {
     run_t3(&fixtures, "review").success();
     assert_eq!(settled_threads(root), vec!["thread-0", "thread-1"], "the later job settles the kept thread as it starts, then its own");
     let logs = job_logs(&fixtures);
-    assert!(logs.contains("Settled the T3 Code thread https://t3.test/thread-0"), "the failed job's log says so: {logs}");
+    assert!(logs.contains("Settled the T3 Code thread https://app.t3.codes/threads/env-test/thread-0"), "the failed job's log says so: {logs}");
 }
 
 /// DEV-747: a thread whose job ended while its ticket was HelpNeeded stays active until the ticket is done, however it
@@ -1438,11 +1487,11 @@ fn a_done_tickets_ended_threads_are_settled_whatever_their_outcome() {
         TaskService::update(&mut fixtures.create_storage(), "TEST-1", update).unwrap();
         AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
         assert_eq!(settled_threads(root), vec!["thread-0"], "{status}");
-        assert!(job_logs(&fixtures).contains("Settled the T3 Code thread https://t3.test/thread-0"), "{status}: the job's log says so");
+        assert!(job_logs(&fixtures).contains("Settled the T3 Code thread https://app.t3.codes/threads/env-test/thread-0"), "{status}: the job's log says so");
     }
 }
 
-/// DEV-754: a kept thread T3 Code refuses to settle is named by the link `t3 thread list` shows, not by its id.
+/// DEV-754: a kept thread T3 Code refuses to settle is named by the link its thread list shows (T3 Code's hosted link, DEV-941), not by its id.
 #[test]
 fn a_kept_thread_that_isnt_settled_is_named_by_its_link() {
     let (fixtures, _env) = t3_harness("");
@@ -1456,7 +1505,7 @@ fn a_kept_thread_that_isnt_settled_is_named_by_its_link() {
     TaskService::update(&mut fixtures.create_storage(), "TEST-1", update).unwrap();
     AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
     let logs = job_logs(&fixtures);
-    assert!(logs.contains("The T3 Code thread https://t3.test/thread-0 was not settled: "), "{logs}");
+    assert!(logs.contains("The T3 Code thread https://app.t3.codes/threads/env-test/thread-0 was not settled: "), "{logs}");
 }
 
 /// DEV-928: a done ticket's `failed` thread, settled through T3 Code's internal API (DEV-917), that the API refuses is
@@ -1485,7 +1534,7 @@ fn a_failed_thread_the_internal_api_doesnt_settle_is_noted_once_and_retried() {
     AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
     assert_eq!(settled_threads(root), vec!["thread-0"]);
     assert!(std::fs::read_to_string(root.join("t3-mcp.log")).unwrap().contains("ws_settle "), "settled through the internal API");
-    assert!(job_logs(&fixtures).contains("Settled the T3 Code thread https://t3.test/thread-0"));
+    assert!(job_logs(&fixtures).contains("Settled the T3 Code thread https://app.t3.codes/threads/env-test/thread-0"));
 }
 
 /// DEV-810: a ticket's next job reuses its session's name, so the harnessmux record holds only the newest thread. The
@@ -1508,7 +1557,7 @@ fn a_kept_thread_whose_session_holds_a_newer_thread_is_settled() {
     run_t3_with(&fixtures, "fix", &["--session", "new"]).success();
     let logs = job_logs(&fixtures);
     assert_eq!(settled_threads(root), vec!["thread-0", "thread-1"], "{logs}");
-    assert!(logs.contains("Settled the T3 Code thread https://t3.test/thread-0"), "{logs}");
+    assert!(logs.contains("Settled the T3 Code thread https://app.t3.codes/threads/env-test/thread-0"), "{logs}");
 }
 
 /// DEV-810: the session of a kept thread ran in the ticket's worktree, which went with the merge. `t3` runs in the

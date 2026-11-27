@@ -18,6 +18,7 @@ use crate::utils::time;
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
@@ -145,7 +146,7 @@ fn ended_threads(tasks_dir: &Path) -> Vec<Resumed> {
     threads.into_values().filter(|resumed| !resumed.cancelled).collect()
 }
 
-/// A thread as `t3 thread list --json` lists it.
+/// A thread as `t3 thread list --json` lists it, or T3 Code's internal API in that shape.
 pub(super) struct Listed {
     pub(super) status: String,
     run: String,
@@ -157,20 +158,33 @@ pub(super) struct Listed {
     pub(super) runtime_mode: String,
 }
 
-/// The project's threads by id, from `t3 thread list --json`.
+/// Whether this process logged that T3 Code's internal API couldn't list threads.
+static API_LIST_FAILED: AtomicBool = AtomicBool::new(false);
+
+/// The project's unsettled threads by id, and the recently settled ones, from T3 Code's internal API
+/// ([`crate::services::t3_thread_api::list_threads`], DEV-941); where that fails, every thread from
+/// `t3 thread list --json`. A thread not listed is settled or archived.
 pub(super) fn list_threads(program: &Path, env: &[(String, String)], cwd: &Path, tasks_dir: &Path) -> Option<HashMap<String, Listed>> {
     let project = crate::services::agent_runner::session_project(tasks_dir);
-    let output = Command::new(program)
-        .args(["thread", "list", "--project"])
-        .arg(&project)
-        .arg("--json")
-        .envs(env.iter().map(|(key, value)| (key, value)))
-        .current_dir(cwd)
-        .stdin(Stdio::null())
-        .output()
-        .ok()
-        .filter(|output| output.status.success())?;
-    let mut listed: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
+    let mut listed = match crate::services::t3_thread_api::list_threads(program, env, cwd, &project) {
+        Ok(threads) => serde_json::Value::Array(threads),
+        Err(err) => {
+            if !API_LIST_FAILED.swap(true, Ordering::Relaxed) && std::env::var("LOTAR_TEST_SILENT").as_deref() != Ok("1") {
+                eprintln!("[lotar] T3 Code's internal API can't list threads, so `t3 thread list` lists them: {err}");
+            }
+            let output = Command::new(program)
+                .args(["thread", "list", "--project"])
+                .arg(&project)
+                .arg("--json")
+                .envs(env.iter().map(|(key, value)| (key, value)))
+                .current_dir(cwd)
+                .stdin(Stdio::null())
+                .output()
+                .ok()
+                .filter(|output| output.status.success())?;
+            serde_json::from_slice(&output.stdout).ok()?
+        }
+    };
     // The threads of host jobs are on the hosts' T3 Code, in a project at the same path (DEV-901).
     for ssh in crate::services::agent_hosts::routed_hosts() {
         let script = format!("t3 thread list --project {} --json", crate::services::agent_hosts::quote(&project.to_string_lossy()));

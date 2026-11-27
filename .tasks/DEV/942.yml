@@ -1,0 +1,77 @@
+title: T3 thread list over the WebSocket returns nothing, without falling back, when no T3 project contains the repo path
+status: Blocked
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-27T22:42:19.854655+00:00
+modified: 2026-11-27T22:42:54.789620+00:00
+relationships:
+  depends_on:
+  - DEV-941
+  related:
+  - DEV-941
+comments:
+- date: 2026-11-27T22:42:44.399107+00:00
+  author: claude
+  text: |-
+    Waits for DEV-941: the code this ticket fixes isn't on main yet.
+
+    - `project_threads` and the WebSocket `list_threads` exist only on `agent/DEV-941` (`crates/lotar-agent/src/services/t3_thread_api.rs`), which is in Reviewing.
+    - Added depends-on DEV-941 and tag `waits`; I continue on top of main once DEV-941 lands.
+    - "Done when" already says what each case must do; no edit needed.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4e31110c0f40a7ee843be316b5369e138d603be82465a53b16f99477783648fb
+description: |-
+  Found in the DEV-941 review (2026-11-27).
+
+  - `project_threads` in `crates/lotar-agent/src/services/t3_thread_api.rs` returns an empty list when no snapshot project's `workspaceRoot` holds `session_project(tasks_dir)`. `list_threads` then reports success, so `resumed::list_threads` never falls back to `t3 thread list` and nothing is logged.
+  - T3 Code's CLI `resolveProject` (`binCli-*.mjs`) goes further in that case: it finds the project through the repo's other git checkouts (a T3 project registered on a worktree). lotar then looks at no threads for that tasks dir, silently.
+
+  ## Done when
+
+  - [ ] No matching project in the snapshot is an error from `t3_thread_api::list_threads`, so the look falls back to `t3 thread list` and logs the reason once.
+  - [ ] A unit test covers it.
+tags:
+- agent
+- backend
+- waits
+history:
+- at: 2026-11-27T22:42:20.831163+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-27T22:42:25.163177+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T22:42:25.905609+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4e31110c0f40a7ee843be316b5369e138d603be82465a53b16f99477783648fb
+- at: 2026-11-27T22:42:43.694715+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-941"]}'
+    new: '{"depends_on":["DEV-941"],"related":["DEV-941"]}'
+- at: 2026-11-27T22:42:44.345268+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, backend
+    new: agent, backend, waits
+- at: 2026-11-27T22:42:44.399107+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T22:42:54.789620+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

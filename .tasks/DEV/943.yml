@@ -1,0 +1,83 @@
+title: Test DEV-941's rule that a kept thread the thread list leaves out counts as settled
+status: Blocked
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-27T22:42:21.183627+00:00
+modified: 2026-11-27T22:43:04.631331+00:00
+relationships:
+  depends_on:
+  - DEV-941
+  related:
+  - DEV-941
+  - DEV-747
+comments:
+- date: 2026-11-27T22:42:53.954071+00:00
+  author: claude
+  text: |-
+    Waits for DEV-941 to land on main: the rule this test covers isn't there yet.
+
+    - `kept::settle` on main still uses `is_some_and(settled)` (`crates/lotar-agent/src/services/agent_job_service/kept.rs:145`); the `is_none_or` change is only in `c316658fd` on `agent/DEV-941` (status Merging).
+    - A test written on this branch now would fail. Once DEV-941 is merged, this branch gets a dev503 test in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`: it removes the later job's thread from the fake `t3 thread list` and checks that the earlier completed kept thread is settled and the unlisted thread is not.
+    - No file changes or commits yet.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6b83916edbe1b418cbcf154eba87dfa938d42dbd0cd34105bad300a61acb2c96
+description: |-
+  Found in the DEV-941 review (2026-11-27).
+
+  - DEV-941 changed `kept::settle` (`crates/lotar-agent/src/services/agent_job_service/kept.rs:145`) from `is_some_and(settled)` to `is_none_or(settled)`: a later job's thread that T3 Code's list leaves out (older settled, archived) now lets the earlier kept threads be settled (DEV-747 rule).
+  - No test covers it: the dev503 fake snapshot lists every thread, settled ones too.
+
+  ## Done when
+
+  - [ ] A dev503 test leaves the later job's thread out of the fake snapshot and checks that the earlier completed kept thread is settled, and that a thread not listed is never settled itself.
+tags:
+- agent
+- backend
+- waits
+history:
+- at: 2026-11-27T22:42:22.121625+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-941"]}'
+    new: '{"related":["DEV-941","DEV-747"]}'
+- at: 2026-11-27T22:42:22.469671+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-27T22:42:25.955650+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T22:42:26.643455+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6b83916edbe1b418cbcf154eba87dfa938d42dbd0cd34105bad300a61acb2c96
+- at: 2026-11-27T22:42:53.261990+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-941","DEV-747"]}'
+    new: '{"depends_on":["DEV-941"],"related":["DEV-941","DEV-747"]}'
+- at: 2026-11-27T22:42:53.898290+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, backend
+    new: agent, backend, waits
+- at: 2026-11-27T22:42:53.954071+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T22:43:04.631331+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

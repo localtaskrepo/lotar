@@ -4,7 +4,7 @@ priority: Medium
 type: Bug
 reporter: claude
 created: 2026-11-20T23:08:35.010019+00:00
-modified: 2026-11-26T01:25:45.664856+00:00
+modified: 2026-11-27T22:42:22.120718+00:00
 relationships:
   blocks:
   - DEV-754
@@ -19,6 +19,8 @@ relationships:
   - DEV-810
   - DEV-845
   - DEV-876
+  - DEV-941
+  - DEV-943
 comments:
 - date: 2026-11-21T00:49:25.895065+00:00
   author: automation
@@ -685,3 +687,15 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-754"],"related":["DEV-729","DEV-732","DEV-626","DEV-754","DEV-750","DEV-725","DEV-761","DEV-810","DEV-845"]}'
     new: '{"blocks":["DEV-754"],"related":["DEV-729","DEV-732","DEV-626","DEV-754","DEV-750","DEV-725","DEV-761","DEV-810","DEV-845","DEV-876"]}'
+- at: 2026-11-27T22:28:33.379464+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-754"],"related":["DEV-729","DEV-732","DEV-626","DEV-754","DEV-750","DEV-725","DEV-761","DEV-810","DEV-845","DEV-876"]}'
+    new: '{"blocks":["DEV-754"],"related":["DEV-729","DEV-732","DEV-626","DEV-754","DEV-750","DEV-725","DEV-761","DEV-810","DEV-845","DEV-876","DEV-941"]}'
+- at: 2026-11-27T22:42:22.120718+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-754"],"related":["DEV-729","DEV-732","DEV-626","DEV-754","DEV-750","DEV-725","DEV-761","DEV-810","DEV-845","DEV-876","DEV-941"]}'
+    new: '{"blocks":["DEV-754"],"related":["DEV-729","DEV-732","DEV-626","DEV-754","DEV-750","DEV-725","DEV-761","DEV-810","DEV-845","DEV-876","DEV-941","DEV-943"]}'

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-15T19:57:40.271694+00:00
-modified: 2026-11-27T00:09:14.416842+00:00
+modified: 2026-11-27T20:07:18.256559+00:00
 relationships:
   related:
   - DEV-499
@@ -200,6 +200,12 @@ comments:
     - Compare against current Cargo+sccache with shared dev targets, split crates, and phase/worktree reuse; retain Cargo/Clippy/nextest and merge validation.
     - The trial waits for DEV-861, DEV-867 and DEV-906, then starts on harnessmux before LoTaR. Report total loop savings including the Cargo validation that remains, not only Blaze warm-check timings.
     - No build command, profile, wrapper or shared cache was changed while planning.
+- date: 2026-11-27T20:07:18.256559+00:00
+  author: claude
+  text: |-
+    LOCA-711: Blaze declined (owner 2026-11-27); the shared development profile and targets stay as they are.
+
+    - The released Blaze can't run (upstream #2465). The harnessmux Cargo+sccache edit loop is under 2 s. Details: https://local.pyxzl.net/task/LOCA-711
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A222650d0-e9ed-4173-8f70-86b27f17be36
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3A177f2d09-0dcb-419d-a0f0-ad691d43efb0
@@ -462,3 +468,7 @@ history:
   - field: relationships
     old: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636","DEV-510","DEV-589","DEV-621","DEV-622","DEV-563","DEV-625","DEV-652","DEV-653","DEV-670"]}'
     new: '{"related":["DEV-499","DEV-574","DEV-581","DEV-604","DEV-634","DEV-635","DEV-636","DEV-510","DEV-589","DEV-621","DEV-622","DEV-563","DEV-625","DEV-652","DEV-653","DEV-670","DEV-861","DEV-867","DEV-906"]}'
+- at: 2026-11-27T20:07:18.256559+00:00
+  actor: claude
+  changes:
+  - field: comment_added

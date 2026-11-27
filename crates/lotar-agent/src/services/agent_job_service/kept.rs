@@ -126,8 +126,10 @@ pub(super) fn settle_superseded(tasks_dir: &Path, ticket_id: &str, own: Option<&
 
 /// Settle each ticket's kept threads, those `listed` shows unsettled: on a
 /// done ticket all whose run ended, whatever its outcome (DEV-876), else the
-/// completed ones of jobs that ended before the job of a settled thread. A
-/// done ticket's job threads no job log names count too ([`unlogged`]).
+/// completed ones of jobs that ended before the job of a settled thread, or
+/// of one `listed` leaves out: T3 Code lists no older settled threads and no
+/// archived ones (DEV-941). A done ticket's job threads no job log names count
+/// too ([`unlogged`]).
 pub(super) fn settle(tasks_dir: &Path, mut threads: BTreeMap<String, Vec<Thread>>, listed: &HashMap<String, resumed::Listed>) {
     for thread in unlogged(tasks_dir, &threads, listed) {
         threads.entry(thread.ticket_id.clone()).or_default().insert(0, thread);
@@ -140,7 +142,7 @@ pub(super) fn settle(tasks_dir: &Path, mut threads: BTreeMap<String, Vec<Thread>
         let done = ticket_done_state(tasks_dir, &ticket_id) == Some(true);
         let kept = |thread: &&Thread| unsettled(thread).is_some_and(|status| if done { ended(status) } else { status == "completed" });
         let upto =
-            if done { threads.len() } else { threads.iter().rposition(|thread| listed.get(&thread.thread).is_some_and(|shown| shown.settled)).unwrap_or(0) };
+            if done { threads.len() } else { threads.iter().rposition(|thread| listed.get(&thread.thread).is_none_or(|shown| shown.settled)).unwrap_or(0) };
         let due: Vec<(&Thread, &resumed::Listed)> =
             threads[..upto].iter().filter(kept).filter_map(|thread| listed.get(&thread.thread).map(|shown| (thread, shown))).collect();
         if !due.is_empty() {
