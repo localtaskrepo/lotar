@@ -1301,10 +1301,6 @@ fn same_entry(a: &AgentQueueEntry, b: &AgentQueueEntry) -> bool {
     a.ticket_id == b.ticket_id && a.agent == b.agent && a.runner == b.runner
 }
 
-/// This process's counts with the job records of every process and the queue
-/// file's tickets. The records include this process's running jobs, so the
-/// larger count wins; its queued jobs left the queue file when they started,
-/// so the two queued counts add up (DEV-865).
 /// With the queue file empty, the jobs a lotar process (`lotar serve`, this
 /// one or another) holds in its memory, which Queued counts (DEV-871): they
 /// wait there, and that process starts them (DEV-910).
@@ -1326,6 +1322,10 @@ fn held_in_memory(tasks_dir: &Path) -> Option<String> {
     Some(format!("nothing in the queue file; queued in a lotar process's memory (such as `lotar serve`'s), which starts them: {}", parts.join("; ")))
 }
 
+/// This process's counts with the job records of every process and the queue
+/// file's tickets. The records include this process's running jobs, so the
+/// larger count wins; its queued jobs left the queue file when they started,
+/// so the two queued counts add up (DEV-865).
 fn combined_stats(mut own: AgentQueueStats, recorded_running: usize, pending: usize) -> AgentQueueStats {
     own.running = own.running.max(recorded_running);
     own.queued += pending;

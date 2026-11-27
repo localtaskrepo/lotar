@@ -1,17 +1,18 @@
 title: 'Agents page: a question of a job in another process shows in a box after a reload, but not live'
-status: Reviewing
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-23T04:27:39.844205+00:00
-modified: 2026-11-27T09:48:51.045808+00:00
+modified: 2026-11-27T12:52:06.256710+00:00
 relationships:
   depends_on:
   - DEV-782
   related:
   - DEV-782
   - DEV-765
+  - DEV-771
 comments:
 - date: 2026-11-23T07:49:44.529276+00:00
   author: claude
@@ -58,9 +59,72 @@ comments:
     - **Browser (own):** I ran this worktree's build of `lotar serve` on a scratch workspace and appended a job log as another process would. Live, the card shows "The agent asks: …" with no buttons, and the next line removes it. Light and dark, at 1920, 1440 and 390, no visual problems. Shots: `/tmp/dev826-review/shots/q-*.png`, `cleared-*.png`. I couldn't check the reload half with a fake log: no live process holds the job, so the reload marks it Failed.
     - **Blocking:** the ticket has tag `ui`, but it has no screenshot attachments (only two T3 links), and the fix comment says the page wasn't checked in a browser. Fix: take before and after shots of the Agents card with a live question (light and dark, 1920/1440/390), attach them with `lotar task reference add upload DEV-826 <file>`, and link them in the hand-off comment. No code change needed.
     - Tickets filed: none
+- date: 2026-11-27T12:49:22.512295+00:00
+  author: claude
+  text: |-
+    Review finding fixed: before/after screenshots of the Agents card are now attached (18 files).
+
+    - Review read HEAD `b99923f6c`. The only finding was the missing screenshots for tag `ui`. No code changed, so the commit stays `b99923f6c` (nothing to amend)
+    - **Before:** released `lotar 0.16.0`. **After:** this branch's `target/debug/lotar`. Each ran `lotar serve` on its own scratch workspace. A Playwright script appended a job log as another process would: `agent_job_question`, then `agent_job_message`
+    - Before: the card shows the question only as its last message, no box (`dev826-before-question-*.png`)
+    - After: box "The agent asks: Example question: run the migration?", no buttons (`dev826-after-question-*.png`). The next line removes the box (`dev826-after-next-*.png`)
+    - Light and dark at 1920, 1440 and 390 wide, no layout problems
+    - `cargo nextest run -p lotar-agent follow::`: 8 passed
+    - Diff: 43 changed lines plus tag `ui`, so full review. `small-diff` wasn't set
+  report:
+    commits:
+    - hash: b99923f6c
+      what: live question of a job in another process carries its title; next line clears it
+    checks:
+    - command: 'cargo nextest run -p lotar-agent follow::'
+      result: passed
+      reason: 8 passed
+    - command: browser before/after (Playwright, scratch workspace)
+      result: passed
+      reason: before no box, after box with no buttons, next line clears it; light and dark at 1920/1440/390
+    - command: npm run lint
+      result: not_run
+      reason: no code changed this round
+    - command: reload half in browser
+      result: not_run
+      reason: a fake log has no live process, so a reload marks the job Failed (reload covered by DEV-782's tests)
+    next: Review again
+- date: 2026-11-27T12:51:57.467733+00:00
+  author: claude
+  text: |-
+    Review: passed. The fix and the screenshots are complete, and my own browser check matches them.
+
+    - **Reviewed:** HEAD `b99923f6c`, the only commit on `main..HEAD`. The branch has no newer commits. It changes only `crates/lotar-agent/src/services/agent_job_service/follow.rs`.
+    - **Code:** `api_event` (`follow.rs:149-163`) passes the current event to `saved_job_dto` as the job's last log entry. A question now gets the same title-only `question` that a reload gets, and the next event sets it back to `null`. Nothing outside the ticket and no stray files.
+    - **Main since then:** `git merge-tree main HEAD` merges cleanly. `JobLogEntry` on main still has the same six fields, so the struct literal still compiles after a rebase.
+    - **Reran:** `npm ci` ok. `cargo nextest run -p lotar-agent follow:: dev782`: 9 passed, including the new live-case test. The earlier review saw that test fail without the fix.
+    - **Fix agent's screenshots** (18 attachments, read): before, the card shows the question only as its last message. After, it shows the box "The agent asks: …" with no buttons, and the next event clears it. Light and dark at 1920, 1440 and 390 wide, no visual problems.
+    - **My own browser check:** this worktree's `target/debug/lotar serve` on a scratch workspace. A Playwright script appended a job log as another process would. At all 6 sizes, the box showed with 0 buttons and was gone after the next event. Shots: `/tmp/dev826-review2/shots/q-*.png`, `next-*.png`.
+    - **Not checked in the browser:** the card after a reload. With a fake log, no live process holds the job, so `GET /api/jobs` reports it `failed`. That half is DEV-782's code, and the `dev782` tests cover it.
+    - **Seen but not part of this change:** "0 Running" while another process's job runs is already DEV-771. The 390-wide nav cutting off "Calenda" also shows in the before shots.
+    - No tickets filed. Worktree left clean.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A407a18347417b166c014fede135d875b0cb8589e4b34f67cb90e149629e91c1d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70dc96c449dc460249eeff37f9c1ba6ca9f3f54735e771c93bcdfde19aaa3cce
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad512848c490cffe6763ad0fcc5d7b5ef00dcb32f7f394cb8f3fc3839068d4910
+- attachment: dev826-before-question-dark-1440.edfc558d68d944cf232b846ba3f482f7.png
+- attachment: dev826-before-question-dark-1920.f087eb515917222837db6ffdf59d7a03.png
+- attachment: dev826-before-question-dark-390.6f1ee70cc2fed7404a18cd70a31fb835.png
+- attachment: dev826-before-question-light-1440.638ec95ac607bfa833e7dbc988cf5693.png
+- attachment: dev826-before-question-light-1920.39af767f68e19af9e09cec700d887991.png
+- attachment: dev826-before-question-light-390.9c3c34d179fcfa7775e856f2e5007b5e.png
+- attachment: dev826-after-question-dark-1440.8e89a068cd2abdfea02adbb5bb1de38a.png
+- attachment: dev826-after-question-dark-1920.befd4335141d704241bc0e2e42305e4a.png
+- attachment: dev826-after-question-dark-390.484d2cd6f92cac4bf2b067da05439f50.png
+- attachment: dev826-after-question-light-1440.6f4cc61d83d412f0a7c4539ba1438115.png
+- attachment: dev826-after-question-light-1920.a053d31b09b2c2882aa2e3cd84e0d0b8.png
+- attachment: dev826-after-question-light-390.72a74ef75dc735d65b632a6fec80c7b6.png
+- attachment: dev826-after-next-dark-1440.7d82fb466e2fdefa7d005ec175798fc7.png
+- attachment: dev826-after-next-dark-1920.e787a1958e5e612abdb66044afec9385.png
+- attachment: dev826-after-next-dark-390.911b8769c8ddd761222787bb8f3b6f63.png
+- attachment: dev826-after-next-light-1440.bfb15cf0e8196fbeef8d4812fb395ccd.png
+- attachment: dev826-after-next-light-1920.130dbeeca9805e0ef86babdc6991aa24.png
+- attachment: dev826-after-next-light-390.2b68136c1a915a6fc169d515d488e336.png
 description: |-
   Found while reviewing DEV-782.
 
@@ -175,3 +239,136 @@ history:
   - field: tags
     old: ui, agent, review-blocked
     new: ui, agent, review-returned
+- at: 2026-11-27T12:46:47.979692+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-27T12:46:49.399471+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad512848c490cffe6763ad0fcc5d7b5ef00dcb32f7f394cb8f3fc3839068d4910
+- at: 2026-11-27T12:49:03.004972+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-before-question-dark-1440.edfc558d68d944cf232b846ba3f482f7.png
+- at: 2026-11-27T12:49:03.053751+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-before-question-dark-1920.f087eb515917222837db6ffdf59d7a03.png
+- at: 2026-11-27T12:49:03.096803+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-before-question-dark-390.6f1ee70cc2fed7404a18cd70a31fb835.png
+- at: 2026-11-27T12:49:03.139987+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-before-question-light-1440.638ec95ac607bfa833e7dbc988cf5693.png
+- at: 2026-11-27T12:49:03.183046+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-before-question-light-1920.39af767f68e19af9e09cec700d887991.png
+- at: 2026-11-27T12:49:03.225983+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-before-question-light-390.9c3c34d179fcfa7775e856f2e5007b5e.png
+- at: 2026-11-27T12:49:03.269043+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-after-question-dark-1440.8e89a068cd2abdfea02adbb5bb1de38a.png
+- at: 2026-11-27T12:49:03.319365+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-after-question-dark-1920.befd4335141d704241bc0e2e42305e4a.png
+- at: 2026-11-27T12:49:03.365413+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-after-question-dark-390.484d2cd6f92cac4bf2b067da05439f50.png
+- at: 2026-11-27T12:49:03.410870+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-after-question-light-1440.6f4cc61d83d412f0a7c4539ba1438115.png
+- at: 2026-11-27T12:49:03.457369+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-after-question-light-1920.a053d31b09b2c2882aa2e3cd84e0d0b8.png
+- at: 2026-11-27T12:49:03.504895+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-after-question-light-390.72a74ef75dc735d65b632a6fec80c7b6.png
+- at: 2026-11-27T12:49:03.551888+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-after-next-dark-1440.7d82fb466e2fdefa7d005ec175798fc7.png
+- at: 2026-11-27T12:49:03.601061+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-after-next-dark-1920.e787a1958e5e612abdb66044afec9385.png
+- at: 2026-11-27T12:49:03.663778+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-after-next-dark-390.911b8769c8ddd761222787bb8f3b6f63.png
+- at: 2026-11-27T12:49:03.709176+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-after-next-light-1440.bfb15cf0e8196fbeef8d4812fb395ccd.png
+- at: 2026-11-27T12:49:03.757244+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-after-next-light-1920.130dbeeca9805e0ef86babdc6991aa24.png
+- at: 2026-11-27T12:49:03.801842+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: attachment:dev826-after-next-light-390.2b68136c1a915a6fc169d515d488e336.png
+- at: 2026-11-27T12:49:22.512295+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T12:49:29.821985+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T12:51:57.467733+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T12:51:58.589183+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-782"],"related":["DEV-782","DEV-765"]}'
+    new: '{"depends_on":["DEV-782"],"related":["DEV-782","DEV-765","DEV-771"]}'
+- at: 2026-11-27T12:52:06.256710+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

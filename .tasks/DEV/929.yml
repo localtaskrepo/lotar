@@ -1,11 +1,11 @@
 title: 'Agent hosts: a waiting dyson thread a new job didn''t take over keeps waiting there, and its MCP forward stays open'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T10:16:41.486933+00:00
-modified: 2026-11-27T12:37:26.156298+00:00
+modified: 2026-11-27T12:46:45.247004+00:00
 relationships:
   depends_on:
   - DEV-901
@@ -14,6 +14,7 @@ relationships:
   - DEV-797
   - DEV-930
   - DEV-911
+  - DEV-923
 comments:
 - date: 2026-11-27T10:22:38.218814+00:00
   author: claude
@@ -182,6 +183,30 @@ comments:
 - date: 2026-11-27T12:37:25.843923+00:00
   author: automation
   text: Waited 22 min for the machine's check lock, held by the merge agent of DEV-911 (job job-20261127T111715.385Z-42, pid 61697), since 12:01 UTC; the merge agent starts now.
+- date: 2026-11-27T12:46:36.738871+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `a7cefa181` is on `main` and `origin/main`.
+
+    - Rebased onto `bb1fd40ab`. It conflicted with DEV-911 (claude/codex on dyson) in `agent_job_service.rs`, `hosted.rs`, `resumed.rs` and `docs/help/agent.md`. I kept both sides:
+      - the waiting message keeps DEV-911's "thread"/"session" wording and DEV-929's `wait_on_host(ticket_id, job_id, thread, hosted)`. `thread` is `None` for claude/codex.
+      - the fake ssh keeps DEV-911's `-T` and `--` handling plus DEV-929's `-R`/`-L` socket stubs.
+      - the docs use DEV-911's text, with DEV-929's sentences added to **Commits**.
+    - After the rebase, DEV-929's test helper `set_up_with_mcp` failed to compile because DEV-911 changed what `Hosted::set_up` takes. I changed its argument to `Some(Check::T3(..))`.
+    - `npm ci` ok. Checks, run on the rebased commit: `lint:agent`, `test:agent` (2700 Rust and 1636 frontend tests) and `smoke` (415) all passed.
+    - `.tasks` changes in the main checkout went into the commit. No rules or config changed, so no `lotar trust` was needed.
+    - I pushed DEV-923's `bb1fd40ab` too. It had already landed on main.
+  report:
+    commits:
+    - hash: a7cefa181
+      what: DEV-929 stop a waiting host thread on a new job and close its MCP forward when its question is gone
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d2e62d982215986aed328bbaa591da39294156cb58b013d72219b1068dbb561
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af37effbe0d34fe08e5d043fb7402bfa58480661953e75ddf34acf58f3bd8c798
@@ -198,9 +223,6 @@ description: |-
   - [ ] A waiting host job's bridge (`ssh -R` process and local socket) closes and its `WAITING_ON_HOST` entry goes when its ticket reaches a done status (Done, WontDo, or any status the project marks done) or its question is dropped (ticket no longer waiting / reassigned away from the question's assignee), without waiting for another job or lotar's exit.
   - [ ] A new job or takeover that comes first still wins: it takes the entry, and the later close finds nothing to do.
   - [ ] A fake-ssh test covers both: a new job stops the waiting thread; a ticket closed while waiting closes the bridge.
-tags:
-- review-returned
-- review-returned-twice
 history:
 - at: 2026-11-27T10:16:43.304930+00:00
   actor: claude
@@ -409,3 +431,22 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-797","DEV-930"]}'
     new: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-797","DEV-930","DEV-911"]}'
+- at: 2026-11-27T12:46:36.738871+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T12:46:37.022610+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-797","DEV-930","DEV-911"]}'
+    new: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-797","DEV-930","DEV-911","DEV-923"]}'
+- at: 2026-11-27T12:46:45.247004+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: review-returned, review-returned-twice
+    new: ''
