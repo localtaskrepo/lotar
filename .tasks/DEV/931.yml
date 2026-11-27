@@ -5,13 +5,16 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T11:16:51.136837+00:00
-modified: 2026-11-27T13:36:50.245028+00:00
+modified: 2026-11-27T14:17:59.334953+00:00
 relationships:
+  blocks:
+  - DEV-933
   related:
   - DEV-911
   - DEV-901
   - DEV-933
   - DEV-934
+  - DEV-928
 comments:
 - date: 2026-11-27T13:30:27.971541+00:00
   author: claude
@@ -129,3 +132,15 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T14:04:46.774163+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-911","DEV-901","DEV-933","DEV-934"]}'
+    new: '{"blocks":["DEV-933"],"related":["DEV-911","DEV-901","DEV-933","DEV-934"]}'
+- at: 2026-11-27T14:17:59.334953+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-933"],"related":["DEV-911","DEV-901","DEV-933","DEV-934"]}'
+    new: '{"blocks":["DEV-933"],"related":["DEV-911","DEV-901","DEV-933","DEV-934","DEV-928"]}'

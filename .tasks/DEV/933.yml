@@ -1,14 +1,27 @@
 title: 'Hosted claude/codex takeover: no test drives resume_session_to_end on a host'
-status: Todo
+status: Blocked
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T13:36:18.043765+00:00
-modified: 2026-11-27T13:36:19.278614+00:00
+modified: 2026-11-27T14:04:56.390739+00:00
 relationships:
+  depends_on:
+  - DEV-931
   related:
   - DEV-931
+comments:
+- date: 2026-11-27T14:04:47.494084+00:00
+  author: claude
+  text: |-
+    Waits for DEV-931: the code this ticket tests isn't on main yet.
+
+    - `0d04ac1fd` (DEV-931, status Merging) is not an ancestor of `main`; on `main`, `resume_session_to_end` still calls `job_agent_table` and `resumed_on_host` runs only for `t3` (`crates/lotar-agent/src/services/agent_job_service.rs:2568`, `:2605`).
+    - A test of the hosted headless takeover would fail on main, so no change on `agent/DEV-933` yet.
+    - Next: once DEV-931 is on main, rebase this branch and add the two tests from "Done when".
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A284391c1577bda911e913ca36f1acdb09d7eac6415b551a410bc6bebcbcf4f35
 description: |-
   Found in the review of DEV-931 (`0d04ac1fd`).
 
@@ -22,9 +35,43 @@ description: |-
   - [ ] A test covers the "could not be resumed" branch on a host: the commits and leftovers come back and the job is queued again.
 tags:
 - agent
+- waits
 history:
 - at: 2026-11-27T13:36:19.278614+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T14:04:17.031439+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T14:04:17.706036+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A284391c1577bda911e913ca36f1acdb09d7eac6415b551a410bc6bebcbcf4f35
+- at: 2026-11-27T14:04:46.774653+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-931"]}'
+    new: '{"depends_on":["DEV-931"],"related":["DEV-931"]}'
+- at: 2026-11-27T14:04:47.436641+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent
+    new: agent, waits
+- at: 2026-11-27T14:04:47.494084+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T14:04:56.390739+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

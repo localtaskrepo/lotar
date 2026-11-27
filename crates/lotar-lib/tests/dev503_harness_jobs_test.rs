@@ -1459,6 +1459,35 @@ fn a_kept_thread_that_isnt_settled_is_named_by_its_link() {
     assert!(logs.contains("The T3 Code thread https://t3.test/thread-0 was not settled: "), "{logs}");
 }
 
+/// DEV-928: a done ticket's `failed` thread, settled through T3 Code's internal API (DEV-917), that the API refuses is
+/// noted once per process and settled at the next look once the API answers.
+#[test]
+fn a_failed_thread_the_internal_api_doesnt_settle_is_noted_once_and_retried() {
+    let (fixtures, _env) = t3_harness("");
+    // Each look runs: none waits out the look interval.
+    let _look = EnvVarGuard::set("LOTAR_AGENT_RESUMED_LOOK_SECONDS", "0");
+    let root = fixtures.get_temp_path();
+    std::fs::write(root.join("list-threads"), "").unwrap();
+    std::fs::write(root.join("failed-thread-0"), "").unwrap();
+    run_t3(&fixtures, "fix").failure();
+    std::fs::remove_file(root.join("failed-thread-0")).unwrap();
+    std::fs::write(root.join("listed-thread-0"), "failed").unwrap();
+    std::fs::write(root.join("ws-refuse"), "").unwrap();
+    let update = lotar::api_types::TaskUpdate { status: Some("Done".into()), ..Default::default() };
+    TaskService::update(&mut fixtures.create_storage(), "TEST-1", update).unwrap();
+    let refused = "The T3 Code thread https://t3.test/thread-0 was not settled: ";
+    AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
+    assert!(settled_threads(root).is_empty(), "the API refused it");
+    assert_eq!(job_logs(&fixtures).matches(refused).count(), 1, "{}", job_logs(&fixtures));
+    AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
+    assert_eq!(job_logs(&fixtures).matches(refused).count(), 1, "a second look adds no note");
+    std::fs::remove_file(root.join("ws-refuse")).unwrap();
+    AgentJobService::adopt_resumed_t3_threads(&fixtures.tasks_root);
+    assert_eq!(settled_threads(root), vec!["thread-0"]);
+    assert!(std::fs::read_to_string(root.join("t3-mcp.log")).unwrap().contains("ws_settle "), "settled through the internal API");
+    assert!(job_logs(&fixtures).contains("Settled the T3 Code thread https://t3.test/thread-0"));
+}
+
 /// DEV-810: a ticket's next job reuses its session's name, so the harnessmux record holds only the newest thread. The
 /// older thread a failed job kept is settled all the same, as the later job starts (DEV-876). The later job starts its own
 /// session (`--session new`): continuing thread-0 would hand off and keep its record as `<name>.<stamp>` (DEV-611).

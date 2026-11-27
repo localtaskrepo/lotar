@@ -1,11 +1,11 @@
 title: 'Agents page: a question of a job in another process shows in a box after a reload, but not live'
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T04:27:39.844205+00:00
-modified: 2026-11-27T13:56:09.781467+00:00
+modified: 2026-11-27T14:04:12.525982+00:00
 relationships:
   depends_on:
   - DEV-782
@@ -14,6 +14,8 @@ relationships:
   - DEV-765
   - DEV-771
   - DEV-915
+  - DEV-909
+  - DEV-918
 comments:
 - date: 2026-11-23T07:49:44.529276+00:00
   author: claude
@@ -125,6 +127,27 @@ comments:
       result: failed
       reason: rerun
     next: The merge agent takes over in a new session
+- date: 2026-11-27T14:04:03.937717+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `20c71f03b` on `main`.
+
+    - lotar's lint failure was the rebase: main's DEV-909 added `transcript` to `JobLogEntry`. Added `transcript: None` next to `tool`/`plan: None` in `follow.rs:api_event` and amended the commit
+    - Main had moved on to `723b1e5e4` (DEV-918); rebased again, no conflicts. `npm ci` ok
+    - Checks, all in this worktree on the rebased commit: `lint:agent` passed; `test:agent` passed (nextest 2703, vitest 1636); `smoke` passed (415)
+    - `git merge --ff-only` into the main checkout, then amended the `.tasks` changes (826, 915, 918, 932) into it: `20c71f03b`
+    - Pushed `723b1e5e4..20c71f03b`. No rules or config changed, so no `lotar trust` needed
+  report:
+    commits:
+    - hash: 20c71f03b
+      what: DEV-826 live question gets the reload's title-only box (rebased onto 723b1e5e4, transcript field added)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A407a18347417b166c014fede135d875b0cb8589e4b34f67cb90e149629e91c1d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70dc96c449dc460249eeff37f9c1ba6ca9f3f54735e771c93bcdfde19aaa3cce
@@ -160,7 +183,6 @@ description: |-
 tags:
 - ui
 - agent
-- review-returned
 history:
 - at: 2026-11-23T04:27:51.331691+00:00
   actor: claude
@@ -404,3 +426,22 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-782"],"related":["DEV-782","DEV-765","DEV-771"]}'
     new: '{"depends_on":["DEV-782"],"related":["DEV-782","DEV-765","DEV-771","DEV-915"]}'
+- at: 2026-11-27T14:04:03.937717+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T14:04:04.228126+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-782"],"related":["DEV-782","DEV-765","DEV-771","DEV-915"]}'
+    new: '{"depends_on":["DEV-782"],"related":["DEV-782","DEV-765","DEV-771","DEV-915","DEV-909","DEV-918"]}'
+- at: 2026-11-27T14:04:12.525982+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: ui, agent, review-returned
+    new: ui, agent
