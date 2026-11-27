@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T10:16:41.486933+00:00
-modified: 2026-11-27T12:16:08.232239+00:00
+modified: 2026-11-27T12:37:26.156298+00:00
 relationships:
   depends_on:
   - DEV-901
@@ -13,6 +13,7 @@ relationships:
   - DEV-901
   - DEV-797
   - DEV-930
+  - DEV-911
 comments:
 - date: 2026-11-27T10:22:38.218814+00:00
   author: claude
@@ -178,6 +179,9 @@ comments:
     - command: npm run -s smoke
       result: passed
     next: The merge agent takes over in a new session
+- date: 2026-11-27T12:37:25.843923+00:00
+  author: automation
+  text: Waited 22 min for the machine's check lock, held by the merge agent of DEV-911 (job job-20261127T111715.385Z-42, pid 61697), since 12:01 UTC; the merge agent starts now.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d2e62d982215986aed328bbaa591da39294156cb58b013d72219b1068dbb561
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af37effbe0d34fe08e5d043fb7402bfa58480661953e75ddf34acf58f3bd8c798
@@ -395,3 +399,13 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-797"]}'
     new: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-797","DEV-930"]}'
+- at: 2026-11-27T12:37:25.843923+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T12:37:26.156298+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-797","DEV-930"]}'
+    new: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-797","DEV-930","DEV-911"]}'

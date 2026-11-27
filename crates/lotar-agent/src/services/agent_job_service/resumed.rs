@@ -57,7 +57,8 @@ impl Resumed {
 
 /// Take over or report the threads of the tasks directory's ended `t3` jobs
 /// that T3 Code runs again, and settle the threads lotar kept active whose
-/// time came ([`super::kept`]), at most every [`LOOK_EVERY`] ([`look_every`]). T3 Code is
+/// time came ([`super::kept`]), at most every [`LOOK_EVERY`] ([`look_every`]). Host jobs
+/// whose question is gone end their wait there (DEV-929). T3 Code is
 /// asked nothing while no ended job has a thread and no project runs `t3`.
 pub(super) fn look(tasks_dir: &Path) {
     {
@@ -69,6 +70,13 @@ pub(super) fn look(tasks_dir: &Path) {
         }
         looks.insert(tasks_dir.to_path_buf(), Instant::now());
     }
+    look_at_threads(tasks_dir);
+    // After the takeovers: the job of an answered thread holds the ticket,
+    // so its wait isn't ended (stopped) under it.
+    super::close_dropped_waits_on_host(tasks_dir);
+}
+
+fn look_at_threads(tasks_dir: &Path) {
     let ended = ended_threads(tasks_dir);
     let kept = super::kept::threads(tasks_dir);
     // A job thread no job log names any more is found in T3 Code's list (DEV-810).

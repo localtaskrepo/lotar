@@ -645,8 +645,10 @@ mod tests {
     use std::os::unix::fs::PermissionsExt as _;
 
     /// A Mac checkout and a "host" in one temp folder: the fake ssh runs each
-    /// command here, with `<root>/mac` paths rewritten to `<root>/host`, and
-    /// a `t3` whose version is in `<root>/host-version`.
+    /// command here, with `<root>/mac` paths rewritten to `<root>/host`, logs
+    /// it to `<root>/ssh.log`, and fakes `-R` (a socket at the forwarded
+    /// path) and `-L` (a TCP forward). The host has a `t3` whose version is in
+    /// `<root>/host-version` and T3 Code's state in `<root>/host-t3`.
     struct Fixture {
         _dir: tempfile::TempDir,
         root: PathBuf,
@@ -672,19 +674,43 @@ mod tests {
             &root.join("bin/ssh"),
             &format!(
                 r#"#!/bin/sh
+remote= local=
 while [ $# -gt 0 ]; do
   case "$1" in
-    -o|-R|-L) shift 2 ;;
+    -R) remote="$2"; shift 2 ;;
+    -L) local="$2"; shift 2 ;;
+    -o) shift 2 ;;
     -N|-T) shift ;;
     *) break ;;
   esac
 done
 shift
 [ "$1" = "--" ] && shift
+if [ -n "$remote" ]; then
+  exec python3 -c 'import os, socket, sys, time
+os.path.exists(sys.argv[1]) and os.remove(sys.argv[1])
+s = socket.socket(socket.AF_UNIX); s.bind(sys.argv[1]); s.listen()
+time.sleep(600)' "${{remote%%:*}}"
+fi
+if [ -n "$local" ]; then
+  exec python3 -c 'import socket, sys, threading
+_, port, host, to = sys.argv[1].split(":")
+server = socket.socket(); server.bind(("127.0.0.1", int(port))); server.listen()
+def pipe(a, b):
+    while data := a.recv(65536):
+        b.sendall(data)
+    b.shutdown(socket.SHUT_WR)
+while True:
+    a, _ = server.accept()
+    b = socket.create_connection((host, int(to)))
+    threading.Thread(target=pipe, args=(a, b), daemon=True).start()
+    threading.Thread(target=pipe, args=(b, a), daemon=True).start()' "$local"
+fi
 cmd="$*"
+printf '%s\n' "$cmd" >> {root}/ssh.log
 case "$cmd" in "sh -lc "*) cmd="sh -c ${{cmd#sh -lc }}" ;; esac
 cmd=$(printf '%s' "$cmd" | sed "s#{root}/mac#{root}/host#g")
-PATH="{root}/host-bin:$PATH" exec sh -c "$cmd"
+T3CODE_HOME="{root}/host-t3" PATH="{root}/host-bin:$PATH" exec sh -c "$cmd"
 "#,
                 root = root.display()
             ),
@@ -692,7 +718,10 @@ PATH="{root}/host-bin:$PATH" exec sh -c "$cmd"
         std::fs::write(root.join("host-version"), "0.1.13\n").expect("version");
         script(
             &root.join("host-bin/t3"),
-            &format!("#!/bin/sh\ncase \"$1\" in --version) cat {}/host-version ;; project) echo added ;; esac\n", root.display()),
+            &format!(
+                "#!/bin/sh\ncase \"$1 $2 $3\" in --version*) cat {}/host-version ;; project*) echo added ;; 'auth session issue') echo '{{\"sessionId\":\"s1\",\"token\":\"secret\"}}' ;; esac\n",
+                root.display()
+            ),
         );
         script(
             &root.join("bin/t3"),
@@ -999,5 +1028,184 @@ PATH="{root}/host-bin:$PATH" exec sh -c "$cmd"
         run_git(&fixture.root.join("host/wt"), &["checkout", "--", "README"]);
         let (_, notes) = set_up(&fixture).expect("an earlier clean worktree goes");
         assert!(notes.iter().any(|note| note.starts_with("Removed the worktree of an earlier job")), "{notes:?}");
+    }
+
+    /// The fixture's host job with lotar's MCP connection: the forward's
+    /// socket on this Mac and on the host.
+    fn set_up_with_mcp(fixture: &Fixture, job_id: &str) -> (Hosted, PathBuf, PathBuf) {
+        // The test runner's temp folder is too deep for a socket's path.
+        // SAFETY: nextest runs each test in its own process.
+        unsafe { std::env::set_var("TMPDIR", "/tmp") };
+        let (repo, worktree) = (fixture.root.join("mac/repo"), fixture.root.join("mac/wt"));
+        let settings = ThreadSettings { deny: Vec::new(), env: BTreeMap::new(), lotar_mcp: true };
+        let checkout = Checkout { repo_root: &repo, worktree: &worktree, branch: "agent/DEV-1" };
+        let server = McpServer { program: PathBuf::from("true"), env: BTreeMap::new(), on_lost: Box::new(|_| {}) };
+        let (hosted, _) =
+            Hosted::set_up(job_id, "dyson", &dyson(), &checkout, &settings, Some(server), Some(Check::T3(fixture.local.clone()))).expect("set up");
+        let bridge = hosted.bridge.as_ref().expect("an MCP connection");
+        let (local, remote) = (bridge.local.clone(), PathBuf::from(&bridge.remote));
+        assert!(local.exists() && remote.exists(), "the forward is open");
+        (hosted, local, remote)
+    }
+
+    /// The tasks directory with the ticket DEV-1.
+    fn tasks(fixture: &Fixture) -> PathBuf {
+        let tasks_dir = fixture.root.join(".tasks");
+        std::fs::create_dir_all(&tasks_dir).expect("tasks");
+        std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: DEV\n").expect("config");
+        let task = crate::api_types::TaskCreate { title: "Waits on dyson".to_string(), project: Some("DEV".to_string()), ..Default::default() };
+        crate::services::task_service::TaskService::create(&mut crate::storage::manager::Storage::new(&tasks_dir), task).expect("ticket");
+        tasks_dir
+    }
+
+    /// T3 Code's server on the host: it answers one command with success
+    /// and hands it to the test.
+    fn t3_server_on_host(fixture: &Fixture) -> std::thread::JoinHandle<serde_json::Value> {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("listen");
+        let origin = format!("http://{}", listener.local_addr().expect("address"));
+        std::fs::create_dir_all(fixture.root.join("host-t3/userdata")).expect("t3 home");
+        std::fs::write(fixture.root.join("host-t3/userdata/server-runtime.json"), serde_json::json!({ "origin": origin }).to_string()).expect("runtime");
+        std::thread::spawn(move || {
+            // The forward's own check connects first and sends nothing.
+            let mut socket = loop {
+                let (stream, _) = listener.accept().expect("accept");
+                if let Ok(socket) = tungstenite::accept(stream) {
+                    break socket;
+                }
+            };
+            let request: serde_json::Value = loop {
+                if let tungstenite::Message::Text(text) = socket.read().expect("read")
+                    && text.contains("Request")
+                {
+                    break serde_json::from_str(text.as_str()).expect("json");
+                }
+            };
+            let answer = serde_json::json!({"_tag": "Exit", "requestId": request["id"], "exit": {"_tag": "Success", "value": {}}});
+            socket.send(tungstenite::Message::text(answer.to_string())).expect("answer");
+            let _ = socket.read();
+            request
+        })
+    }
+
+    fn comments(tasks_dir: &Path) -> Vec<String> {
+        let storage = crate::storage::manager::Storage::new(tasks_dir);
+        let task = crate::services::task_service::TaskService::get(&storage, "DEV-1", None).expect("ticket");
+        task.comments.into_iter().map(|comment| comment.text).collect()
+    }
+
+    /// DEV-929: a new job of the ticket brings the waiting thread's commits
+    /// back, closes its MCP connection, then stops the thread on the host.
+    #[test]
+    fn a_new_job_stops_the_thread_that_waits_on_the_host() {
+        use crate::services::agent_job_service::{WAITING_ON_HOST, collect_waiting_on_host, wait_on_host};
+        let fixture = fixture();
+        let tasks_dir = tasks(&fixture);
+        let (mut hosted, local, remote) = set_up_with_mcp(&fixture, "job-dev929-asked");
+        commit_on_host(&fixture, "asked.txt");
+        hosted.bring_back_so_far("DEV-1").expect("so far");
+        agent_hosts::route_thread("thread-asked", &hosted.ssh);
+        wait_on_host("DEV-1", "job-dev929-asked", Some("thread-asked".to_string()), hosted);
+        commit_on_host(&fixture, "after.txt");
+        let server = t3_server_on_host(&fixture);
+
+        collect_waiting_on_host("job-dev929-new", "DEV-1", &tasks_dir);
+        let request = server.join().expect("the stop reached T3 Code on the host");
+        assert_eq!((request["payload"]["type"].as_str(), request["payload"]["threadId"].as_str()), (Some("thread.stop"), Some("thread-asked")));
+        assert!(fixture.root.join("mac/wt/after.txt").is_file(), "its commits came back");
+        assert!(!fixture.root.join("host/wt").exists(), "the host's worktree went");
+        assert!(!local.exists() && !remote.exists(), "the MCP connection closed");
+        assert!(WAITING_ON_HOST.lock().expect("lock").is_empty());
+        let log = std::fs::read_to_string(fixture.root.join("ssh.log")).expect("ssh log");
+        let (fetched, stopped) = (log.rfind("git-upload-pack").expect("fetched"), log.find("server-runtime.json").expect("stopped"));
+        assert!(fetched < stopped, "the commits come back before the thread stops:\n{log}");
+        assert!(comments(&tasks_dir).is_empty(), "{:?}", comments(&tasks_dir));
+    }
+
+    /// DEV-929: a stop that fails leaves the new job to run, says why on the
+    /// ticket, and the MCP connection still closes.
+    #[test]
+    fn a_thread_that_cant_be_stopped_is_named_on_the_ticket() {
+        use crate::services::agent_job_service::{WAITING_ON_HOST, collect_waiting_on_host, wait_on_host};
+        let fixture = fixture();
+        let tasks_dir = tasks(&fixture);
+        let (hosted, local, remote) = set_up_with_mcp(&fixture, "job-dev929-unstoppable");
+        agent_hosts::route_thread("thread-unstoppable", &hosted.ssh);
+        wait_on_host("DEV-1", "job-dev929-unstoppable", Some("thread-unstoppable".to_string()), hosted);
+
+        collect_waiting_on_host("job-dev929-next", "DEV-1", &tasks_dir);
+        let comments = comments(&tasks_dir);
+        assert!(comments.iter().any(|text| text.starts_with("Could not stop the thread thread-unstoppable") && text.contains("isn't running")), "{comments:?}");
+        assert!(!local.exists() && !remote.exists(), "the MCP connection closed");
+        assert!(WAITING_ON_HOST.lock().expect("lock").is_empty());
+    }
+
+    /// DEV-929: a question the ticket drops while its thread waits on the
+    /// host ends the wait at the next look: the commits come back, the MCP
+    /// connection closes and the thread stops. A job that comes later finds
+    /// nothing left to stop.
+    fn a_dropped_question_ends_the_wait(patch: crate::api_types::TaskUpdate, job_id: &str, thread: &str) {
+        use crate::services::agent_job_service::{WAITING_ON_HOST, close_dropped_waits_on_host, collect_waiting_on_host, note_question_on_host, wait_on_host};
+        let fixture = fixture();
+        let tasks_dir = tasks(&fixture);
+        let (hosted, local, remote) = set_up_with_mcp(&fixture, job_id);
+        agent_hosts::route_thread(thread, &hosted.ssh);
+        wait_on_host("DEV-1", job_id, Some(thread.to_string()), hosted);
+        close_dropped_waits_on_host(&tasks_dir);
+        assert!(WAITING_ON_HOST.lock().expect("lock").contains_key("DEV-1"), "the job's end hasn't left the question yet");
+        note_question_on_host(job_id, "DEV-1", &tasks_dir);
+        close_dropped_waits_on_host(&tasks_dir);
+        assert!(local.exists() && remote.exists(), "the question still waits");
+
+        commit_on_host(&fixture, "after.txt");
+        let server = t3_server_on_host(&fixture);
+        crate::services::task_service::TaskService::update(&mut crate::storage::manager::Storage::new(&tasks_dir), "DEV-1", patch).expect("drop");
+        close_dropped_waits_on_host(&tasks_dir);
+        let request = server.join().expect("the stop reached T3 Code on the host");
+        assert_eq!((request["payload"]["type"].as_str(), request["payload"]["threadId"].as_str()), (Some("thread.stop"), Some(thread)));
+        assert!(!local.exists() && !remote.exists(), "the MCP connection closed");
+        assert!(fixture.root.join("mac/wt/after.txt").is_file(), "its commits came back");
+        assert!(WAITING_ON_HOST.lock().expect("lock").is_empty());
+
+        let before = std::fs::read_to_string(fixture.root.join("ssh.log")).expect("ssh log");
+        collect_waiting_on_host("job-dev929-later", "DEV-1", &tasks_dir);
+        assert_eq!(std::fs::read_to_string(fixture.root.join("ssh.log")).expect("ssh log"), before, "the later job has nothing to do");
+        assert!(comments(&tasks_dir).is_empty(), "{:?}", comments(&tasks_dir));
+    }
+
+    /// DEV-929: a takeover moves the ticket to its agent before its job
+    /// takes the entry; the look leaves that job its thread and connection.
+    #[test]
+    fn a_thread_taken_over_keeps_its_wait_while_its_job_runs() {
+        use crate::services::agent_job_service::{JOB_REGISTRY, WAITING_ON_HOST, close_dropped_waits_on_host, note_question_on_host, wait_on_host};
+        let fixture = fixture();
+        let tasks_dir = tasks(&fixture);
+        let (hosted, local, remote) = set_up_with_mcp(&fixture, "job-dev929-answered");
+        agent_hosts::route_thread("thread-answered", &hosted.ssh);
+        wait_on_host("DEV-1", "job-dev929-answered", Some("thread-answered".to_string()), hosted);
+        note_question_on_host("job-dev929-answered", "DEV-1", &tasks_dir);
+        let patch = crate::api_types::TaskUpdate { assignee: Some("@claude".to_string()), ..Default::default() };
+        crate::services::task_service::TaskService::update(&mut crate::storage::manager::Storage::new(&tasks_dir), "DEV-1", patch).expect("take over");
+        JOB_REGISTRY.lock().expect("registry").active_by_ticket.insert("DEV-1".to_string(), "job-dev929-takeover".to_string());
+
+        close_dropped_waits_on_host(&tasks_dir);
+        assert!(WAITING_ON_HOST.lock().expect("lock").contains_key("DEV-1"), "the takeover's job takes the entry");
+        assert!(local.exists() && remote.exists(), "the MCP connection stays open");
+        let log = std::fs::read_to_string(fixture.root.join("ssh.log")).expect("ssh log");
+        assert!(!log.contains("server-runtime.json"), "the thread isn't stopped:\n{log}");
+        JOB_REGISTRY.lock().expect("registry").active_by_ticket.remove("DEV-1");
+        let mut entry = super::super::take_waiting_on_host("DEV-1").expect("entry");
+        entry.hosted.close();
+    }
+
+    #[test]
+    fn a_ticket_closed_while_its_thread_waits_ends_the_wait() {
+        let patch = crate::api_types::TaskUpdate { status: Some("Done".to_string()), ..Default::default() };
+        a_dropped_question_ends_the_wait(patch, "job-dev929-closed", "thread-closed");
+    }
+
+    #[test]
+    fn a_ticket_reassigned_while_its_thread_waits_ends_the_wait_before_a_later_job() {
+        let patch = crate::api_types::TaskUpdate { assignee: Some("sam".to_string()), ..Default::default() };
+        a_dropped_question_ends_the_wait(patch, "job-dev929-reassigned", "thread-reassigned");
     }
 }

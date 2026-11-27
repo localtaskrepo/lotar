@@ -5,13 +5,14 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T04:02:53.831434+00:00
-modified: 2026-11-27T12:27:17.873554+00:00
+modified: 2026-11-27T12:37:26.548472+00:00
 relationships:
   depends_on:
   - DEV-843
   related:
   - DEV-843
   - DEV-797
+  - DEV-915
 comments:
 - date: 2026-11-27T09:11:29.108523+00:00
   author: claude
@@ -58,6 +59,34 @@ comments:
     - The fixture split (`queued_ticket_that_gets_deleted(dir, recreate)`) keeps the DEV-843 reuse test unchanged. No stray files, no second branch.
     - Reran: `npm ci` ok. `cargo nextest run -p lotar-agent -E 'test(/an_entry_whose_ticket|reuses_a_deleted/)'`: 3 passed. `cargo clippy -p lotar-agent --tests -- -D warnings` and `rustfmt --edition 2024 --check` on the file are clean. Full suites not run: the merge runs them (DEV-797).
     - No UI change, so no screenshots to review. Findings: none. Tickets filed: none.
+- date: 2026-11-27T12:37:26.249476+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the main checkout has uncommitted changes, so lotar didn't push:
+    ```
+    M .tasks/DEV/911.yml
+     M .tasks/DEV/929.yml
+    ```.
+
+    - Rebase onto `main` changed nothing (`9fe251fabd61`)
+    - Waited 4 min for the machine's check lock, held by lotar's merge checks of DEV-915 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-915 (pid 61697), since 11:01 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `9fe251fabd61`
+    - Amended the pending `.tasks` changes into the merged commit: `bb1fd40ab93b`
+  report:
+    commits:
+    - hash: 9fe251fab
+      what: 'DEV-923 Agent queue: no test covers a queued entry whose ticket was deleted and not re-created'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A028b7825cedd9d889f13fe98fc9c83df6c45dc4198d6be79bfc5618f2ad7019f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Accdd8ab79d235eede73d91173d406053172e2269c95b3065cdac8d58059a6985
@@ -162,3 +191,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T12:37:26.249476+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T12:37:26.548472+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-843"],"related":["DEV-843","DEV-797"]}'
+    new: '{"depends_on":["DEV-843"],"related":["DEV-843","DEV-797","DEV-915"]}'

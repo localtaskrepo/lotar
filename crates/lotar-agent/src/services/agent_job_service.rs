@@ -4148,7 +4148,7 @@ fn run_job(
     if in_check_lock {
         env.insert(check_lock::HELD_ENV.to_string(), "1".to_string());
     }
-    collect_waiting_on_host(&job_id, &ticket_id);
+    collect_waiting_on_host(&job_id, &ticket_id, &tasks_dir);
     // A job on an agent host readies the host; one it can't take runs here
     // once the Mac has a slot (DEV-901).
     let mut on_host = None;
@@ -4285,6 +4285,11 @@ fn finish_on_host(job_id: &str, ticket_id: &str, mut hosted: hosted::Hosted, end
     };
     let thread = if hosted.thread { host_thread(session, &hosted.ssh) } else { None };
     crate::services::agent_hosts::release(job_id);
+    // A cancelled job's thread stops like any other's, below.
+    let end = match end {
+        RunEnd::WaitingForAnswer(_) if should_stop_job(job_id) => RunEnd::Stopped,
+        end => end,
+    };
     if let RunEnd::WaitingForAnswer(message) = end {
         let name = hosted.name.clone();
         let note = match hosted.bring_back_so_far(ticket_id) {
@@ -4297,7 +4302,7 @@ fn finish_on_host(job_id: &str, ticket_id: &str, mut hosted: hosted::Hosted, end
             Err(err) => format!("Its commits didn't come back to the Mac: {err}. Its worktree stays on {name}."),
         };
         let what = if hosted.thread { "thread" } else { "session" };
-        wait_on_host(ticket_id, hosted);
+        wait_on_host(ticket_id, job_id, thread, hosted);
         return RunEnd::WaitingForAnswer(format!("{message}\n\nThe {what} runs on {name}. {note}"));
     }
     let lost = hosted.lost();
@@ -4330,45 +4335,142 @@ fn finish_on_host(job_id: &str, ticket_id: &str, mut hosted: hosted::Hosted, end
 /// Host jobs whose thread waits for an answer, by ticket (DEV-901): the job
 /// that takes the answered thread over gets its worktree and MCP connection
 /// on the host and brings its commits back at its end.
-static WAITING_ON_HOST: LazyLock<Mutex<HashMap<String, hosted::Hosted>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+static WAITING_ON_HOST: LazyLock<Mutex<HashMap<String, WaitingOnHost>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-fn wait_on_host(ticket_id: &str, hosted: hosted::Hosted) {
+/// A host job whose thread waits for an answer.
+struct WaitingOnHost {
+    job_id: String,
+    /// The waiting T3 Code thread, routed to the host.
+    thread: Option<String>,
+    /// The tasks directory and the ticket's status and assignee as the
+    /// job's end left them with the question (DEV-929); unset until then.
+    question: Option<(std::path::PathBuf, (String, Option<String>))>,
+    hosted: hosted::Hosted,
+}
+
+fn wait_on_host(ticket_id: &str, job_id: &str, thread: Option<String>, hosted: hosted::Hosted) {
     if let Ok(mut waiting) = WAITING_ON_HOST.lock() {
-        waiting.insert(ticket_id.to_string(), hosted);
+        waiting.insert(ticket_id.to_string(), WaitingOnHost { job_id: job_id.to_string(), thread, question: None, hosted });
     }
 }
 
-fn take_waiting_on_host(ticket_id: &str) -> Option<hosted::Hosted> {
+/// Record the ticket's state the job's end left with its question, so a
+/// later look sees when the question is dropped (DEV-929).
+fn note_question_on_host(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path) {
+    let Some(state) = ticket_state(tasks_dir, ticket_id) else {
+        return;
+    };
+    if let Ok(mut waiting) = WAITING_ON_HOST.lock()
+        && let Some(entry) = waiting.values_mut().find(|entry| entry.job_id == job_id)
+    {
+        entry.question = Some((tasks_dir.to_path_buf(), state));
+    }
+}
+
+fn take_waiting_on_host(ticket_id: &str) -> Option<WaitingOnHost> {
     let mut waiting = WAITING_ON_HOST.lock().ok()?;
     let key = waiting.keys().find(|key| crate::storage::identity::aliases_match(key, ticket_id))?.clone();
     waiting.remove(&key)
 }
 
 /// A new job of a ticket whose thread waited for an answer on a host and
-/// wasn't taken over (DEV-901): what that thread committed there since
-/// comes back first, and its MCP connection closes.
-fn collect_waiting_on_host(job_id: &str, ticket_id: &str) {
-    let Some(mut waiting) = take_waiting_on_host(ticket_id) else {
+/// wasn't taken over (DEV-901): the waiting job ends there
+/// ([`end_wait_on_host`]) before this one starts.
+fn collect_waiting_on_host(job_id: &str, ticket_id: &str, tasks_dir: &std::path::Path) {
+    let Some(entry) = take_waiting_on_host(ticket_id) else {
         return;
     };
-    let notes = waiting.bring_back(ticket_id, false).unwrap_or_else(|err| {
-        vec![format!(
-            "What the earlier thread of {ticket_id} committed on {} after its question didn't come back: {err}. Its commits up to the question are here.",
-            waiting.name
-        )]
-    });
-    for note in notes {
+    for note in end_wait_on_host(entry, ticket_id, tasks_dir, &format!("lotar's job {job_id} took {ticket_id} over")) {
         update_job(job_id, |state| {
             record_and_emit(state, "agent_job_progress", Some(note.clone()));
         });
     }
 }
 
+/// End the tasks directory's host jobs whose question is gone (DEV-929):
+/// the ticket is done, or no longer has the status or assignee the question
+/// left. A new job or takeover that took the entry first wins, also one
+/// that runs but hasn't taken it yet: a takeover moves the ticket to its
+/// agent before its job reaches [`resumed_on_host`].
+fn close_dropped_waits_on_host(tasks_dir: &std::path::Path) {
+    let canonical = |path: &std::path::Path| fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let here = canonical(tasks_dir);
+    let questions: Vec<(String, String, (String, Option<String>))> = match WAITING_ON_HOST.lock() {
+        Ok(waiting) => waiting
+            .iter()
+            .filter_map(|(ticket, entry)| {
+                let (dir, state) = entry.question.as_ref()?;
+                (canonical(dir) == here).then(|| (ticket.clone(), entry.job_id.clone(), state.clone()))
+            })
+            .collect(),
+        Err(_) => return,
+    };
+    for (ticket_id, job_id, asked) in questions {
+        if AgentJobService::has_active_job_in(tasks_dir, &ticket_id) {
+            continue;
+        }
+        let why = if ticket_done_state(tasks_dir, &ticket_id) == Some(true) {
+            format!("{ticket_id} is done")
+        } else {
+            match ticket_state(tasks_dir, &ticket_id) {
+                Some(now) if now != asked => format!("{ticket_id} no longer waits for the answer"),
+                Some(_) => continue,
+                None => format!("{ticket_id} is gone"),
+            }
+        };
+        let entry = WAITING_ON_HOST.lock().ok().and_then(|mut waiting| {
+            let same = waiting.get(&ticket_id).is_some_and(|entry| entry.job_id == job_id);
+            same.then(|| waiting.remove(&ticket_id)).flatten()
+        });
+        let Some(entry) = entry else { continue };
+        for note in end_wait_on_host(entry, &ticket_id, tasks_dir, &why) {
+            update_job(&job_id, |state| {
+                record_and_emit(state, "agent_job_progress", Some(note.clone()));
+            });
+        }
+    }
+}
+
+/// End a host job's wait for an answer `why`: what its thread committed
+/// there since comes back first and its MCP connection closes; then the
+/// thread stops there (DEV-929), so an answer in it no longer runs it
+/// without its worktree. A stop that fails is also commented on the
+/// ticket. The notes for the job log.
+fn end_wait_on_host(entry: WaitingOnHost, ticket_id: &str, tasks_dir: &std::path::Path, why: &str) -> Vec<String> {
+    let WaitingOnHost { mut hosted, thread, job_id: waited, .. } = entry;
+    let mut notes = hosted.bring_back(ticket_id, false).unwrap_or_else(|err| {
+        vec![format!(
+            "What the earlier thread of {ticket_id} committed on {} after its question didn't come back: {err}. Its commits up to the question are here.",
+            hosted.name
+        )]
+    });
+    let Some(thread) = thread else {
+        return notes;
+    };
+    match crate::services::t3_thread_api::stop_thread(std::path::Path::new("t3"), &[], std::path::Path::new("/"), &thread, why) {
+        Ok(()) => notes.push(format!("Stopped the thread {thread} of the job {waited} that waited for an answer on {}: {why}.", hosted.name)),
+        Err(err) => {
+            let note = format!(
+                "Could not stop the thread {thread} of the job {waited} that waits for an answer on {} ({why}): {err}. Stop it there: an answer in it runs it without its worktree.",
+                hosted.name
+            );
+            let _ = TaskService::add_comment_with_context(
+                &mut Storage::new(tasks_dir),
+                ticket_id,
+                &note,
+                crate::services::task_service::CommentContext::automation(),
+            );
+            notes.push(note);
+        }
+    }
+    notes
+}
+
 /// The host a taken-over `t3` thread runs on (DEV-901): the waiting job's
 /// worktree and MCP connection there, else (lotar restarted meanwhile) its
 /// worktree alone. The job holds a slot there and brings the commits back.
 fn resumed_on_host(job_id: &str, ticket_id: &str, host: Option<&str>, tasks_dir: &std::path::Path, config: &ResolvedConfig) -> Option<hosted::Hosted> {
-    let hosted = take_waiting_on_host(ticket_id).or_else(|| {
+    let hosted = take_waiting_on_host(ticket_id).map(|entry| entry.hosted).or_else(|| {
         let name = host?;
         let host = config.agent_hosts.get(name)?;
         let (worktree, branch) =
@@ -4647,6 +4749,7 @@ fn end_job(
         RunEnd::WaitingForAnswer(message) if !should_stop_job(job_id) => {
             hand_back_waiting_job(job_id, ticket_id, &message, tasks_dir, config);
             finalize_job(job_id, ticket_id, Some(WAITS_FOR_ANSWER), context_messages, tasks_dir, config);
+            note_question_on_host(job_id, ticket_id, tasks_dir);
         }
         RunEnd::HandedBack(message) if !should_stop_job(job_id) => {
             hand_back_waiting_job(job_id, ticket_id, &message, tasks_dir, config);
