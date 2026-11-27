@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T03:08:35.727731+00:00
-modified: 2026-11-27T10:05:39.673707+00:00
+modified: 2026-11-27T17:18:31.907141+00:00
 relationships:
   related:
   - DEV-896
@@ -129,6 +129,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A59bae2bfdd713fed611d6e91d60bb2e917e5e0922b6052e35a0f3afbcbeb8d42
+releases:
+- 14
 description: 'Found on DEV-896''s merge (2026-11-26): `npm run -s test:agent` failed twice. `include_str!` couldn''t read `/private/tmp/dev896-review-scratch/.../docs/help/agent-instructions.md`. The review had built a deleted scratch worktree into DEV-896''s `target/`. The build-script run `target/debug/build/lotar-agent/<hash>/run/stdout` kept `LOTAR_DOCS_DIR` pointing there, because `rerun-if-changed=../../docs/...` is relative and stays the same. Check: `grep -rl review-scratch target/debug/build/*/*/run/stdout` in a ticket worktree. Done when: a build in one checkout can''t reuse another checkout''s `LOTAR_DOCS_DIR`, for example `crates/lotar-agent/build.rs` and `crates/lotar-lib/build.rs` also rerun when `CARGO_MANIFEST_DIR` changes, with a test.'
 tags:
 - health
@@ -215,3 +217,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-896","DEV-841","DEV-927"]}'
     new: '{"related":["DEV-896","DEV-841","DEV-927","DEV-917"]}'
+- at: 2026-11-27T17:18:31.907141+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

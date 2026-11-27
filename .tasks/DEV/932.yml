@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T11:58:59.845101+00:00
-modified: 2026-11-27T15:51:22.795101+00:00
+modified: 2026-11-27T17:18:32.329340+00:00
 relationships:
   related:
   - DEV-920
@@ -95,6 +95,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae198604b4f163166e3cbb9ead47ce120cf1d76a8daef1ea66b1f2dda05c0e8a5
+releases:
+- 14
 description: |-
   ## Found (review of DEV-920, 2026-11-27)
   - DEV-920's `takeover_request` (`crates/lotar-agent/src/services/agent_job_service/resumed.rs`) reads the earlier job's request from the limit retry, then this process's `JOB_REGISTRY`, then the earlier job's `run_inputs` log line.
@@ -216,3 +218,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-920","DEV-808","DEV-928","DEV-931","DEV-933","DEV-936"]}'
     new: '{"related":["DEV-920","DEV-808","DEV-928","DEV-931","DEV-933","DEV-936","DEV-935"]}'
+- at: 2026-11-27T17:18:32.329340+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

@@ -1,11 +1,11 @@
 title: 'Hosted claude/codex takeover: no test cancels a job while resume_session_to_end takes it over on a host'
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T15:18:02.306993+00:00
-modified: 2026-11-27T15:46:23.734260+00:00
+modified: 2026-11-27T17:18:32.509868+00:00
 relationships:
   depends_on:
   - DEV-933
@@ -13,6 +13,7 @@ relationships:
   - DEV-933
   - DEV-931
   - DEV-932
+  - DEV-935
 comments:
 - date: 2026-11-27T15:22:13.719566+00:00
   author: claude
@@ -55,8 +56,41 @@ comments:
     - Reran on main plus the fix, in a detached copy: `cargo nextest run -p lotar-agent -E 'test(/hosted::/)'` passed 23/23. `rustfmt --check` on `hosted.rs` passed, and `cargo clippy -p lotar-agent --tests` gave no warnings.
     - Mutation check: replacing the cancel branch's `finish_on_host` call makes the test fail at `hosted.rs:1480`. Code put back.
     - `npm ci` passed. No stray files and no second branch. No tickets filed.
+- date: 2026-11-27T16:03:36.881343+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-936` is in `main`.
+
+    - Rebased `agent/DEV-936` onto `main` (`c1862fa84ccb`): `e16d3fa2ff39`
+    - Waited 4 min for the machine's check lock, held by lotar's merge checks of DEV-935 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-935 (pid 61697), since 15:43 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-936` onto `main` (`0d7d3eb00f57`): `dfb2b81d24dc`
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `dfb2b81d24dc`
+    - Amended the pending `.tasks` changes into the merged commit: `76f28e5ad1cb`
+    - Pushed 2 commits to `origin/main`
+  report:
+    commits:
+    - hash: 0d7d3eb00
+      what: 'DEV-935 Activity feed: every BlobBatch drop now runs ps -A twice to kill a healthy git cat-file (DEV-808''s kill_tree)'
+    - hash: 76f28e5ad
+      what: 'DEV-936 Hosted claude/codex takeover: no test cancels a job while resume_session_to_end takes it over on a host'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad3c6ee465ab88ef270a37b30447963869604cff25e074986fc0dbef2fcc9c8f5
+releases:
+- 14
 description: |-
   Found in the review of DEV-933 (`159432151`).
 
@@ -171,3 +205,24 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T16:03:36.881343+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T16:03:37.196624+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-933"],"related":["DEV-933","DEV-931","DEV-932"]}'
+    new: '{"depends_on":["DEV-933"],"related":["DEV-933","DEV-931","DEV-932","DEV-935"]}'
+- at: 2026-11-27T16:03:37.871600+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-27T17:18:32.509868+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

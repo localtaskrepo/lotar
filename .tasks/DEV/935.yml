@@ -5,13 +5,14 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T14:47:12.984378+00:00
-modified: 2026-11-27T15:51:23.768857+00:00
+modified: 2026-11-27T17:18:32.451615+00:00
 relationships:
   related:
   - DEV-808
   - DEV-466
   - DEV-932
   - DEV-933
+  - DEV-936
 comments:
 - date: 2026-11-27T14:51:37.998380+00:00
   author: claude
@@ -105,6 +106,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac8c351facab0d2f67165f2c044d5f961217fef3f9d2e56d8bbcd602dcc68ad05
+releases:
+- 14
 description: |-
   Found in the DEV-808 review (2026-11-27): `kill_process_group` in `crates/lotar-core/src/utils/git.rs` now calls `kill_tree`, which SIGSTOPs the group and lists the process table with `ps -A` twice. `BlobBatch`'s `Drop` (`crates/lotar-lib/src/services/audit_service.rs:97`) calls it at the normal end of every tracked activity feed, so each feed request spawns two `ps` (~40 ms each here) to stop a `git cat-file --batch` that has no children.
 
@@ -228,3 +231,14 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-27T16:03:37.196029+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-808","DEV-466","DEV-932","DEV-933"]}'
+    new: '{"related":["DEV-808","DEV-466","DEV-932","DEV-933","DEV-936"]}'
+- at: 2026-11-27T17:18:32.451615+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T10:16:41.486933+00:00
-modified: 2026-11-27T13:07:24.451042+00:00
+modified: 2026-11-27T17:18:32.165914+00:00
 relationships:
   depends_on:
   - DEV-901
@@ -211,6 +211,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d2e62d982215986aed328bbaa591da39294156cb58b013d72219b1068dbb561
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af37effbe0d34fe08e5d043fb7402bfa58480661953e75ddf34acf58f3bd8c798
+releases:
+- 14
 description: |-
   Found in the DEV-901 review (2026-11-27, branch `agent/DEV-901` at `49a3fa827`).
 
@@ -457,3 +459,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-797","DEV-930","DEV-911","DEV-923"]}'
     new: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-797","DEV-930","DEV-911","DEV-923","DEV-915"]}'
+- at: 2026-11-27T17:18:32.165914+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

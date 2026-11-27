@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T00:04:01.449016+00:00
-modified: 2026-11-27T13:56:09.782061+00:00
+modified: 2026-11-27T17:18:31.685909+00:00
 relationships:
   depends_on:
   - DEV-910
@@ -100,6 +100,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A680674b4bb9f3226a0545c290f9674bbc58c2d66158ba18bc621157fff9695be
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae11ac081715db83175eedd84fb9269b452365c2a14da9719298192f6e059691e
+releases:
+- 14
 description: |-
   Found in the review of DEV-910.
 
@@ -257,3 +259,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-910"],"related":["DEV-910","DEV-865","DEV-871","DEV-843","DEV-923","DEV-801","DEV-918","DEV-929"]}'
     new: '{"depends_on":["DEV-910"],"related":["DEV-910","DEV-865","DEV-871","DEV-843","DEV-923","DEV-801","DEV-918","DEV-929","DEV-826"]}'
+- at: 2026-11-27T17:18:31.685909+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

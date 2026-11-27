@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T19:27:41.962615+00:00
-modified: 2026-11-27T12:12:09.507774+00:00
+modified: 2026-11-27T17:18:31.379155+00:00
 relationships:
   related:
   - DEV-858
@@ -135,6 +135,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abdbc73e5c042eb609474382b70ddcaca9f0f02c95c0b38424a98ca70a7a7c532
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A852f0c8878dc57d4d90273be23977fbcff3ea9aa8982a4e397f789218cf2e4f5
+releases:
+- 14
 description: 'Found in the DEV-858 review on main 0cf94860d plus the DEV-858 test: `cargo nextest run --workspace --test integration dev503` failed `a_continued_merge_in_the_reviews_process_runs_with_the_merge_profiles_env` and `a_continued_merge_without_a_session_of_its_own_takes_the_reviews_thread` after about 60 s each, right after a cold `cargo build --workspace`; the rerun passed 59/59 in 14 s. Check: rerun dev503 under load. Done: both join the serial wall-clock filter in `.config/nextest.toml` (AGENTS.md), or their wait is fixed.'
 tags:
 - health
@@ -298,3 +300,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-858","DEV-801","DEV-810","DEV-912","TEST-1","DEV-914","DEV-913"]}'
     new: '{"related":["DEV-858","DEV-801","DEV-810","DEV-912","TEST-1","DEV-914","DEV-913","DEV-925"]}'
+- at: 2026-11-27T17:18:31.379155+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

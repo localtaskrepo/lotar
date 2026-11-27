@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T23:29:18.207980+00:00
-modified: 2026-11-27T08:50:34.904973+00:00
+modified: 2026-11-27T17:18:31.534642+00:00
 relationships:
   blocks:
   - DEV-920
@@ -100,6 +100,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad43913606878248e7587ef76a76c59158e8af6e92648c892a41f3c30e985ef08
+releases:
+- 14
 description: |-
   Same usage-limit stop, two outcomes, lotar 0.15.7, both t3 runner, 17 minutes apart:
 
@@ -196,3 +198,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-920"],"related":["DEV-584","DEV-833","DEV-855","DEV-901","DEV-920","DEV-909"]}'
     new: '{"blocks":["DEV-920"],"related":["DEV-584","DEV-833","DEV-855","DEV-901","DEV-920","DEV-909","DEV-908"]}'
+- at: 2026-11-27T17:18:31.534642+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

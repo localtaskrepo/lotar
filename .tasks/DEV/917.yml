@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T00:16:20.412681+00:00
-modified: 2026-11-27T10:35:56.149391+00:00
+modified: 2026-11-27T17:18:31.780744+00:00
 relationships:
   depends_on:
   - DEV-810
@@ -158,6 +158,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A54c0a5c8da360b963fc88ee14eda15831f9d7b811da77dae836ce9d5a30930fd
+releases:
+- 14
 description: |-
   Found in the DEV-810 review (2026-11-26).
 
@@ -317,3 +319,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-810"],"related":["DEV-810","DEV-876","DEV-928","DEV-919","DEV-841"]}'
     new: '{"depends_on":["DEV-810"],"related":["DEV-810","DEV-876","DEV-928","DEV-919","DEV-841","DEV-902"]}'
+- at: 2026-11-27T17:18:31.780744+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

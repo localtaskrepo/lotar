@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T07:45:41.052287+00:00
-modified: 2026-11-27T10:16:55.485150+00:00
+modified: 2026-11-27T17:18:31.165090+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -219,6 +219,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A28118acf01dea3aac80b4fc195bac1b28817edc83e4f78d9cbce250ea5431ce1
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1ce7499cac79969a6af3e6141c7a9ed4b3f29d7ae6c82fb8ac4a332a79245b97
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A736722c74faf1b38d5648de0cb8468b1ec646ddd290fddf77a364b4ddc84acc6
+releases:
+- 14
 description: |-
   Found in the DEV-797 review: `adopt_orphaned_job` → `finish_orphaned_job` (`crates/lotar-agent/src/services/agent_job_service.rs`) resumes a merge job's agent session (a t3 thread may still run its full suites) but never takes the machine's check lock (`agent_job_service/check_lock.rs`, port 47586). The OS freed the lock when the old lotar exited, so a second merge can run its suites beside the adopted one, which DEV-797 forbids (a merge agent "holds it until the job ends").
 
@@ -541,3 +543,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626","DEV-801","DEV-909","DEV-579","DEV-925","DEV-913","DEV-858"]}'
     new: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626","DEV-801","DEV-909","DEV-579","DEV-925","DEV-913","DEV-858","DEV-901"]}'
+- at: 2026-11-27T17:18:31.165090+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

@@ -1,0 +1,114 @@
+title: 'Disk gate ignores purgeable space: jobs held at the floor while macOS would free its Time Machine snapshots'
+status: Merging
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@merge'
+created: 2026-11-27T17:12:14.663265+00:00
+modified: 2026-11-27T17:18:09.198131+00:00
+relationships:
+  related:
+  - DEV-837
+comments:
+- date: 2026-11-27T17:16:29.529219+00:00
+  author: claude
+  text: |-
+    Disk gate now counts purgeable space on macOS.
+
+    - `read_free` in `crates/lotar-agent/src/services/disk_gate.rs` reads `kCFURLVolumeAvailableCapacityForImportantUsageKey` via CoreFoundation FFI (no new crate); statvfs on other systems or when macOS gives no value.
+    - Hold reason names the reading: `41.5 GB free on the job worktrees' disk (available for important use, purgeable included), under the floor of 60 GB`; `(statvfs)` or `(LOTAR_DISK_FREE_GB)` otherwise. The cleanup log line names it too.
+    - `LOTAR_DISK_FREE_GB` still wins over both.
+    - New test `the_reading_counts_purgeable_space_on_macos_and_is_statvfs_elsewhere` reads the real disk.
+    - On this Mac: `df` 367 GB available, important-use 378 GB.
+    - Docs: `docs/help/agent.md` Disk gate section.
+  report:
+    commits:
+    - hash: 012d3b0f6
+      what: macOS disk gate reads important-use capacity (purgeable included), message names the reading
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: cargo nextest run -p lotar-agent --lib disk_gate
+      result: passed
+    - command: cargo nextest run -p lotar-lib --test integration dev837
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: merge runs the full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs it
+    next: Review, then merge
+- date: 2026-11-27T17:18:02.408469+00:00
+  author: claude
+  text: |-
+    Review: passed. The fix does everything "Done when" asks, nothing blocks the merge, and I filed no tickets.
+
+    - **Read:** the diff of `012d3b0f6`, compared against `main` at `76f28e5ad`. Also the ticket, the owner's decision ("lotar counts purgeable (Recommended)"), the DEV-837 docs and `AGENTS.md`. No other commits or branches carry this fix.
+    - **Done when:**
+      - On macOS, `read_volume` asks CoreFoundation for `kCFURLVolumeAvailableCapacityForImportantUsageKey`; other systems, or a macOS call that gives no value, fall back to statvfs. See `crates/lotar-agent/src/services/disk_gate.rs:420`.
+      - The hold message and the cleanup log line both name the reading they used (`disk_gate.rs:246`).
+      - `LOTAR_DISK_FREE_GB` is still checked before any real reading (`disk_gate.rs:414`).
+      - The new test `the_reading_counts_purgeable_space_on_macos_and_is_statvfs_elsewhere` could not have passed before the fix. It relies on the unit-test ctor setting `LOTAR_DISK_FREE_GB`; the ctor does set it (`crates/lotar-core/tests/common/unit_test_environment.rs:35`, included through `crates/lotar-agent/src/lib.rs:25`).
+    - **FFI:** every CoreFoundation object the code creates or copies is released exactly once, and the value's type is checked before it is read as a number. No new crate.
+    - **Docs:** the Disk gate section of `docs/help/agent.md` matches the code.
+    - **Reran, all passed:**
+      - `npm ci`
+      - `cargo nextest run -p lotar-agent --lib disk_gate` (6 tests)
+      - `cargo clippy -p lotar-agent --all-targets`
+      - `cargo build --bin lotar`, then `cargo nextest run -p lotar-lib --test integration dev837`
+      - `rustfmt --check` and `prettier --check` on the changed files
+    - **Not rerun:** the full `npm run lint`, `npm test` and `npm run smoke`; the merge runs them. No UI changed, so no screenshots were needed.
+    - The worktree is clean.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8f3f8ba5dc82de3415c9d8a71809877ed2ad528c1e1d86761e231e60fffc37fb
+description: |-
+  Found 2026-11-27 on the owner's Mac: Data volume 865 of 926 GB used, the disk gate read 61 GB free; after the local Time Machine snapshots went, 160 GB free. Snapshot space is purgeable: macOS frees it by itself when space runs short. read_free (crates/lotar-agent/src/services/disk_gate.rs:402) uses fs2::available_space (statvfs f_bavail), which leaves purgeable space out, so the gate holds jobs at the floor (owner's config 30 GB, default 60 GB) though the space is there. 2026-11-26 the gate held jobs from 09:52 at 37 GB free while the snapshots held about 420 GB.
+
+  Owner 2026-11-27, asked whether lotar should count purgeable space: "lotar counts purgeable (Recommended)".
+
+  Done when: on macOS the gate reads the space available for important use (NSURLVolumeAvailableCapacityForImportantUsageKey, which includes purgeable space; statvfs elsewhere), the hold message names which reading it used, LOTAR_DISK_FREE_GB still overrides it, and a test covers the reading.
+history:
+- at: 2026-11-27T17:12:20.978376+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T17:12:21.708519+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A8f3f8ba5dc82de3415c9d8a71809877ed2ad528c1e1d86761e231e60fffc37fb
+- at: 2026-11-27T17:16:29.529219+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T17:16:40.145657+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T17:18:02.408469+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T17:18:02.744439+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-837"]}'
+- at: 2026-11-27T17:18:09.198131+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

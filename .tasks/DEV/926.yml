@@ -1,12 +1,55 @@
 title: DEV's Prerequisites rule keeps the ticket Blocked, so the daily automation run tells it again
-status: Todo
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
+assignee: '@merge'
 created: 2026-11-27T09:45:21.828627+00:00
+modified: 2026-11-27T17:18:51.401469+00:00
 relationships:
   related:
   - DEV-902
+comments:
+- date: 2026-11-27T17:17:32.335814+00:00
+  author: mallox
+  text: |-
+    Answer: yes (Yes, set status InProgress)
+
+    By voice, 2026-11-27: Yes, set InProgress (2026-11-27 morning report) (answered in INBOX-823)
+- date: 2026-11-27T17:18:21.135599+00:00
+  author: claude
+  text: |-
+    DEV's "Prerequisites done" rule now moves the ticket out of Blocked (your answer: yes, set InProgress).
+
+    - `.tasks/DEV/automation.yml`: the `unblocked` action now has `set: status: InProgress`, the same as the agent-team template after DEV-902. `remove tags [waits]`, `agent` and `tell_agent` are unchanged.
+    - InProgress starts no `updated` rule. The only rules that match it are manual, and "Stalled: continue the unblocked ticket" already expects InProgress.
+    - Commit `b58948765` on `agent/DEV-926`.
+  report:
+    commits:
+    - hash: b58948765
+      what: DEV Prerequisites rule sets status InProgress on unblocked
+    checks:
+    - command: lotar config validate --project DEV
+      result: passed
+      reason: valid; the 'unknown type Change' warning predates this change
+    - command: 'lotar automation run ''Prerequisites done: continue the waiting ticket'' --dry-run'
+      result: passed
+      reason: rule parses, no Blocked ticket matches now
+    - command: npx prettier --check .tasks/DEV/automation.yml
+      result: passed
+    - command: npm test / npm run smoke
+      result: not_run
+      reason: config-only change, the merge runs the full suites
+    next: Merge agent lands agent/DEV-926
+- date: 2026-11-27T17:18:46.543894+00:00
+  author: claude
+  text: |-
+    Review: nothing to review
+
+    - The branch has one commit, `b58948765`, and it changes only `.tasks/DEV/automation.yml`: the `unblocked` action gets `set: status: InProgress`, with a comment quoting your answer from 2026-11-27.
+    - The review job stops when a branch changes only `.tasks`, so I reran no checks.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2b00eb58668bb2b8a95dcc6ea50e3cd36e4bc99f856f8ff125e4c5e74ff79950
 description: |-
   Found in the DEV-902 review (2026-11-27). The rule "Prerequisites done: continue the waiting ticket" in `.tasks/DEV/automation.yml` (line 1048) has no `set` that moves the ticket out of Blocked. docs/help/automation.md (When prerequisites are done) says such a rule needs one: `lotar automation run` fires `unblocked` on every run while the ticket still matches. The comment above the rule says the daily `repos.ts --fix` runs it, so while the @fix job waits for a slot, each daily run tells the agent again. DEV-902 fixed the same gap in the agent-team template (`set: status: InProgress`).
 
@@ -17,3 +60,50 @@ description: |-
   - [ ] The DEV rule's `unblocked` action sets `status: InProgress` (or the owner picks another way out of Blocked); its `remove tags [waits]`, `agent` and `tell_agent` stay.
 tags:
 - owner
+history:
+- at: 2026-11-27T17:17:32.335814+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-11-27T17:17:32.981557+00:00
+  actor: mallox
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-27T17:17:36.951792+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T17:17:37.721676+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2b00eb58668bb2b8a95dcc6ea50e3cd36e4bc99f856f8ff125e4c5e74ff79950
+- at: 2026-11-27T17:18:21.135599+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T17:18:30.154620+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T17:18:46.543894+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T17:18:51.401469+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

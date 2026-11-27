@@ -1,11 +1,52 @@
 title: Release v0.16.1
-status: Todo
+status: Merging
 priority: Medium
 type: Chore
 reporter: claude
-assignee: mallox
+assignee: '@merge'
 created: 2026-11-27T04:12:22.007541+00:00
-modified: 2026-11-27T04:12:22.701311+00:00
+modified: 2026-11-27T17:20:19.340988+00:00
+comments:
+- date: 2026-11-27T17:17:33.897340+00:00
+  author: claude
+  text: 'Owner 2026-11-27 (morning report), asked whether to release v0.16.1 now: "Release now (Recommended)". Patch bump; follow .github/skills/release/SKILL.md.'
+- date: 2026-11-27T17:19:08.682248+00:00
+  author: claude
+  text: |-
+    Steps 1–2 done: version bump to 0.16.1 committed on `agent/DEV-924` (`7bb3e6b0e`); the tag follows after the merge.
+
+    - Step 1: no ticket waits for this release (`lotar task relationships DEV-924 --kind blocks` is empty). The 31 tickets with commits on main since `v0.16.0` that were in no release are now in release 0.16.1 (#14, 33/34 done; only DEV-924 open).
+    - Step 2: patch bump, as the owner asked ("Release now", 2026-11-27). `Cargo.toml` workspace version and the five `=0.16.1` pins, plus `Cargo.lock` from `cargo update --workspace --offline`. No docs name the release number (`docs/help/releases.md` and `docs/openapi.json` use 0.16.0 only as an example).
+    - Diff is 24 lines, so no `small-diff` tag.
+  report:
+    commits:
+    - hash: 7bb3e6b0e
+      what: bump to 0.16.1 (Cargo.toml workspace version, five =0.16.1 crate pins, Cargo.lock)
+    checks:
+    - command: cargo check --workspace --locked
+      result: passed
+    - command: npm run lint
+      result: not_run
+      reason: version-only change; the merge runs the full suites
+    - command: npm run test:agent
+      result: not_run
+      reason: the merge runs it
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: 'After merge: @fix runs release skill steps 3-8 (QA green, signed tag v0.16.1, release workflow, brew upgrade, close, open Release v0.16.2)'
+- date: 2026-11-27T17:20:13.333408+00:00
+  author: claude
+  text: |-
+    Review: passed. `7bb3e6b0e` bumps the version to 0.16.1 as the release guide says, and nothing else.
+
+    - Read: the diff, `.github/skills/release/SKILL.md`, the Pre-Release Checklist in `docs/release-guide.md`, the previous release commit `e1bedb96f` (v0.16.0), and the owner's "Release now" from 2026-11-27 (comment #1). A patch bump needs no further OK.
+    - Diff: `Cargo.toml` has the `[workspace.package]` version and the five `=0.16.1` pins. `Cargo.lock` has the six workspace packages. This matches what `e1bedb96f` changed. No other file names the release number: the `0.16.0` hits are examples in docs and tests, and the `0.16.8` in `package-lock.json` is a dependency.
+    - Step 1 holds: `lotar task relationships DEV-924` is empty. Every `DEV-N` that has a commit in `v0.16.0..main` is in release #14, which holds 34 tickets, and only DEV-924 is not Done.
+    - Reran: `npm ci` passed and `cargo check --workspace --locked` passed. `git status` is clean afterwards.
+    - Nothing to file. The tag, QA and publish steps come after the merge, as the fix agent says.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A74dac8958ad2432482ba2e9ec2455024221bcdded1ad7f3feb5c03ae66698252
 releases:
 - 14
 description: |-
@@ -18,3 +59,50 @@ history:
   changes:
   - field: releases
     new: '#14'
+- at: 2026-11-27T17:17:33.897340+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T17:17:34.242944+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: mallox
+    new: '@fix'
+- at: 2026-11-27T17:17:38.014747+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T17:17:38.742395+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A74dac8958ad2432482ba2e9ec2455024221bcdded1ad7f3feb5c03ae66698252
+- at: 2026-11-27T17:19:08.682248+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T17:19:17.354053+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T17:20:13.333408+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T17:20:19.340988+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

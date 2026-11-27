@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T17:27:28.763305+00:00
-modified: 2026-11-27T11:43:25.375926+00:00
+modified: 2026-11-27T17:18:31.326757+00:00
 relationships:
   depends_on:
   - DEV-796
@@ -116,6 +116,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2d1de45ca813895e721f5f0dfbce0dedb4b74fa2f6b6424e61f6fe4f89e6a087
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae5d32d07d75eefa7b9b282fad00b618f216e2fadddf23234aa919e93eb16659f
+releases:
+- 14
 description: |-
   Found in the DEV-796 review (2026-11-26). The rule "Prerequisites done: continue the waiting ticket" in `crates/lotar-lib/src/cli/handlers/config/init/templates/agent-team.yml` (on `agent/DEV-796`, not yet on main) has no `set` that moves the ticket out of Blocked. docs/help/automation.md (When prerequisites are done) says such a rule needs one, because `lotar automation run` fires `unblocked` on every run while the ticket matches. The ticket only leaves Blocked at job_started. While the job waits for a slot, each scheduled run tells the agent again and leaves another "told no agent on <ID> yet" comment.
 
@@ -261,3 +263,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-796"],"related":["DEV-796","DEV-926","DEV-843","DEV-917"]}'
     new: '{"depends_on":["DEV-796"],"related":["DEV-796","DEV-926","DEV-843","DEV-917","DEV-916"]}'
+- at: 2026-11-27T17:18:31.326757+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T23:41:56.315913+00:00
-modified: 2026-11-27T09:10:42.752369+00:00
+modified: 2026-11-27T17:18:31.632465+00:00
 relationships:
   related:
   - DEV-892
@@ -85,6 +85,8 @@ comments:
       reason: scratch copy of main's .tasks
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A45ab338036c3819f2b1bfb98fa1220ef8844a7f4b07497578c6c53f9d4a063dc
+releases:
+- 14
 description: |-
   ## Found
   Found by the DEV-892 review, 2026-11-26. DEV-892 (`15a6d7cf1`) copied the standards automation.yml into `.tasks/DEV/automation.yml` at STD-354 and kept lotar's own rule 'Login expired: ask the owner to sign in' (DEV-835) after it. STD-370 (standards `380f51c2`, later the same day) puts its own 'Login expired' rule into the shared file. The next copy brings in both, so one auth pause files two sign-in tickets for mallox.
@@ -177,3 +179,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-27T17:18:31.632465+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T23:14:46.615229+00:00
-modified: 2026-11-27T13:27:37.004392+00:00
+modified: 2026-11-27T17:18:31.480547+00:00
 relationships:
   depends_on:
   - DEV-901
@@ -109,6 +109,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A516d0b27722fd34b3ce0f2f549950eacbd305944dc80892f651586002d0fbb2f
+releases:
+- 14
 description: |-
   Part of the owner's route B on DEV-901 (2026-11-26, INBOX-805): besides fix and research jobs in dyson's T3 Code, the profiles lotar runs through harnessmux (`review`, `review-claude`, `review-light`, `triage`, `triage-codex`) run on dyson over ssh. `merge` stays on the Mac. Builds on DEV-901's `agent.hosts`, placement, wake, worktree push/fetch/re-sign and ticket socket.
 
@@ -285,3 +287,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-931","DEV-916","DEV-930","DEV-801","DEV-920","DEV-929"]}'
     new: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-931","DEV-916","DEV-930","DEV-801","DEV-920","DEV-929","DEV-918"]}'
+- at: 2026-11-27T17:18:31.480547+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

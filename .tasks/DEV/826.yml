@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T04:27:39.844205+00:00
-modified: 2026-11-27T14:42:44.714834+00:00
+modified: 2026-11-27T17:18:31.009255+00:00
 relationships:
   depends_on:
   - DEV-782
@@ -172,6 +172,8 @@ references:
 - attachment: dev826-after-next-light-1440.bfb15cf0e8196fbeef8d4812fb395ccd.png
 - attachment: dev826-after-next-light-1920.130dbeeca9805e0ef86babdc6991aa24.png
 - attachment: dev826-after-next-light-390.2b68136c1a915a6fc169d515d488e336.png
+releases:
+- 14
 description: |-
   Found while reviewing DEV-782.
 
@@ -459,3 +461,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-782"],"related":["DEV-782","DEV-765","DEV-771","DEV-915","DEV-909","DEV-918","DEV-928"]}'
     new: '{"depends_on":["DEV-782"],"related":["DEV-782","DEV-765","DEV-771","DEV-915","DEV-909","DEV-918","DEV-928","DEV-931"]}'
+- at: 2026-11-27T17:18:31.009255+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

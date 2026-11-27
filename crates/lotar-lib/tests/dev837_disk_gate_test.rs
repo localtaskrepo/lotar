@@ -75,7 +75,7 @@ fn a_queued_worktree_job_waits_while_the_disk_is_under_the_floor() {
         std::thread::sleep(Duration::from_millis(100));
     };
     let reason = queue["disk_hold"]["reason"].as_str().unwrap();
-    assert_eq!(reason, "41.5 GB free on the job worktrees' disk, under the floor of 60 GB");
+    assert_eq!(reason, "41.5 GB free on the job worktrees' disk (LOTAR_DISK_FREE_GB), under the floor of 60 GB");
     assert!(queue["disk_hold"]["since"].as_str().is_some_and(|since| since.ends_with('Z')), "{queue}");
     assert!(queue["memory_hold"].is_null(), "{queue}");
     assert_eq!(queue["worker_state"], "active", "{queue}");

@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T10:20:52.236519+00:00
-modified: 2026-11-27T12:16:08.232858+00:00
+modified: 2026-11-27T17:18:32.220589+00:00
 relationships:
   depends_on:
   - DEV-801
@@ -93,6 +93,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab7f77e63bce99126e80231f5f3b0c27ac0fa98c35f4bdc688935963707dea1a2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6c71231383698f113295c8bdacd74cacb1854eb4a1a061481db1c888220d518a
+releases:
+- 14
 description: |-
   Found: in the review of DEV-801, `smoke/tests/ui.agent-jobs.smoke.spec.ts` ('shows the prompt and settings a finished job ran with behind its Instructions button') gets a try/catch around `settings.waitFor` that dumps toggle and panel state, with the comment "Seen once under the full suite's load (DEV-801), never alone". The flake it targets (DEV-801 comment 11, DEV-832 merge 2026-11-25) predates DEV-875 (`cb61901d7`, test waits for the loaded log's header) and DEV-888 (the panel stays open across the remount), which found and fixed its cause.
   Check: `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts` and the full `npm run -s smoke` once the diagnostic is gone.
@@ -217,3 +219,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-801"],"related":["DEV-801","DEV-875","DEV-832","DEV-888","DEV-913","DEV-911"]}'
     new: '{"depends_on":["DEV-801"],"related":["DEV-801","DEV-875","DEV-832","DEV-888","DEV-913","DEV-911","DEV-929"]}'
+- at: 2026-11-27T17:18:32.220589+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T11:16:51.136837+00:00
-modified: 2026-11-27T15:46:15.428183+00:00
+modified: 2026-11-27T17:18:32.274376+00:00
 relationships:
   blocks:
   - DEV-933
@@ -106,6 +106,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A609c84c563d445759d43a78c6c108a2f5c69d4df44be9371c0aeb335f5e8a5d6
+releases:
+- 14
 description: |-
   Found in the review of DEV-911 (`7ecdf8f50`). Review and triage jobs rarely change files, so the merge can go ahead. Any other `claude`/`codex` profile with `host` can strand work on the host.
 
@@ -227,3 +229,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-933"],"related":["DEV-911","DEV-901","DEV-933","DEV-934","DEV-928","DEV-826","DEV-918","DEV-808","DEV-932"]}'
     new: '{"blocks":["DEV-933"],"related":["DEV-911","DEV-901","DEV-933","DEV-934","DEV-928","DEV-826","DEV-918","DEV-808","DEV-932","DEV-936"]}'
+- at: 2026-11-27T17:18:32.274376+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

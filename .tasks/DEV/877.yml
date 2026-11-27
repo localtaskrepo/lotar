@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T19:54:54.990569+00:00
-modified: 2026-11-27T10:16:55.486077+00:00
+modified: 2026-11-27T17:18:31.218927+00:00
 relationships:
   related:
   - DEV-849
@@ -183,6 +183,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2e2b32d886df49058f21c8ffec0c11b99179a7ef8827eafbf638f478e01131b3
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A21ab9d8a75352d745b41e79794c66c74598112d86f236b011a4aa7af178a5344
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A62ff6f8adf791bf76d3d0b906e810fd03ee6c984d2439da3a277568864ce0ede
+releases:
+- 14
 description: |-
   T3 Code 0.1.12 adds typed turn results (t3_submit_output) and MCP Events webhooks/streams for milestones. lotar's T3 runner could take a structured result instead of parsing the final reply, and get live state instead of polling (related DEV-849). Owner chose to file this 2026-11-25: "the runner asks for a typed result and uses it, takes events for live state, and tests cover both with the fake t3."
 
@@ -503,3 +505,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-849","DEV-320","DEV-857","DEV-870","DEV-871","DEV-876","DEV-886","DEV-895","DEV-862"]}'
     new: '{"related":["DEV-849","DEV-320","DEV-857","DEV-870","DEV-871","DEV-876","DEV-886","DEV-895","DEV-862","DEV-901"]}'
+- at: 2026-11-27T17:18:31.218927+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T09:51:24.772911+00:00
-modified: 2026-11-27T13:22:34.868368+00:00
+modified: 2026-11-27T17:18:32.053003+00:00
 relationships:
   related:
   - DEV-919
@@ -90,6 +90,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae8bfa107895de32b19a3d591cc09be5809515d27745945fa3457607ba6bb230d
+releases:
+- 14
 description: 'Found in DEV-919''s review (2026-11-27). Cargo reads `.cargo/config.toml` from the current directory, not the manifest''s, so `cargo build --manifest-path <copy>/Cargo.toml` run from checkout A sets `LOTAR_CHECKOUT_DIR` to A while building the copy; A''s next build then keeps the copy''s `LOTAR_DOCS_DIR`. Check: in a scratch workspace with the DEV-919 config, `cd a && cargo run --manifest-path ../b/Cargo.toml --target-dir t && cargo run --target-dir t` prints b''s path twice. Done when: the build scripts rerun per checkout without relying on cwd, for example by also emitting `rerun-if-changed` on an absolute path under CARGO_MANIFEST_DIR, with a test.'
 tags:
 - health
@@ -158,3 +160,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-27T17:18:32.053003+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

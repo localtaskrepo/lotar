@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T09:55:29.362385+00:00
-modified: 2026-11-27T15:21:44.654839+00:00
+modified: 2026-11-27T17:18:32.103957+00:00
 relationships:
   related:
   - DEV-917
@@ -89,6 +89,8 @@ comments:
       result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af0931223529be1e84dfc6bbd530ac8faa9a283fab9779d47ef5d31204c94ca5b
+releases:
+- 14
 description: |-
   Found in the DEV-917 review (2026-11-27).
 
@@ -188,3 +190,8 @@ history:
   - field: relationships
     old: '{"related":["DEV-917","DEV-918","DEV-931","DEV-826"]}'
     new: '{"related":["DEV-917","DEV-918","DEV-931","DEV-826","DEV-932"]}'
+- at: 2026-11-27T17:18:32.103957+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

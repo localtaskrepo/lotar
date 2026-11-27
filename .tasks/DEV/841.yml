@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T17:20:58.415465+00:00
-modified: 2026-11-27T11:24:03.042291+00:00
+modified: 2026-11-27T17:18:31.058484+00:00
 relationships:
   depends_on:
   - DEV-778
@@ -100,6 +100,8 @@ references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A44d0364e44e95130a1b473670bcf8e9bd10004deb2ba5f7d03d6fddab04b573d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac4c18a97c8b2f8f8d4f765fd3ee7b97c0634731fb1521c1f15e6bd4f0a361127
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A237469a2d13990eb54ae5ad310e701763f2ce308c2182e50589c70015883809a
+releases:
+- 14
 description: |-
   Found in the DEV-778 review. `AgentHandler` worktree cleanup (`crates/lotar-lib/src/cli/handlers/agent.rs` ~665) calls `sweep_build_root(&repo_root, config, None)` once with the global config only. A project that sets `agent_worktree_build_root` itself (allowed: `dev153_worktree_settings_test::build_root_is_settable`) gets its root swept only through a removed worktree's `target` link, so the last worktree's leftover in that root stays.
 
@@ -294,3 +296,8 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-778"],"related":["DEV-778","DEV-905","DEV-919","DEV-917","DEV-901"]}'
     new: '{"depends_on":["DEV-778"],"related":["DEV-778","DEV-905","DEV-919","DEV-917","DEV-901","DEV-801"]}'
+- at: 2026-11-27T17:18:31.058484+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

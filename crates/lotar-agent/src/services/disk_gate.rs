@@ -156,7 +156,7 @@ impl Gate {
         (self.config.min_free_gb as f64 * GIB) as u64
     }
 
-    fn free(&self) -> Result<u64, String> {
+    fn free(&self) -> Result<Free, String> {
         read_free(&self.volume)
     }
 }
@@ -196,13 +196,13 @@ pub fn clean(tasks_dir: &Path) {
         return;
     }
     let floor = gate.floor_bytes();
-    if !gate.free().is_ok_and(|free| free < floor) {
+    if !gate.free().is_ok_and(|free| free.bytes < floor) {
         return;
     }
     let running = running_branches(tasks_dir, &gate.branch_prefix);
     let idle = Duration::from_secs(gate.config.idle_hours.saturating_mul(3600));
-    let removed = clean_idle_builds(root, &gate.branch_prefix, &running, idle, SystemTime::now(), || gate.free().is_ok_and(|free| free >= floor));
-    let free = gate.free().ok().map(|free| format!("{:.1} GB free, floor {} GB", free as f64 / GIB, gate.config.min_free_gb));
+    let removed = clean_idle_builds(root, &gate.branch_prefix, &running, idle, SystemTime::now(), || gate.free().is_ok_and(|free| free.bytes >= floor));
+    let free = gate.free().ok().map(|free| format!("{:.1} GB free ({}), floor {} GB", free.bytes as f64 / GIB, free.reading, gate.config.min_free_gb));
     // Another process may have saved a reading meanwhile: keep it.
     let mut state = load(&path);
     state.last_cleanup = Some(Cleanup { at: now, removed, free });
@@ -224,7 +224,7 @@ pub fn status(tasks_dir: &Path) -> Option<DiskHold> {
 }
 
 /// A failed reading holds nothing and ends a hold.
-fn decide(previous: &GateState, free: Option<u64>, now: Timestamp, config: &AgentDiskGateConfig) -> GateState {
+fn decide(previous: &GateState, free: Option<Free>, now: Timestamp, config: &AgentDiskGateConfig) -> GateState {
     let floor = (config.min_free_gb as f64 * GIB) as u64;
     let kept = GateState {
         checked_at: Some(now),
@@ -234,7 +234,7 @@ fn decide(previous: &GateState, free: Option<u64>, now: Timestamp, config: &Agen
         ..GateState::default()
     };
     match free {
-        Some(free) if free < floor => GateState { held_since: previous.held_since.or(Some(now)), reason: Some(free_text(free, config)), ..kept },
+        Some(free) if free.bytes < floor => GateState { held_since: previous.held_since.or(Some(now)), reason: Some(free_text(free, config)), ..kept },
         _ => {
             let ended = previous.held_since.map(|since| EndedHold { reason: previous.reason.clone().unwrap_or_default(), since, until: now });
             GateState { last_hold: ended.or(kept.last_hold.clone()), ..kept }
@@ -242,8 +242,8 @@ fn decide(previous: &GateState, free: Option<u64>, now: Timestamp, config: &Agen
     }
 }
 
-fn free_text(free: u64, config: &AgentDiskGateConfig) -> String {
-    format!("{:.1} GB free on the job worktrees' disk, under the floor of {} GB", free as f64 / GIB, config.min_free_gb)
+fn free_text(free: Free, config: &AgentDiskGateConfig) -> String {
+    format!("{:.1} GB free on the job worktrees' disk ({}), under the floor of {} GB", free.bytes as f64 / GIB, free.reading, config.min_free_gb)
 }
 
 /// Writes each hold's start and end and each cleanup once, for `lotar
@@ -398,15 +398,86 @@ fn last_work(worktree: &Path, target: &Path, profiles: &[String]) -> SystemTime 
     paths.iter().filter_map(|path| std::fs::metadata(path).and_then(|meta| meta.modified()).ok()).max().unwrap_or(SystemTime::UNIX_EPOCH)
 }
 
-/// `LOTAR_DISK_FREE_GB` replaces the reading, for tests: free GB, as `12.5`.
-fn read_free(volume: &Path) -> Result<u64, String> {
+/// A free space reading and which reading it is, for the hold message.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Free {
+    bytes: u64,
+    reading: &'static str,
+}
+
+/// On macOS the space available for important use, which counts purgeable
+/// space (local Time Machine snapshots, caches) that macOS frees by itself
+/// when space runs short (DEV-937); statvfs's available space elsewhere, or
+/// when macOS gives no such reading. `LOTAR_DISK_FREE_GB` replaces the
+/// reading, for tests: free GB, as `12.5`.
+fn read_free(volume: &Path) -> Result<Free, String> {
     if let Ok(fake) = std::env::var("LOTAR_DISK_FREE_GB") {
         let gb = fake.trim().parse::<f64>().ok().filter(|gb| *gb >= 0.0).ok_or_else(|| format!("LOTAR_DISK_FREE_GB: bad value '{fake}'"))?;
-        return Ok((gb * GIB) as u64);
+        return Ok(Free { bytes: (gb * GIB) as u64, reading: "LOTAR_DISK_FREE_GB" });
     }
+    read_volume(volume)
+}
+
+fn read_volume(volume: &Path) -> Result<Free, String> {
     // The volume folder may not exist yet: its nearest existing parent is on the same disk.
     let existing = volume.ancestors().find(|dir| dir.is_dir()).unwrap_or(volume);
-    fs2::available_space(existing).map_err(|err| format!("free space of {}: {err}", existing.display()))
+    #[cfg(target_os = "macos")]
+    if let Some(bytes) = important_usage::available(existing) {
+        return Ok(Free { bytes, reading: IMPORTANT_USAGE });
+    }
+    let bytes = fs2::available_space(existing).map_err(|err| format!("free space of {}: {err}", existing.display()))?;
+    Ok(Free { bytes, reading: "statvfs" })
+}
+
+#[cfg(target_os = "macos")]
+const IMPORTANT_USAGE: &str = "available for important use, purgeable included";
+
+/// `NSURLVolumeAvailableCapacityForImportantUsageKey`, through CoreFoundation.
+#[cfg(target_os = "macos")]
+mod important_usage {
+    use std::ffi::c_void;
+    use std::os::unix::ffi::OsStrExt;
+    use std::path::Path;
+
+    type CfRef = *const c_void;
+    /// `kCFNumberSInt64Type`.
+    const SINT64: isize = 4;
+
+    #[link(name = "CoreFoundation", kind = "framework")]
+    unsafe extern "C" {
+        static kCFURLVolumeAvailableCapacityForImportantUsageKey: CfRef;
+        fn CFURLCreateFromFileSystemRepresentation(allocator: CfRef, buffer: *const u8, len: isize, is_directory: u8) -> CfRef;
+        fn CFURLCopyResourcePropertyForKey(url: CfRef, key: CfRef, value: *mut CfRef, error: *mut CfRef) -> u8;
+        fn CFGetTypeID(value: CfRef) -> usize;
+        fn CFNumberGetTypeID() -> usize;
+        fn CFNumberGetValue(number: CfRef, kind: isize, value: *mut c_void) -> u8;
+        fn CFRelease(value: CfRef);
+    }
+
+    /// `None` when macOS gives no reading for the volume.
+    pub fn available(dir: &Path) -> Option<u64> {
+        let path = dir.as_os_str().as_bytes();
+        let len = isize::try_from(path.len()).ok()?;
+        // SAFETY: the buffer is `len` bytes long; each object created or
+        // copied here is released once, and the number is read only after
+        // its type is checked.
+        unsafe {
+            let url = CFURLCreateFromFileSystemRepresentation(std::ptr::null(), path.as_ptr(), len, 1);
+            if url.is_null() {
+                return None;
+            }
+            let mut value: CfRef = std::ptr::null();
+            let copied = CFURLCopyResourcePropertyForKey(url, kCFURLVolumeAvailableCapacityForImportantUsageKey, &mut value, std::ptr::null_mut());
+            CFRelease(url);
+            if copied == 0 || value.is_null() {
+                return None;
+            }
+            let mut bytes: i64 = 0;
+            let read = CFGetTypeID(value) == CFNumberGetTypeID() && CFNumberGetValue(value, SINT64, (&raw mut bytes).cast()) != 0;
+            CFRelease(value);
+            if read { u64::try_from(bytes).ok() } else { None }
+        }
+    }
 }
 
 fn hold_of(state: &GateState) -> Option<DiskHold> {
@@ -444,8 +515,8 @@ mod tests {
         Timestamp::from_second(1_800_000_000 + secs).unwrap()
     }
 
-    fn gb(value: f64) -> Option<u64> {
-        Some((value * GIB) as u64)
+    fn gb(value: f64) -> Option<Free> {
+        Some(Free { bytes: (value * GIB) as u64, reading: "statvfs" })
     }
 
     #[test]
@@ -454,19 +525,41 @@ mod tests {
         let held = decide(&GateState::default(), gb(41.5), at(0), &config);
         let hold = hold_of(&held).unwrap();
         assert_eq!(hold.since, at(0));
-        assert_eq!(hold.reason, "41.5 GB free on the job worktrees' disk, under the floor of 60 GB");
+        assert_eq!(hold.reason, "41.5 GB free on the job worktrees' disk (statvfs), under the floor of 60 GB");
         // Still under: the first since stays.
         let still = decide(&held, gb(59.9), at(30), &config);
         assert_eq!(hold_of(&still).unwrap().since, at(0));
         // At the floor, held jobs start.
         let open = decide(&still, gb(60.0), at(60), &config);
         assert!(hold_of(&open).is_none());
-        let ended = EndedHold { reason: "59.9 GB free on the job worktrees' disk, under the floor of 60 GB".to_string(), since: at(0), until: at(60) };
+        let ended =
+            EndedHold { reason: "59.9 GB free on the job worktrees' disk (statvfs), under the floor of 60 GB".to_string(), since: at(0), until: at(60) };
         assert_eq!(open, GateState { checked_at: Some(at(60)), floor_gb: Some(60), last_hold: Some(ended), ..GateState::default() });
         // A failed reading holds nothing and ends the hold at its time.
         let failed = decide(&held, None, at(90), &config);
         assert!(hold_of(&failed).is_none());
         assert_eq!(failed.last_hold.map(|hold| hold.until), Some(at(90)));
+    }
+
+    /// The tests' `LOTAR_DISK_FREE_GB` stands in for `read_free`'s reading;
+    /// this reads the disk.
+    #[test]
+    fn the_reading_counts_purgeable_space_on_macos_and_is_statvfs_elsewhere() {
+        let dir = tempfile::tempdir().unwrap();
+        let free = read_volume(&dir.path().join("not/yet")).unwrap();
+        let statvfs = fs2::available_space(dir.path()).unwrap();
+        #[cfg(target_os = "macos")]
+        {
+            assert_eq!(free.reading, IMPORTANT_USAGE);
+            // Purgeable space comes on top; other writers move both a little.
+            assert!(free.bytes as f64 >= statvfs as f64 * 0.9, "{free:?}, statvfs {statvfs}");
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            assert_eq!(free.reading, "statvfs");
+            assert!(free.bytes.abs_diff(statvfs) < 1 << 30, "{free:?}, statvfs {statvfs}");
+        }
+        assert_eq!(read_free(dir.path()).unwrap().reading, "LOTAR_DISK_FREE_GB");
     }
 
     #[test]
@@ -478,19 +571,19 @@ mod tests {
         let mut held = decide(&open, gb(41.5), at(5), &config);
         assert_eq!(
             log.lines(&held),
-            ["[lotar] disk hold started: 41.5 GB free on the job worktrees' disk, under the floor of 60 GB, since 2027-01-15T08:00:05Z"]
+            ["[lotar] disk hold started: 41.5 GB free on the job worktrees' disk (statvfs), under the floor of 60 GB, since 2027-01-15T08:00:05Z"]
         );
         held.last_cleanup = Some(Cleanup {
             at: at(6),
             removed: vec!["removed the cargo build profiles debug from /w/T-1/target".to_string()],
-            free: Some("50.0 GB free, floor 60 GB".to_string()),
+            free: Some("50.0 GB free (statvfs), floor 60 GB".to_string()),
         });
         let still = decide(&held, gb(50.0), at(35), &config);
         assert_eq!(
             log.lines(&still),
             [
                 "[lotar] disk gate: removed the cargo build profiles debug from /w/T-1/target at 2027-01-15T08:00:06Z",
-                "[lotar] disk gate: after the cleanup, 50.0 GB free, floor 60 GB",
+                "[lotar] disk gate: after the cleanup, 50.0 GB free (statvfs), floor 60 GB",
             ],
             "the same hold with another reason starts once"
         );
@@ -501,7 +594,7 @@ mod tests {
         assert_eq!(
             log.lines(&back),
             [
-                "[lotar] disk hold ended: 50.0 GB free on the job worktrees' disk, under the floor of 60 GB, since 2027-01-15T08:00:05Z, until 2027-01-15T08:12:10Z"
+                "[lotar] disk hold ended: 50.0 GB free on the job worktrees' disk (statvfs), under the floor of 60 GB, since 2027-01-15T08:00:05Z, until 2027-01-15T08:12:10Z"
             ]
         );
         assert!(log.lines(&decide(&back, gb(61.0), at(760), &config)).is_empty(), "an ended hold is logged once");

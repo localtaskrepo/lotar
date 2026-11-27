@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T00:07:42.828735+00:00
-modified: 2026-11-27T11:43:26.216399+00:00
+modified: 2026-11-27T17:18:31.731311+00:00
 relationships:
   depends_on:
   - DEV-861
@@ -106,6 +106,8 @@ comments:
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A367ce76bdd74d6b2c9958f1b72bf14db3c8b03cfb9dbb9380e87009f17bca911
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abe3c3ad780c978dbb055b88f6bd4e3e2272ca95b7a80f2bb8800e3125b731dcd
+releases:
+- 14
 description: |-
   Found 2026-11-26 in the DEV-861 review: the DEV-796 branch adds `while [ ! -f "{go}" ]; do sleep 0.1; done` in the stub script `template-team-agent.sh` (`crates/lotar-lib/tests/agent_automation_integration_test.rs`, about line 2966 on that branch). Two of these scripts from test runs started at 12:37 and 12:38 were still running at 16:07 (ppid 1), under `$TMPDIR/.lotar-test-scratch/`.
 
@@ -225,3 +227,8 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-27T17:18:31.731311+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'

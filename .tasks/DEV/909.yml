@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T19:31:53.927572+00:00
-modified: 2026-11-27T14:04:04.228758+00:00
+modified: 2026-11-27T17:18:31.430213+00:00
 relationships:
   blocks:
   - DEV-918
@@ -233,6 +233,8 @@ references:
 - attachment: before-thread-dark-390.69155400910e68de443f3c3e929f1bef.png
 - attachment: before-thread-light-1440.13643bec48170f1b4741427cfa0df153.png
 - attachment: before-thread-light-390.c8944686b53d8d2b052973384d4966d5.png
+releases:
+- 14
 description: |-
   Ravi asked on 2026-11-24 to review the full chain of agent work in the ticket timeline. The approach is agreed in DEV-850: [docs/research/inline-transcript-review.md](https://github.com/localtaskrepo/lotar/blob/main/docs/research/inline-transcript-review.md). Ravi chose on 2026-11-26: "expand (Load on open only)".
 
@@ -540,3 +542,8 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-918"],"related":["DEV-849","DEV-850","DEV-782","DEV-867","DEV-901","DEV-918","DEV-786","DEV-797","DEV-810","DEV-888","DEV-910","DEV-912","DEV-843","DEV-913","DEV-934"]}'
     new: '{"blocks":["DEV-918"],"related":["DEV-849","DEV-850","DEV-782","DEV-867","DEV-901","DEV-918","DEV-786","DEV-797","DEV-810","DEV-888","DEV-910","DEV-912","DEV-843","DEV-913","DEV-934","DEV-826"]}'
+- at: 2026-11-27T17:18:31.430213+00:00
+  actor: claude
+  changes:
+  - field: releases
+    new: '#14'
