@@ -1,16 +1,17 @@
 title: 'Agent queue: no test covers a queued entry whose ticket was deleted and not re-created'
-status: Blocked
+status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-27T04:02:53.831434+00:00
-modified: 2026-11-27T09:42:12.099999+00:00
+modified: 2026-11-27T12:27:17.873554+00:00
 relationships:
   depends_on:
   - DEV-843
   related:
   - DEV-843
+  - DEV-797
 comments:
 - date: 2026-11-27T09:11:29.108523+00:00
   author: claude
@@ -19,8 +20,47 @@ comments:
 
     - `drop_stale_entry` and the test `an_entry_whose_ticket_was_deleted_leaves_the_queue_without_starting` exist only on `agent/DEV-843` (`4d12bb5c0`), status Merging; main `8efc6c8aa` has neither.
     - Writing the test now would build on unmerged code. Continue when DEV-843 lands: add a test in `crates/lotar-agent/src/services/agent_queue_service.rs` that hard-deletes the queued ticket without re-creating it.
+- date: 2026-11-27T12:25:57.252568+00:00
+  author: claude
+  text: |-
+    Added the test for a queued ticket that is hard-deleted and not re-created.
+
+    - Fast-forwarded `agent/DEV-923` to main `2cbb6ec73`, which has DEV-843 (`03663babd`)
+    - New test `an_entry_whose_ticket_is_gone_leaves_the_queue_without_starting_or_commenting` in `crates/lotar-agent/src/services/agent_queue_service.rs`: reason is `RID-1 no longer exists`, `start_entry` returns Ok (the worker settles it instead of requeueing with one more attempt), queue and parked list are empty, no job is registered, and no file under the tasks dir changes (no comment, no re-created ticket)
+    - The fixture `queued_ticket_that_gets_reused` now wraps `queued_ticket_that_gets_deleted(dir, recreate)`
+  report:
+    commits:
+    - hash: 9fe251fab
+      what: test for a queued ticket hard-deleted and not re-created
+    checks:
+    - command: cargo nextest run -p lotar-agent -E 'test(/an_entry_whose_ticket|reuses_a_deleted/)'
+      result: passed
+    - command: cargo clippy -p lotar-agent --all-targets -- -D warnings
+      result: passed
+    - command: rustfmt --edition 2024 --check agent_queue_service.rs
+      result: passed
+    - command: npm run lint / npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    next: Merge agent/DEV-923
+- date: 2026-11-27T12:27:12.341310+00:00
+  author: claude
+  text: |-
+    Review: passed. The new test covers a queued ticket that is hard-deleted and not re-created, and it passes.
+
+    - Reviewed `9fe251fab` (the only commit in `main..HEAD`; `agent/DEV-923` is HEAD, so this is not a pre-rework copy). It changes only `crates/lotar-agent/src/services/agent_queue_service.rs`, and only in the tests.
+    - Done when is met. `an_entry_whose_ticket_is_gone_leaves_the_queue_without_starting_or_commenting` checks:
+      - the `TaskNotFound` reason, `RID-1 no longer exists`;
+      - `start_entry` returns Ok; the worker loop (`agent_queue_service.rs:919-923`) then settles the entry with `settle_taken(.., None)` and doesn't requeue it, so no attempt is spent;
+      - the pending and parked lists are empty;
+      - no job is in the registry or in `agent_active_jobs`;
+      - no file is added under the tasks dir, so no comment was written and the ticket wasn't re-created.
+    - The fixture split (`queued_ticket_that_gets_deleted(dir, recreate)`) keeps the DEV-843 reuse test unchanged. No stray files, no second branch.
+    - Reran: `npm ci` ok. `cargo nextest run -p lotar-agent -E 'test(/an_entry_whose_ticket|reuses_a_deleted/)'`: 3 passed. `cargo clippy -p lotar-agent --tests -- -D warnings` and `rustfmt --edition 2024 --check` on the file are clean. Full suites not run: the merge runs them (DEV-797).
+    - No UI change, so no screenshots to review. Findings: none. Tickets filed: none.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A028b7825cedd9d889f13fe98fc9c83df6c45dc4198d6be79bfc5618f2ad7019f
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Accdd8ab79d235eede73d91173d406053172e2269c95b3065cdac8d58059a6985
 description: |-
   Found in the DEV-843 review. `drop_stale_entry` has two reasons: the ticket no longer exists (`TaskNotFound`), or a new ticket reuses its ID. The test `an_entry_whose_ticket_was_deleted_leaves_the_queue_without_starting` (`crates/lotar-agent/src/services/agent_queue_service.rs`) covers only the reuse case.
 
@@ -79,3 +119,46 @@ history:
   - field: tags
     old: agent, waits
     new: agent
+- at: 2026-11-27T12:23:35.781168+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-27T12:23:37.271278+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Accdd8ab79d235eede73d91173d406053172e2269c95b3065cdac8d58059a6985
+- at: 2026-11-27T12:25:57.252568+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T12:26:07.693425+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T12:27:12.341310+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T12:27:12.640569+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-843"],"related":["DEV-843"]}'
+    new: '{"depends_on":["DEV-843"],"related":["DEV-843","DEV-797"]}'
+- at: 2026-11-27T12:27:17.873554+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

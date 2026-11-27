@@ -2664,8 +2664,15 @@ mod tests {
         assert!(ambiguous.contains("PRQ-2 is queued for @fix, @review"), "{ambiguous}");
     }
 
-    /// A tasks dir with project RID and one ticket, RID-1, queued for @fix.
+    /// A tasks dir with project RID and one ticket, RID-1, queued for @fix,
+    /// then hard-deleted and created again: the new RID-1 reuses the ID.
     fn queued_ticket_that_gets_reused(dir: &Path) -> (PathBuf, crate::storage::manager::Storage) {
+        queued_ticket_that_gets_deleted(dir, true)
+    }
+
+    /// A tasks dir with project RID and one ticket, RID-1, queued for @fix
+    /// and then hard-deleted; `recreate` creates a new RID-1 afterwards.
+    fn queued_ticket_that_gets_deleted(dir: &Path, recreate: bool) -> (PathBuf, crate::storage::manager::Storage) {
         let tasks_dir = dir.join("tasks");
         std::fs::create_dir_all(&tasks_dir).unwrap();
         std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: RID\n").unwrap();
@@ -2681,7 +2688,9 @@ mod tests {
         let req = AgentJobCreateRequest { ticket_id: "RID-1".into(), prompt: "Work the example".into(), agent: Some("fix".into()), ..Default::default() };
         assert!(AgentQueueService::enqueue(&tasks_dir, req).unwrap());
         crate::services::task_service::TaskService::delete_with_options(&mut storage, "RID-1", None, true).unwrap();
-        assert_eq!(create(&mut storage, "The finding").id, "RID-1", "a hard delete frees the ID");
+        if recreate {
+            assert_eq!(create(&mut storage, "The finding").id, "RID-1", "a hard delete frees the ID");
+        }
         (tasks_dir, storage)
     }
 
@@ -2726,5 +2735,44 @@ mod tests {
         );
         let legacy = AgentQueueEntry { ticket_created: None, ..entry };
         assert_eq!(entry_ticket_gone(&tasks_dir, &legacy), None, "an entry queued before entries knew their ticket is not checked");
+    }
+
+    /// DEV-923: an entry whose ticket was hard-deleted and not created again
+    /// leaves the queue unstarted, spends no attempt and comments nowhere.
+    #[test]
+    fn an_entry_whose_ticket_is_gone_leaves_the_queue_without_starting_or_commenting() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let (tasks_dir, storage) = queued_ticket_that_gets_deleted(dir.path(), false);
+        let files_before = files_under(&tasks_dir);
+
+        let entry = dequeue_startable(&tasks_dir, false).unwrap().remove(0);
+        assert_eq!(entry_ticket_gone(&tasks_dir, &entry).as_deref(), Some("RID-1 no longer exists"));
+        // Ok is the worker's started branch: the entry is settled, not
+        // requeued with one attempt more.
+        start_entry(&tasks_dir, entry.clone()).unwrap();
+        settle_taken(&tasks_dir, &entry, None).unwrap();
+
+        assert!(AgentQueueService::list_pending(&tasks_dir).unwrap().is_empty());
+        assert!(AgentQueueService::list_parked(&tasks_dir).unwrap().is_empty());
+        assert!(!AgentJobService::active_jobs().iter().any(|(ticket, _)| ticket == "RID-1"), "no job started");
+        assert!(crate::services::agent_active_jobs::list(&tasks_dir).iter().all(|job| job.ticket_id != "RID-1"), "no job started");
+        assert!(matches!(crate::services::task_service::TaskService::get(&storage, "RID-1", None), Err(LoTaRError::TaskNotFound(_))));
+        assert_eq!(files_under(&tasks_dir), files_before, "no ticket or comment was written");
+    }
+
+    /// Every file below `root`, sorted.
+    fn files_under(root: &Path) -> Vec<PathBuf> {
+        let mut files = Vec::new();
+        let mut dirs = vec![root.to_path_buf()];
+        while let Some(dir) = dirs.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() { dirs.push(path) } else { files.push(path) }
+            }
+        }
+        files.sort();
+        files
     }
 }
