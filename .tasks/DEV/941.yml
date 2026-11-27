@@ -1,11 +1,11 @@
 title: 'lotar''s T3 thread look lists every settled thread every 30 s: about 14 Electron starts a minute, growing with each job'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T22:24:41.944938+00:00
-modified: 2026-11-27T22:42:53.261299+00:00
+modified: 2026-11-27T22:48:48.821107+00:00
 relationships:
   blocks:
   - DEV-942
@@ -67,6 +67,29 @@ comments:
     - **Reran:** `npm ci` (ok), `cargo build --workspace --bins`, `cargo nextest run -E 'test(t3_thread_api) | test(/dev503_harness_jobs_test::|dev626_resumed_t3_threads_test::/)'` (91 passed), `npm run lint` (passed). The worktree is unchanged.
     - **Minor, filed:** [DEV-942](https://lotar.pyxzl.net/task/DEV-942): when no T3 project contains the repo, the WebSocket list returns an empty success instead of falling back to the CLI. [DEV-943](https://lotar.pyxzl.net/task/DEV-943): no test covers the new rule that a missing thread counts as settled (`kept.rs:145`).
     - **Still open, after release:** measure `t3_thread_list` calls and new `auth_sessions` rows per hour. The full suites and smoke run at merge.
+- date: 2026-11-27T22:48:48.456082+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-941` is in `main`.
+
+    - Rebase onto `main` changed nothing (`c316658fd3aa`)
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `c316658fd3aa`
+    - Amended the pending `.tasks` changes into the merged commit: `1a7112098fe6`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: 1a7112098
+      what: 'DEV-941 lotar''s T3 thread look lists every settled thread every 30 s: about 14 Electron starts a minute, growing with each job'
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - file: crates/lotar-agent/src/services/agent_job_service/resumed.rs
 - file: crates/lotar-agent/src/services/agent_job_service/kept.rs
@@ -267,3 +290,13 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-942"],"related":["DEV-626","DEV-810","DEV-836","DEV-876","DEV-747","DEV-901","DEV-934","DEV-942","DEV-943"]}'
     new: '{"blocks":["DEV-942","DEV-943"],"related":["DEV-626","DEV-810","DEV-836","DEV-876","DEV-747","DEV-901","DEV-934","DEV-942","DEV-943"]}'
+- at: 2026-11-27T22:48:48.456082+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T22:48:48.821107+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

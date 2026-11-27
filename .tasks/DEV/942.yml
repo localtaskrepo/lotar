@@ -1,11 +1,11 @@
 title: T3 thread list over the WebSocket returns nothing, without falling back, when no T3 project contains the repo path
-status: Blocked
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-27T22:42:19.854655+00:00
-modified: 2026-11-27T22:42:54.789620+00:00
+modified: 2026-11-27T22:52:13.766778+00:00
 relationships:
   depends_on:
   - DEV-941
@@ -20,6 +20,42 @@ comments:
     - `project_threads` and the WebSocket `list_threads` exist only on `agent/DEV-941` (`crates/lotar-agent/src/services/t3_thread_api.rs`), which is in Reviewing.
     - Added depends-on DEV-941 and tag `waits`; I continue on top of main once DEV-941 lands.
     - "Done when" already says what each case must do; no edit needed.
+- date: 2026-11-27T22:50:53.335709+00:00
+  author: claude
+  text: |-
+    Fixed: no T3 project holding the repo path is now an error, so the look falls back to `t3 thread list`.
+
+    - `project_threads` in `crates/lotar-agent/src/services/t3_thread_api.rs` returns `Err("no T3 Code project in the snapshot holds <path>")` instead of an empty list; `list_threads` passes it on.
+    - `resumed::list_threads` already falls back to the CLI on `Err` and logs the reason once (`API_LIST_FAILED`); no change there.
+    - New test `no_project_holding_the_path_is_an_error_so_the_cli_lists_the_threads`.
+    - Branch fast-forwarded to main (`1a7112098`, DEV-941) first; tag `waits` removed.
+  report:
+    commits:
+    - hash: bd8191112
+      what: no matching T3 project is an error, so the look falls back to t3 thread list
+    checks:
+    - command: cargo nextest run -p lotar-agent t3_thread_api resumed
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: Review, then merge
+- date: 2026-11-27T22:52:07.088711+00:00
+  author: claude
+  text: |-
+    Review: passed. `bd8191112` does both "Done when" items and nothing more.
+
+    - Read: the diff (one file, `crates/lotar-agent/src/services/t3_thread_api.rs`), the ticket, DEV-941 and the caller `resumed::list_threads` in `crates/lotar-agent/src/services/agent_job_service/resumed.rs:167`.
+    - `project_threads` now returns `Err("no T3 Code project in the snapshot holds <path>")`. `resumed::list_threads` falls back to `t3 thread list` on `Err` and logs once per process (`API_LIST_FAILED`), as the fix agent says.
+    - Safer than before: the empty list made every kept thread look settled. Now a failed CLI fallback returns `None`, and `resumed.rs:91` and `kept.rs:92` and `:111` then skip the look.
+    - Test `no_project_holding_the_path_is_an_error_so_the_cli_lists_the_threads` covers the case. The old code returned a `Vec`, and the old test asserted that the result was empty.
+    - Rerun: `npm ci` passed, `cargo nextest run -p lotar-agent t3_thread_api resumed` passed (12 tests) and `npm run lint` passed. The worktree is still clean.
+    - No UI work, no stray files, no owner decision touched. No tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4e31110c0f40a7ee843be316b5369e138d603be82465a53b16f99477783648fb
 description: |-
@@ -35,7 +71,6 @@ description: |-
 tags:
 - agent
 - backend
-- waits
 history:
 - at: 2026-11-27T22:42:20.831163+00:00
   actor: claude
@@ -75,3 +110,38 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-27T22:48:52.105770+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+  - field: tags
+    old: agent, backend, waits
+    new: agent, backend
+- at: 2026-11-27T22:50:53.335709+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T22:51:02.364649+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T22:52:07.088711+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T22:52:13.766778+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

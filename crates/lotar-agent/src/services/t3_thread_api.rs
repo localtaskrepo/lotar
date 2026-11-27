@@ -167,7 +167,7 @@ pub(crate) fn list_threads(program: &Path, env: &[(String, String)], cwd: &Path,
     })?;
     let snapshot = shell_snapshot(socket)?;
     let environment = std::fs::read_to_string(home.join("userdata").join("environment-id")).ok().map(|id| id.trim().to_string()).filter(|id| !id.is_empty());
-    Ok(project_threads(&snapshot, project, environment.as_deref()))
+    project_threads(&snapshot, project, environment.as_deref())
 }
 
 /// The first snapshot `orchestration.subscribeShell` sends, without older settled threads and idle subagents.
@@ -203,8 +203,10 @@ fn shell_snapshot(mut socket: Socket) -> Result<serde_json::Value, String> {
     answer
 }
 
-/// The threads of the snapshot's project at `project`, shaped as `t3 thread list --json` prints them.
-fn project_threads(snapshot: &serde_json::Value, project: &Path, environment: Option<&str>) -> Vec<serde_json::Value> {
+/// The threads of the snapshot's project at `project`, shaped as `t3 thread list --json` prints them. No project
+/// holding `project` is an error: T3 Code's CLI also finds a project through the repo's other git checkouts, so the
+/// caller falls back to it (DEV-942).
+fn project_threads(snapshot: &serde_json::Value, project: &Path, environment: Option<&str>) -> Result<Vec<serde_json::Value>, String> {
     let text = |value: &serde_json::Value, key: &str| value.get(key).and_then(serde_json::Value::as_str).map(str::to_string);
     let real = |path: &str| std::fs::canonicalize(path).unwrap_or_else(|_| PathBuf::from(path));
     let target = std::fs::canonicalize(project).unwrap_or_else(|_| project.to_path_buf());
@@ -215,10 +217,10 @@ fn project_threads(snapshot: &serde_json::Value, project: &Path, environment: Op
         .max_by_key(|(_, root)| root.as_os_str().len())
         .map(|(id, _)| id)
     else {
-        return Vec::new();
+        return Err(format!("no T3 Code project in the snapshot holds {}", project.display()));
     };
     let threads = snapshot.get("threads").and_then(serde_json::Value::as_array).into_iter().flatten();
-    threads
+    Ok(threads
         .filter(|thread| text(thread, "projectId").as_deref() == Some(project_id.as_str()))
         .filter(|thread| thread.pointer("/lineage/relationshipToParent").and_then(serde_json::Value::as_str) != Some("subagent"))
         .filter_map(|thread| {
@@ -234,7 +236,7 @@ fn project_threads(snapshot: &serde_json::Value, project: &Path, environment: Op
                 "runtimeMode": text(thread, "runtimeMode").unwrap_or_default(),
             }))
         })
-        .collect()
+        .collect())
 }
 
 /// A thread's status as T3 Code's thread list derives it: the active run's, else `failed`, else `waiting` while
@@ -495,7 +497,7 @@ mod tests {
     fn a_projects_threads_come_from_the_shell_snapshot_as_the_cli_lists_them() {
         let root = tempfile::tempdir().unwrap();
         let snapshot = snapshot(root.path());
-        let threads = project_threads(&snapshot, root.path(), Some("env-1"));
+        let threads = project_threads(&snapshot, root.path(), Some("env-1")).unwrap();
         let by_id: std::collections::HashMap<&str, &serde_json::Value> = threads.iter().map(|thread| (thread["threadId"].as_str().unwrap(), thread)).collect();
         let mut ids: Vec<&str> = by_id.keys().copied().collect();
         ids.sort_unstable();
@@ -510,11 +512,18 @@ mod tests {
         assert_eq!(by_id["holds"]["status"], "waiting", "an open subagent holds completion");
         assert_eq!(by_id["failed"]["status"], "failed");
         assert_eq!(by_id["monitor"]["status"], "completed", "a monitor doesn't hold completion");
-        let nested = project_threads(&snapshot, &root.path().join("nested/src"), None);
+        let nested = project_threads(&snapshot, &root.path().join("nested/src"), None).unwrap();
         assert_eq!(nested.len(), 1, "the deepest project holding the path");
         assert_eq!(nested[0]["threadId"], "elsewhere");
         assert_eq!(nested[0]["link"], serde_json::Value::Null);
-        assert!(project_threads(&snapshot, Path::new("/nowhere"), None).is_empty());
+    }
+
+    #[test]
+    fn no_project_holding_the_path_is_an_error_so_the_cli_lists_the_threads() {
+        let root = tempfile::tempdir().unwrap();
+        let snapshot = snapshot(&root.path().join("repo"));
+        let elsewhere = root.path().join("other-checkout");
+        assert_eq!(project_threads(&snapshot, &elsewhere, None), Err(format!("no T3 Code project in the snapshot holds {}", elsewhere.display())));
     }
 
     #[test]
