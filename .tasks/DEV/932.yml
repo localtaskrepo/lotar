@@ -1,25 +1,128 @@
 title: 'A takeover of a job another process took over still asks ''Go on with the ticket''s work'': a taken-over job writes no run_inputs line'
-status: Todo
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-27T11:58:59.845101+00:00
-modified: 2026-11-27T11:59:00.851350+00:00
+modified: 2026-11-27T13:52:09.528310+00:00
 relationships:
   related:
   - DEV-920
+comments:
+- date: 2026-11-27T13:47:56.642583+00:00
+  author: claude
+  text: |-
+    A taken-over job now writes a `run_inputs` line, so a takeover in a later process asks the first job's request.
+
+    - `adopt` (`crates/lotar-agent/src/services/agent_job_service/resumed.rs`) records, once `start_job` made the log, a `run_inputs` line from new `run_inputs::takeover_inputs`: prompt `User request:\n<request>` as its one `User request` section, runner `t3`, profile, model, effort, session `resumed`. `earlier_request` already reads that section.
+    - Order unchanged: limit retry, this process's record, the log line, `GO_ON`. A failed write leaves the job running, as for other jobs.
+    - New test `a_takeover_of_a_job_another_process_took_over_asks_the_first_jobs_request` (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs`): a `lotar agent worker` subprocess takes the thread over and exits; the takeover in the test process (no record of that job, no retry queued) pauses on a limit and its retry asks `Work on it` on `fix`.
+    - `docs/help/agent.md`: the takeover line says "taken over itself, in this process or another"; Run inputs says what a taken-over job's line holds.
+    - Note: the test runs the root `lotar` binary, so `cargo build -p lotar` comes before it.
+    - No guidance correction found.
+  report:
+    commits:
+    - hash: a965c1ec7
+      what: taken-over jobs write a run_inputs line with their request; test and docs
+    checks:
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(takeover) | test(taken_over)'
+      result: passed
+      reason: 16 tests; the new test failed first on a binary without the fix (asked GO_ON)
+    - command: cargo nextest run -p lotar-agent -E 'test(run_inputs) | test(resumed)'
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: merge runs the full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: merge runs it (DEV-797)
+    next: Review, then merge
+- date: 2026-11-27T13:52:02.401093+00:00
+  author: claude
+  text: |-
+    Review: passed. `a965c1ec7` does what "Done when" asks; nothing blocking, no minor findings.
+
+    - Read: the diff (`resumed.rs`, `run_inputs.rs`, `dev503_harness_jobs_test.rs`, `docs/help/agent.md`), the ticket, DEV-920, the last 5 commits on main to these files.
+    - `adopt` writes the `run_inputs` line after `start_job` made the log: one `User request` section, runner `t3`, profile, model, effort, session `resumed`. `earlier_request` reads exactly that format. The lookup order is unchanged: limit retry, this process's record, log line, `GO_ON`. A failed write is ignored (`run_inputs::record`), so the job keeps running.
+    - The only other reader of `run_inputs` is the Instructions/`--inputs` display (`agent_job_service.rs:700`), which now shows the takeover's request where it said "Not recorded". The docs say so.
+    - The new test fails without the fix. In a scratch worktree with the `record` line removed, the retry asked `Go on with the ticket's work…` instead of `Work on it`. With the fix it passes.
+    - Reran: `npm ci` (ok), `cargo build -p lotar`, `cargo nextest run -p lotar-lib --test integration -E 'test(/dev503_harness_jobs_test::.*(takeover|taken_over|took_over)/)'` (5 passed), `npm run lint` (exit 0). Not run: full suites and smoke (the merge runs them).
+    - No stray files, one commit, no UI changes.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae198604b4f163166e3cbb9ead47ce120cf1d76a8daef1ea66b1f2dda05c0e8a5
 description: |-
   ## Found (review of DEV-920, 2026-11-27)
   - DEV-920's `takeover_request` (`crates/lotar-agent/src/services/agent_job_service/resumed.rs`) reads the earlier job's request from the limit retry, then this process's `JOB_REGISTRY`, then the earlier job's `run_inputs` log line.
   - A taken-over job (`adopt`) still writes no `run_inputs` line, and its `agent_active_jobs` record (which holds `request`) is gone once it ends. So when the process that took it over has exited (queue worker gone idle, `lotar serve` restarted) and no limit retry is queued, the next takeover falls back to `GO_ON`. The fix agent noted this as a known gap; `docs/help/agent.md` says "also when that one was taken over in the same process".
 
   ## Done when
-  - [ ] A test: a job taken over in another process (empty registry), ended without a limit retry, is taken over again and gets the first job's prompt and profile.
-  - [ ] A taken-over job keeps its request where a later process can read it (for example a `run_inputs` line in its log), and the doc line drops "in the same process".
+  - [ ] A test: a job taken over in another process (a `lotar agent worker` subprocess that exits, so this process's registry has no record of it), ended without a limit retry, is taken over again and its retry gets the first job's prompt and profile.
+  - [ ] A taken-over job writes a `run_inputs` line once its log exists: the request it would ask as its `User request` section, its profile, runner `t3`, session `resumed`. Order stays: limit retry, then this process's record, then the log line, then `GO_ON`. A failed write leaves the job running (as for other jobs); the next takeover then falls back to `GO_ON`.
+  - [ ] `docs/help/agent.md`: the takeover line drops "in the same process"; Run inputs says what a taken-over job's line holds.
 history:
 - at: 2026-11-27T11:59:00.851350+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T13:42:08.617517+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T13:42:09.297730+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae198604b4f163166e3cbb9ead47ce120cf1d76a8daef1ea66b1f2dda05c0e8a5
+- at: 2026-11-27T13:43:39.364141+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      ## Found (review of DEV-920, 2026-11-27)
+      - DEV-920's `takeover_request` (`crates/lotar-agent/src/services/agent_job_service/resumed.rs`) reads the earlier job's request from the limit retry, then this process's `JOB_REGISTRY`, then the earlier job's `run_inputs` log line.
+      - A taken-over job (`adopt`) still writes no `run_inputs` line, and its `agent_active_jobs` record (which holds `request`) is gone once it ends. So when the process that took it over has exited (queue worker gone idle, `lotar serve` restarted) and no limit retry is queued, the next takeover falls back to `GO_ON`. The fix agent noted this as a known gap; `docs/help/agent.md` says "also when that one was taken over in the same process".
+
+      ## Done when
+      - [ ] A test: a job taken over in another process (empty registry), ended without a limit retry, is taken over again and gets the first job's prompt and profile.
+      - [ ] A taken-over job keeps its request where a later process can read it (for example a `run_inputs` line in its log), and the doc line drops "in the same process".
+    new: |-
+      ## Found (review of DEV-920, 2026-11-27)
+      - DEV-920's `takeover_request` (`crates/lotar-agent/src/services/agent_job_service/resumed.rs`) reads the earlier job's request from the limit retry, then this process's `JOB_REGISTRY`, then the earlier job's `run_inputs` log line.
+      - A taken-over job (`adopt`) still writes no `run_inputs` line, and its `agent_active_jobs` record (which holds `request`) is gone once it ends. So when the process that took it over has exited (queue worker gone idle, `lotar serve` restarted) and no limit retry is queued, the next takeover falls back to `GO_ON`. The fix agent noted this as a known gap; `docs/help/agent.md` says "also when that one was taken over in the same process".
+
+      ## Done when
+      - [ ] A test: a job taken over in another process (a `lotar agent worker` subprocess that exits, so this process's registry has no record of it), ended without a limit retry, is taken over again and its retry gets the first job's prompt and profile.
+      - [ ] A taken-over job writes a `run_inputs` line once its log exists: the request it would ask as its `User request` section, its profile, runner `t3`, session `resumed`. Order stays: limit retry, then this process's record, then the log line, then `GO_ON`. A failed write leaves the job running (as for other jobs); the next takeover then falls back to `GO_ON`.
+      - [ ] `docs/help/agent.md`: the takeover line drops "in the same process"; Run inputs says what a taken-over job's line holds.
+- at: 2026-11-27T13:47:56.642583+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T13:48:09.761170+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T13:52:02.401093+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T13:52:09.528310+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

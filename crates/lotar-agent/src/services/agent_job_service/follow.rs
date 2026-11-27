@@ -5,7 +5,7 @@
 
 use super::{AgentJobEvent, JOB_REGISTRY, job_event_payload, job_log_dirs, saved_job_dto, workspace_root_of};
 use crate::api_events::ApiEvent;
-use crate::services::agent_log_service::{JobLogHeader, JobLogLine, JobStatusLine, SavedJob, is_job_log, resolve_logs_dir};
+use crate::services::agent_log_service::{JobLogEntry, JobLogHeader, JobLogLine, JobStatusLine, SavedJob, is_job_log, resolve_logs_dir};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
@@ -147,8 +147,19 @@ impl Followed {
         }
     }
 
+    /// The event with the job's fields. The event goes in as the job's last log entry, so a question gets the same
+    /// title-only `question` a reload gives, and the next event clears it (DEV-826).
     fn api_event(&self, header: &JobLogHeader, event: &AgentJobEvent) -> ApiEvent {
-        let mut job = saved_job_dto(&SavedJob { header: header.clone(), events: Vec::new(), status: self.status.clone() }, true);
+        let last = JobLogEntry {
+            kind: event.kind.clone(),
+            at: event.at.clone(),
+            message: event.message.clone(),
+            sequence: Some(event.sequence),
+            tool: None,
+            plan: None,
+            transcript: None,
+        };
+        let mut job = saved_job_dto(&SavedJob { header: header.clone(), events: vec![last], status: self.status.clone() }, true);
         job.started_at = self.started_at.clone();
         ApiEvent { kind: event.kind.clone(), data: job_event_payload(&job, event) }
     }
@@ -255,6 +266,35 @@ mod tests {
         assert_eq!(events[1].data["tool"]["id"], "toolu_1");
         assert_eq!(events[1].data["tool"]["input"], "ls");
         assert!(events[0].data["tool"].is_null());
+    }
+
+    /// DEV-826: a followed question carries the same title-only question a reload gives; the next line clears it.
+    #[test]
+    fn a_followed_question_carries_its_title_and_the_next_line_clears_it() {
+        let (_dir, tasks) = tasks_dir();
+        let log = tasks.join("@agent-logs").join("job-follow-question.jsonl");
+        let mut follower = LogFollower::new(&tasks);
+        append(
+            &log,
+            &format!(
+                "{}\n{}\n{}\n",
+                HEADER.replace("JOB", "job-follow-question"),
+                event("agent_job_started", 1, ""),
+                event("agent_job_question", 2, "Run the migration?")
+            ),
+        );
+        let events = follower.changed(&log);
+        assert_eq!(events.len(), 2);
+        assert!(events[0].data["question"].is_null());
+        assert_eq!(events[1].kind, "agent_job_question");
+        assert_eq!(events[1].data["question"]["title"], "Run the migration?");
+        assert_eq!(events[1].data["question"]["request"], "");
+        assert_eq!(events[1].data["question"]["options"], serde_json::json!([]));
+
+        append(&log, &format!("{}\n", event("agent_job_message", 3, "go on")));
+        let next = follower.changed(&log);
+        assert_eq!(next.len(), 1);
+        assert!(next[0].data["question"].is_null(), "the next event clears the question");
     }
 
     /// A log that shrank is read again; a deleted one is forgotten; files that are no job logs are not followed.

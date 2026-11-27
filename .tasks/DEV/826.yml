@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-23T04:27:39.844205+00:00
-modified: 2026-11-27T12:52:06.256710+00:00
+modified: 2026-11-27T13:56:09.781467+00:00
 relationships:
   depends_on:
   - DEV-782
@@ -13,6 +13,7 @@ relationships:
   - DEV-782
   - DEV-765
   - DEV-771
+  - DEV-915
 comments:
 - date: 2026-11-23T07:49:44.529276+00:00
   author: claude
@@ -103,6 +104,27 @@ comments:
     - **Not checked in the browser:** the card after a reload. With a fake log, no live process holds the job, so `GET /api/jobs` reports it `failed`. That half is DEV-782's code, and the `dev782` tests cover it.
     - **Seen but not part of this change:** "0 Running" while another process's job runs is already DEV-771. The 390-wide nav cutting off "Calenda" also shows in the before shots.
     - No tickets filed. Worktree left clean.
+- date: 2026-11-27T13:56:09.483498+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the check `npm run -s lint:agent` failed, and again when rerun on its own:
+    ```
+    crates/lotar-agent/src/services/agent_job_service/follow.rs:153:20: error[E0063]: missing field `transcript` in initializer of `services::agent_log_service::JobLogEntry`: missing `transcript`
+    error: could not compile `lotar-agent` (lib) due to 1 previous error
+    error: could not compile `lotar-agent` (lib test) due to 1 previous error
+    ```.
+
+    - Rebased `agent/DEV-826` onto `main` (`a7cefa181943`): `a57660b0dee3`
+    - Waited 64 min for the machine's check lock, held by lotar's merge checks of DEV-915 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-915 (pid 61697), since 12:30 UTC
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: failed
+      reason: first run
+    - command: npm run -s lint:agent
+      result: failed
+      reason: rerun
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A407a18347417b166c014fede135d875b0cb8589e4b34f67cb90e149629e91c1d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A70dc96c449dc460249eeff37f9c1ba6ca9f3f54735e771c93bcdfde19aaa3cce
@@ -372,3 +394,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T13:56:09.483498+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T13:56:09.781467+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-782"],"related":["DEV-782","DEV-765","DEV-771"]}'
+    new: '{"depends_on":["DEV-782"],"related":["DEV-782","DEV-765","DEV-771","DEV-915"]}'

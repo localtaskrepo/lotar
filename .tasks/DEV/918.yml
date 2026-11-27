@@ -1,11 +1,11 @@
 title: Transcript reader takes a kept copy of a longer-named session for the job's own
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T01:02:35.316395+00:00
-modified: 2026-11-27T13:36:29.649834+00:00
+modified: 2026-11-27T13:42:03.828228+00:00
 relationships:
   depends_on:
   - DEV-909
@@ -75,6 +75,27 @@ comments:
 - date: 2026-11-27T13:34:36.031906+00:00
   author: automation
   text: Waited 7 min for the machine's check lock, held by lotar's merge checks of DEV-928 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-928 (pid 61697), since 13:13 UTC; the merge agent starts now.
+- date: 2026-11-27T13:41:55.184778+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `723b1e5e4` is on `main` and `origin/main`.
+
+    - `main` had moved on (DEV-927 `c518a585d`): rebased `agent/DEV-918` cleanly to `86ccaa294`, ran `npm ci`.
+    - All three merge checks reran on the rebased commit and passed: `lint:agent`, `test:agent`, `smoke`.
+    - `git merge --ff-only` in the main checkout, then amended the pending `.tasks` changes into it (`723b1e5e4`).
+    - No rule or config files changed: `lotar trust` not needed.
+    - Main checkout clean, no other unpushed commits: `git push` passed its hook.
+  report:
+    commits:
+    - hash: 723b1e5e4
+      what: DEV-918 kept-copy base must equal the session or be its 47-char cut
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae1a29fbe4bcea30c3959670eaf07e248ec106b3f020c832392f7dedd633c4061
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3de5e9c7f46b9b8e194c9aedb1fc604ecb9c0980300ab125696a391f079510ba
@@ -207,3 +228,13 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-909"],"related":["DEV-909","DEV-915","DEV-927","DEV-911","DEV-928"]}'
     new: '{"depends_on":["DEV-909"],"related":["DEV-909","DEV-915","DEV-927","DEV-911","DEV-928","DEV-934"]}'
+- at: 2026-11-27T13:41:55.184778+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T13:42:03.828228+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
