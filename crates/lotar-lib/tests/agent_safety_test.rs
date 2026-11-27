@@ -1777,6 +1777,41 @@ fn leftover_builds_in_the_build_root_go_with_the_next_removal_or_cleanup() {
     assert!(repo_dir.join("adding").exists(), "a worktree being added keeps its build");
 }
 
+/// DEV-841: a build root set only in a project's config is swept too: the
+/// orphan build of a ticket with no worktree goes, a listed worktree's
+/// build stays, and `--dry-run` deletes nothing.
+#[test]
+fn cleanup_sweeps_a_build_root_set_only_for_a_project() {
+    common::require_git();
+    let (fixture, ticket) = setup("exit 0", true);
+    let root = fixture.get_temp_path();
+    let builds = tempfile::tempdir().unwrap();
+    let lotar = |args: &[&str]| {
+        let output = Command::new(crate::common::lotar_bin())
+            .args(["--tasks-dir", fixture.tasks_root.to_str().unwrap()])
+            .args(args)
+            .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{args:?}: {}", String::from_utf8_lossy(&output.stderr));
+    };
+    lotar(&["config", "set", "agent_worktree_build_root", builds.path().to_str().unwrap(), "-p", "SAFE"]);
+    let repo_dir = builds.path().join(root.file_name().unwrap());
+    let orphan = repo_dir.join(&ticket);
+    fs::create_dir_all(&orphan).unwrap();
+    fs::write(orphan.join("app"), "built").unwrap();
+    let live = root.join("worktrees").join("live");
+    git(root, &["worktree", "add", "-q", "-b", "agent/live", live.to_str().unwrap()]);
+    fs::create_dir_all(repo_dir.join("live")).unwrap();
+
+    lotar(&["agent", "worktree", "cleanup", "--dry-run"]);
+    assert!(orphan.join("app").exists(), "--dry-run deletes nothing");
+    lotar(&["agent", "worktree", "cleanup"]);
+    assert!(!orphan.exists(), "the project's build root is swept");
+    assert!(repo_dir.join("live").exists(), "a listed worktree's build stays");
+}
+
 /// DEV-778: a job's end parks the ticket's build in the build root to
 /// delete it; parked folders a cut-off cleanup left go with the next one.
 #[test]

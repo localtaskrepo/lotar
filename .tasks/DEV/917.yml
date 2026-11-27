@@ -1,11 +1,11 @@
 title: 'Done ticket''s failed T3 thread isn''t settled by the look: harnessmux settle refuses any status but completed'
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T00:16:20.412681+00:00
-modified: 2026-11-27T10:05:39.673049+00:00
+modified: 2026-11-27T10:14:30.819381+00:00
 relationships:
   depends_on:
   - DEV-810
@@ -132,6 +132,28 @@ comments:
       result: failed
       reason: rerun
     next: The merge agent takes over in a new session
+- date: 2026-11-27T10:14:24.004579+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `4de9925ef` is on main and on origin.
+
+    - **Why test:agent failed:** my review had built a scratch worktree (`/private/tmp/dev917-review`) into this worktree's `target/`, and its cached build-script output still pointed `LOTAR_DOCS_DIR` at the deleted scratch path. I removed `target/debug/build/lotar-agent/bd8f2dd54ba5a84a`, so the build script ran again here. DEV-919, now on main, addresses the same problem.
+    - **Rebase:** main had moved on to `e737e8b9f` (DEV-919). The rebase had no conflicts and gave `ad6a57001`. `npm ci` passed.
+    - **Checks** on `ad6a57001`, all run again with `LOTAR_CHECK_LOCK_HELD=1`: `npm run -s lint:agent`, `npm run -s test:agent` and `npm run -s smoke` (415 tests) passed.
+    - **Fast-forward:** main went `e737e8b9f..ad6a57001`. I then amended the pending `.tasks` changes (DEV 801, 861, 901, 917, 919, 921, 922, `DEV/config.yml`) into that commit, giving `4de9925ef`.
+    - **Trust:** the merge changed `.tasks/DEV/config.yml`, so I ran `lotar trust`. The status now says Trusted.
+    - **Push:** `git push` sent `e737e8b9f..4de9925ef`. The main checkout was clean and no other commit was waiting to be pushed.
+  report:
+    commits:
+    - hash: 4de9925ef
+      what: DEV-917 settle a done ticket's non-completed T3 thread through T3 Code's internal API
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A54c0a5c8da360b963fc88ee14eda15831f9d7b811da77dae836ce9d5a30930fd
 description: |-
@@ -271,3 +293,13 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-810"],"related":["DEV-810","DEV-876","DEV-928"]}'
     new: '{"depends_on":["DEV-810"],"related":["DEV-810","DEV-876","DEV-928","DEV-919"]}'
+- at: 2026-11-27T10:14:24.004579+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T10:14:30.819381+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T17:22:39.025840+00:00
-modified: 2026-11-27T09:45:45.833857+00:00
+modified: 2026-11-27T10:16:55.484198+00:00
 relationships:
   blocks:
   - DEV-923
@@ -23,6 +23,7 @@ relationships:
   - DEV-909
   - DEV-913
   - DEV-902
+  - DEV-901
 comments:
 - date: 2026-11-24T19:18:18.982167+00:00
   author: automation
@@ -617,3 +618,9 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-923"],"related":["DEV-786","DEV-818","DEV-833","DEV-845","DEV-837","DEV-860","DEV-870","DEV-887","DEV-905","DEV-923","DEV-909","DEV-913"]}'
     new: '{"blocks":["DEV-923"],"related":["DEV-786","DEV-818","DEV-833","DEV-845","DEV-837","DEV-860","DEV-870","DEV-887","DEV-905","DEV-923","DEV-909","DEV-913","DEV-902"]}'
+- at: 2026-11-27T10:16:55.484198+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-923"],"related":["DEV-786","DEV-818","DEV-833","DEV-845","DEV-837","DEV-860","DEV-870","DEV-887","DEV-905","DEV-923","DEV-909","DEV-913","DEV-902"]}'
+    new: '{"blocks":["DEV-923"],"related":["DEV-786","DEV-818","DEV-833","DEV-845","DEV-837","DEV-860","DEV-870","DEV-887","DEV-905","DEV-923","DEV-909","DEV-913","DEV-902","DEV-901"]}'

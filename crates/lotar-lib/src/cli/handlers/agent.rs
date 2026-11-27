@@ -766,12 +766,18 @@ impl AgentHandler {
                 .and_then(|(project, _)| crate::config::resolution::config_for_project(&resolver.path, Some(project)).ok())
                 .unwrap_or_else(|| config.clone())
         };
-        // What removals cut off left in the build root, the last
-        // worktree's included (DEV-778).
+        // What removals cut off left in the build roots, the last
+        // worktree's included (DEV-778): the global one and each project's
+        // own (DEV-841). A project whose config can't be read is skipped.
         if !args.dry_run
             && let Some(repo_root) = crate::utils::git::find_repo_root(&resolver.path)
         {
-            agent_job_service::sweep_build_root(&repo_root, config, None);
+            let projects = crate::utils::filesystem::list_visible_subdirs(&resolver.path)
+                .into_iter()
+                .filter(|(_, path)| path.join("config.yml").is_file())
+                .filter_map(|(prefix, _)| crate::config::resolution::config_for_project(&resolver.path, Some(&prefix)).ok());
+            let configs: Vec<_> = std::iter::once(config.clone()).chain(projects).collect();
+            agent_job_service::sweep_build_roots(&repo_root, &configs, None);
         }
 
         // Filter to worktrees that should be removed

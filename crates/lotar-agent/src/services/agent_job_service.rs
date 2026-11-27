@@ -1960,12 +1960,21 @@ const PARKED_BUILD_MARKER: &str = ".lotar-cleanup-";
 /// `agent.worktree.dir` or beside a listed worktree); when git can't list
 /// the worktrees, nothing goes. A failed delete is a warning.
 pub fn sweep_build_root(repo_root: &std::path::Path, config: &ResolvedConfig, linked: Option<&std::path::Path>) {
+    sweep_build_roots(repo_root, std::slice::from_ref(config), linked);
+}
+
+/// [`sweep_build_root`] over several configs (DEV-841: the global one and
+/// each project's): every resolved build root once, and a folder in any
+/// of their `agent.worktree.dir` counts as a worktree being added.
+pub fn sweep_build_roots(repo_root: &std::path::Path, configs: &[ResolvedConfig], linked: Option<&std::path::Path>) {
     let Some(repo_name) = repo_root.file_name() else {
         return;
     };
     let mut dirs: Vec<std::path::PathBuf> = Vec::new();
-    if let Ok(Some(root)) = resolve_build_root(repo_root, config.agent_worktree.build_root.as_deref()) {
-        dirs.push(root.join(repo_name));
+    for config in configs {
+        if let Ok(Some(root)) = resolve_build_root(repo_root, config.agent_worktree.build_root.as_deref()) {
+            dirs.push(root.join(repo_name));
+        }
     }
     if let Some(dir) = linked.and_then(std::path::Path::parent).filter(|dir| dir.file_name() == Some(repo_name)) {
         dirs.push(dir.to_path_buf());
@@ -1979,8 +1988,9 @@ pub fn sweep_build_root(repo_root: &std::path::Path, config: &ResolvedConfig, li
     };
     let names: std::collections::HashSet<_> = worktrees.iter().filter_map(|path| path.file_name()).collect();
     let builds: std::collections::HashSet<_> = worktrees.iter().filter_map(|path| fs::canonicalize(path.join("target")).ok()).collect();
-    let worktree_root = resolve_worktree_root(repo_root, config.agent_worktree.dir.as_deref()).ok();
-    let places: std::collections::HashSet<_> = worktrees.iter().filter_map(|path| path.parent()).chain(worktree_root.as_deref()).collect();
+    let worktree_roots: Vec<_> = configs.iter().filter_map(|config| resolve_worktree_root(repo_root, config.agent_worktree.dir.as_deref()).ok()).collect();
+    let places: std::collections::HashSet<_> =
+        worktrees.iter().filter_map(|path| path.parent()).chain(worktree_roots.iter().map(std::path::PathBuf::as_path)).collect();
     for dir in dirs {
         let Ok(entries) = fs::read_dir(&dir) else {
             continue;

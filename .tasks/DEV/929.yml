@@ -1,0 +1,24 @@
+title: 'Agent hosts: a waiting dyson thread a new job didn''t take over keeps waiting there, and its MCP forward stays open'
+status: Todo
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-27T10:16:41.486933+00:00
+modified: 2026-11-27T10:16:43.304930+00:00
+relationships:
+  related:
+  - DEV-901
+description: |-
+  Found in the DEV-901 review (2026-11-27, branch `agent/DEV-901` at `49a3fa827`).
+
+  - `collect_waiting_on_host` (`crates/lotar-agent/src/services/agent_job_service.rs`, in `run_job`): a new job of a ticket whose thread waits on dyson brings the commits back and, when the worktree is clean, removes it (`Hosted::bring_back`). The waiting T3 thread on dyson isn't stopped. When that job runs on the Mac with a handoff, an answer in the old thread runs it on dyson without its worktree or MCP server.
+  - `WAITING_ON_HOST` keeps a waiting job's MCP bridge (an `ssh -R` process and the local socket) open until another job of the ticket or a takeover comes. A ticket the owner closes in the meantime keeps the forward open until lotar exits.
+
+  Done when: a new job that takes over a waiting host thread's worktree stops that thread through T3 (as a cancelled host job does). A waiting host job's bridge closes when its ticket is done or its question is dropped. A fake-ssh test covers both.
+history:
+- at: 2026-11-27T10:16:43.304930+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

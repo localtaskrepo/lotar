@@ -1,11 +1,11 @@
 title: Flaky tests
-status: Reviewing
+status: Merging
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-22T19:22:12.213895+00:00
-modified: 2026-11-27T10:10:12.951168+00:00
+modified: 2026-11-27T10:21:12.287984+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -36,6 +36,10 @@ relationships:
   - DEV-921
   - DEV-922
   - DEV-861
+  - DEV-930
+  - DEV-875
+  - DEV-888
+  - DEV-913
 comments:
 - date: 2026-11-22T22:40:05.875209+00:00
   author: claude
@@ -244,6 +248,28 @@ comments:
       result: not_run
       reason: the merge runs the full suites
     next: Review the rebased branch
+- date: 2026-11-27T10:21:03.740445+00:00
+  author: claude
+  text: |-
+    Review: passed. `04fb4634b` sits on main `e737e8b9f`, the duplicate lock block is gone, and the queue-worker default holds.
+
+    Read: the ticket and its 21 comments, comment 16's blocking review, the diff `e737e8b9f..04fb4634b`, the recent main commits to the touched files (DEV-867, DEV-913, DEV-908, DEV-875), DEV-875, DEV-888.
+
+    **Holds**
+    - Comment 16's findings are fixed. `crates/lotar-lib/tests/common/mod.rs` now sets only `LOTAR_AGENT_QUEUE_DISABLE_WORKER=1`. The lock default stays in DEV-890's `reset_lotar_test_environment`, and the README line and the guard test's doc comment both name it
+    - Every test that needs a queue worker opts in: `agent_safety`, `dev361`, `cli_agent_check` (which also waits for its worker to end), `dev503` continued-merge, and main's `dev584/592/604/623/630/660/732/733/837`
+    - `the_tests_start_no_queue_worker_unless_they_ask_for_one` fails without the constructor change
+    - No stray files, no second copy of the fix
+
+    **Minor, filed as [DEV-930](https://lotar.pyxzl.net/task/DEV-930)**
+    - `smoke/tests/ui.agent-jobs.smoke.spec.ts:375-393`: the try/catch diagnostic targets comment 11's flake. That flake (DEV-832 merge, 2026-11-25) came before DEV-875 (`cb61901d7`, the test waits for the loaded log's header) and DEV-888 (the panel stays open across the remount), and those two found and fixed its cause. The diagnostic is harmless but rests on "cause unknown". So comment 11 goes to DEV-875 and DEV-888 in the outcome, not to this branch
+
+    **Reran**
+    - `npm ci`: passed
+    - `node scripts/rust-test-runner.mjs --cargo-profile dev -p lotar-lib --test integration -E <15 worker/lock modules>`: 177/177 passed at load ~6-10, after `cargo build --profile dev --bins`
+    - `npm run -s lint`: passed
+    - `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts`: 17/17 passed. The first try failed 17/17 because this worktree had no web build. It passed after `npm run -s build:web` and a rebuild
+    - Not run: `test:agent` and the full smoke suite (the merge runs them). No UI review: the diff changes no pages
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A75080ac346701fc3377f56ac792640c8450190058560a4bf13c0ec6cbdc24d02
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A30b4d0255c9ae0259ed6230fb5853f0a8c697bf8ecc35349d0db7cc2c2db09fd
@@ -559,3 +585,28 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-27T10:20:52.772639+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906","DEV-908","DEV-840","DEV-890","DEV-921","DEV-922","DEV-861"]}'
+    new: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906","DEV-908","DEV-840","DEV-890","DEV-921","DEV-922","DEV-861","DEV-930"]}'
+- at: 2026-11-27T10:21:03.740445+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T10:21:04.038097+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906","DEV-908","DEV-840","DEV-890","DEV-921","DEV-922","DEV-861","DEV-930"]}'
+    new: '{"depends_on":["DEV-797"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906","DEV-908","DEV-840","DEV-890","DEV-921","DEV-922","DEV-861","DEV-930","DEV-875","DEV-888","DEV-913"]}'
+- at: 2026-11-27T10:21:12.287984+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
