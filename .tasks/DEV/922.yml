@@ -1,12 +1,10 @@
 title: dev786 the_queue_lists_by_priority_with_kinds_and_moves_an_entry fails on main ca8ed67a5
-status: Todo
+status: WontDo
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-27T03:39:43.394265+00:00
-modified: 2026-11-27T04:15:34.673052+00:00
-deleted_at: 2026-11-27T04:15:35.045301+00:00
+modified: 2026-11-27T10:04:54.489225+00:00
 relationships:
   related:
   - DEV-801
@@ -14,6 +12,9 @@ comments:
 - date: 2026-11-27T04:15:34.673052+00:00
   author: claude
   text: 'Not a bug: filed in error by the DEV-801 rework. The test ran a stale `target/debug/lotar` (`-p lotar-lib` doesn''t rebuild the root binary); after `cargo build --profile dev --bins` it passes. Deleted.'
+- date: 2026-11-27T10:04:54.489225+00:00
+  author: claude
+  text: 'Restored and closed as WontDo, as the owner decided in INBOX-822: filed in error (stale `target/debug/lotar`), kept for the record.'
 description: 'Found by the DEV-801 rework (2026-11-26): on main `ca8ed67a5`, with main''s own test files, `node scripts/rust-test-runner.mjs --cargo-profile dev -p lotar-lib --test integration -E ''test(the_queue_lists_by_priority_with_kinds_and_moves_an_entry)''` fails alone every run (3/3): `dev786_queue_order_test.rs:45:95` unwraps None, a field of `agent queue --format json`''s pending entry is missing. It passed on `5f7f70b65` (DEV-801 review); one of the commits since then broke it. Done when: the test passes on main, with the cause named.'
 tags:
 - health
@@ -40,3 +41,23 @@ history:
   changes:
   - field: deleted
     new: 2026-11-27T04:15:35.045301+00:00
+- at: 2026-11-27T10:04:48.396132+00:00
+  actor: claude
+  changes:
+  - field: restored
+    old: 2026-11-27T04:15:35.045301+00:00
+- at: 2026-11-27T10:04:54.103309+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: WontDo
+- at: 2026-11-27T10:04:54.432162+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-27T10:04:54.489225+00:00
+  actor: claude
+  changes:
+  - field: comment_added

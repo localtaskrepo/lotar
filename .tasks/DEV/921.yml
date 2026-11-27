@@ -1,12 +1,10 @@
 title: dev503 a_kept_thread_whose_session_holds_a_newer_thread_is_settled fails on main ca8ed67a5
-status: Todo
+status: WontDo
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-27T03:38:41.596321+00:00
-modified: 2026-11-27T04:15:34.279392+00:00
-deleted_at: 2026-11-27T04:15:34.641556+00:00
+modified: 2026-11-27T10:04:53.734876+00:00
 relationships:
   related:
   - DEV-801
@@ -16,6 +14,9 @@ comments:
 - date: 2026-11-27T04:15:34.279392+00:00
   author: claude
   text: 'Not a bug: filed in error by the DEV-801 rework. The test ran a stale `target/debug/lotar` (`-p lotar-lib` doesn''t rebuild the root binary); after `cargo build --profile dev --bins` it passes. Deleted.'
+- date: 2026-11-27T10:04:53.734876+00:00
+  author: claude
+  text: 'Restored and closed as WontDo, as the owner decided in INBOX-822: filed in error (stale `target/debug/lotar`), kept for the record.'
 description: 'Found by the DEV-801 rework (2026-11-26): on main `ca8ed67a5` (DEV-810, merged 19:35 PST) `node scripts/rust-test-runner.mjs --cargo-profile dev -p lotar-lib --test integration -E ''test(a_kept_thread_whose_session_holds_a_newer_thread_is_settled)''` fails alone at load ~7, also with main''s own test files and the T3CODE_* env removed: `settled_threads` is ["thread-1"], want ["thread-1", "thread-0"]; log says ''The T3 Code thread https://t3.test/thread-0 was not settled: no harnessmux session holds it''. It passed in DEV-810''s review (via DEV-876''s settle_superseded). Done when: the test passes on main, with the cause named.'
 tags:
 - health
@@ -42,3 +43,23 @@ history:
   changes:
   - field: deleted
     new: 2026-11-27T04:15:34.641556+00:00
+- at: 2026-11-27T10:04:48.335230+00:00
+  actor: claude
+  changes:
+  - field: restored
+    old: 2026-11-27T04:15:34.641556+00:00
+- at: 2026-11-27T10:04:53.338004+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: WontDo
+- at: 2026-11-27T10:04:53.678649+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-27T10:04:53.734876+00:00
+  actor: claude
+  changes:
+  - field: comment_added

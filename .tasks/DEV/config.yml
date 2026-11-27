@@ -30,7 +30,8 @@ attachments:
   dir: DEV/@attachments
 agent:
   worktree:
-    max_parallel_jobs: 3
+    # 4 jobs at a time (owner 2026-11-27, 11 jobs queued: "Raise to 4"): load 7-11 on 14 cores and 48 GB free left room.
+    max_parallel_jobs: 4
     waiting_run:
     - cargo
     - clean

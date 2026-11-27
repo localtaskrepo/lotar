@@ -1,16 +1,17 @@
 title: A review's scratch worktree that builds into the ticket worktree's target/ breaks the next merge's lotar-agent build
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T03:08:35.727731+00:00
-modified: 2026-11-27T09:56:19.663634+00:00
+modified: 2026-11-27T10:05:39.673707+00:00
 relationships:
   related:
   - DEV-896
   - DEV-841
   - DEV-927
+  - DEV-917
 comments:
 - date: 2026-11-27T04:17:13.015891+00:00
   author: claude
@@ -105,6 +106,27 @@ comments:
       result: failed
       reason: rerun
     next: The merge agent takes over in a new session
+- date: 2026-11-27T10:04:13.932523+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `e737e8b9f` is on `main` and `origin/main`.
+
+    - `test:agent` failed on the work: the new test reads `.cargo/config.toml`, and `ci.yml`'s Rust path filter didn't match it, so a change to only that file would skip CI's Rust job. I added `\.cargo/config\.toml` to the filter in `.github/workflows/ci.yml` and amended the branch commit.
+    - After the fix: `npm ci` ok, then `npm run -s lint:agent`, `npm run -s test:agent` (2661 passed) and `npm run -s smoke` (415 passed) all passed.
+    - Fast-forwarded the main checkout; folded its pending `.tasks` changes into the commit (`git commit --amend -- .tasks`).
+    - No rule or config files changed, so no `lotar trust` was needed.
+    - Health check: `grep -rl review-scratch target/debug/build/*/*/run/stdout` found nothing.
+  report:
+    commits:
+    - hash: e737e8b9f
+      what: build scripts rerun when the checkout changes; ci.yml Rust filter covers .cargo/config.toml
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A59bae2bfdd713fed611d6e91d60bb2e917e5e0922b6052e35a0f3afbcbeb8d42
 description: 'Found on DEV-896''s merge (2026-11-26): `npm run -s test:agent` failed twice. `include_str!` couldn''t read `/private/tmp/dev896-review-scratch/.../docs/help/agent-instructions.md`. The review had built a deleted scratch worktree into DEV-896''s `target/`. The build-script run `target/debug/build/lotar-agent/<hash>/run/stdout` kept `LOTAR_DOCS_DIR` pointing there, because `rerun-if-changed=../../docs/...` is relative and stays the same. Check: `grep -rl review-scratch target/debug/build/*/*/run/stdout` in a ticket worktree. Done when: a build in one checkout can''t reuse another checkout''s `LOTAR_DOCS_DIR`, for example `crates/lotar-agent/build.rs` and `crates/lotar-lib/build.rs` also rerun when `CARGO_MANIFEST_DIR` changes, with a test.'
@@ -177,3 +199,19 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T10:04:13.932523+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T10:04:22.223968+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-27T10:05:39.673707+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-896","DEV-841","DEV-927"]}'
+    new: '{"related":["DEV-896","DEV-841","DEV-927","DEV-917"]}'

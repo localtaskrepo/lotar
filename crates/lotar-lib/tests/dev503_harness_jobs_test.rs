@@ -916,7 +916,7 @@ fn a_ticket_hands_its_context_from_harness_to_harness_through_its_states() {
 /// for a send, to `$FAKE_LOG` (a launch's prompt to `$FAKE_LOG.prompt-<n>`), and runs `$FAKE_RUN` in the thread's
 /// worktree. Without the env the run still runs. It answers with status `running` while a file `running-<id>` is next
 /// to the script, an `activeRunId` while `active-<id>` is, as waiting for an answer while `waiting-<id>` is, and with
-/// status `failed` while `failed-<id>` is, and as waiting on a background command (status `waiting`,
+/// status `failed` while `failed-<id>` is (the status in `listed-<id>` while that is), and as waiting on a background command (status `waiting`,
 /// `pendingBackgroundTasks`) for as many more shows as the number in `background-<id>`; it logs `show <id>` to `t3-show.log` there.
 /// While `list-threads` is there, `thread list` lists the threads with those statuses, their title (`title` in the
 /// thread's folder), their runtime mode (`auto` while a file `auto` is there, else `full-access`) and whether they are settled. `thread start` (a session in the
@@ -985,6 +985,7 @@ if [ -f "$threads/$id/pending" ]; then status=running; run=$(cat "$threads/$id/p
 [ -f "$dir/active-$id" ] && active='"r1"'
 [ -f "$dir/waiting-$id" ] && status=running pending=1
 [ -f "$dir/failed-$id" ] && status=failed
+[ -f "$dir/listed-$id" ] && status=$(cat "$dir/listed-$id")
 tasks='[]'
 if [ -f "$dir/background-$id" ]; then
   left=$(cat "$dir/background-$id")
@@ -1000,7 +1001,8 @@ printf '{"thread":{"threadId":"%s","link":"https://t3.test/%s","status":"%s","ac
 /// the fake `t3 thread show` does it. `t3_thread_organize` fails with the text in `organize-error` while that file is
 /// there; else it marks the thread settled. `t3_thread_read` gives the thread's latest run the error in `limit-<id>` while
 /// that file is there. Each tool call is logged to `t3-mcp.log` (`<tool> <arguments>`). A WebSocket on `/ws` takes T3 Code's
-/// internal rename command (DEV-619), logs it there as `ws_rename <payload>` and answers success; while `ws-refuse` is
+/// internal rename command (DEV-619), logs it there as `ws_rename <payload>` and answers success; a `thread.settle`
+/// command it logs as `ws_settle <payload>` and marks the thread settled; while `ws-refuse` is
 /// there, `/ws` answers 404. Returns the origin.
 fn fake_t3_server(dir: &Path, project: &Path) -> String {
     use std::collections::{HashMap, HashSet};
@@ -1020,7 +1022,13 @@ fn fake_t3_server(dir: &Path, project: &Path) -> String {
                 if let Ok(tungstenite::Message::Text(text)) = socket.read() {
                     let request: serde_json::Value = serde_json::from_str(text.as_str()).unwrap();
                     let mut log = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("t3-mcp.log")).unwrap();
-                    writeln!(log, "ws_rename {}", request["payload"]).unwrap();
+                    let payload = &request["payload"];
+                    if payload["type"] == "thread.settle" {
+                        let _ = std::fs::write(threads.join(payload["threadId"].as_str().unwrap_or_default()).join("settled"), "");
+                        writeln!(log, "ws_settle {payload}").unwrap();
+                    } else {
+                        writeln!(log, "ws_rename {payload}").unwrap();
+                    }
                     let answer = serde_json::json!({"_tag": "Exit", "requestId": request["id"], "exit": {"_tag": "Success", "value": {"sequence": 1}}});
                     let _ = socket.send(tungstenite::Message::text(answer.to_string()));
                     let _ = socket.read();
@@ -1362,13 +1370,20 @@ fn a_t3_thread_stays_active_while_its_ticket_waits_or_its_job_failed() {
     assert!(job_logs(&fixtures).contains("The T3 Code thread was not settled: "), "the refusal is a note");
 }
 
-/// The fake T3 Code server's settled threads, in the order it settled them.
+/// The fake T3 Code server's settled threads, in the order it settled them, through `t3_thread_organize` or the
+/// internal API's `thread.settle` (DEV-917).
 fn settled_threads(root: &Path) -> Vec<String> {
-    mcp_calls(root, "t3_thread_organize").iter().map(|call| call["threadId"].as_str().unwrap_or_default().to_string()).collect()
+    let calls = std::fs::read_to_string(root.join("t3-mcp.log")).unwrap_or_default();
+    let settle = |line: &str| line.strip_prefix("t3_thread_organize ").or_else(|| line.strip_prefix("ws_settle ")).map(str::to_string);
+    let threads = calls
+        .lines()
+        .filter_map(settle)
+        .map(|args| serde_json::from_str::<serde_json::Value>(&args).unwrap()["threadId"].as_str().unwrap_or_default().to_string());
+    threads.collect()
 }
 
 /// DEV-747: a failed job's thread stayed active for good, also after later jobs settled their own threads (DEV-732).
-/// It is settled once a later job on the ticket completes and settles its own thread.
+/// It is settled once a later job on the ticket starts (DEV-876), before that job settles its own thread.
 #[test]
 fn a_failed_jobs_thread_is_settled_once_a_later_job_completes() {
     let (fixtures, _env) = t3_harness("");
@@ -1380,7 +1395,7 @@ fn a_failed_jobs_thread_is_settled_once_a_later_job_completes() {
     // As DEV-729's threads did, the thread completes after its job failed.
     std::fs::remove_file(root.join("failed-thread-0")).unwrap();
     run_t3(&fixtures, "review").success();
-    assert_eq!(settled_threads(root), vec!["thread-1", "thread-0"], "the later job settles its own thread, then the kept one");
+    assert_eq!(settled_threads(root), vec!["thread-0", "thread-1"], "the later job settles the kept thread as it starts, then its own");
     let logs = job_logs(&fixtures);
     assert!(logs.contains("Settled the T3 Code thread https://t3.test/thread-0"), "the failed job's log says so: {logs}");
 }
@@ -1445,7 +1460,7 @@ fn a_kept_thread_that_isnt_settled_is_named_by_its_link() {
 }
 
 /// DEV-810: a ticket's next job reuses its session's name, so the harnessmux record holds only the newest thread. The
-/// older thread a failed job kept is settled all the same once the later job completes. The later job starts its own
+/// older thread a failed job kept is settled all the same, as the later job starts (DEV-876). The later job starts its own
 /// session (`--session new`): continuing thread-0 would hand off and keep its record as `<name>.<stamp>` (DEV-611).
 #[test]
 fn a_kept_thread_whose_session_holds_a_newer_thread_is_settled() {
@@ -1463,7 +1478,7 @@ fn a_kept_thread_whose_session_holds_a_newer_thread_is_settled() {
     .expect("automation rules");
     run_t3_with(&fixtures, "fix", &["--session", "new"]).success();
     let logs = job_logs(&fixtures);
-    assert_eq!(settled_threads(root), vec!["thread-1", "thread-0"], "{logs}");
+    assert_eq!(settled_threads(root), vec!["thread-0", "thread-1"], "{logs}");
     assert!(logs.contains("Settled the T3 Code thread https://t3.test/thread-0"), "{logs}");
 }
 

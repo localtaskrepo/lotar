@@ -1,11 +1,11 @@
 title: Run agent jobs on a second machine over ssh (dyson)
-status: Reviewing
+status: InProgress
 priority: Medium
 type: Feature
 reporter: claude
-assignee: '@review'
+assignee: '@fix'
 created: 2026-11-26T17:08:01.064005+00:00
-modified: 2026-11-27T04:36:14.739408+00:00
+modified: 2026-11-27T10:06:22.037809+00:00
 relationships:
   depends_on:
   - harnessmux:HARN-33
@@ -126,10 +126,39 @@ comments:
       result: not_run
       reason: needs a daytime run on the real host
     next: After the release, run one job on dyson in hours and check its commits come back signed
+- date: 2026-11-27T10:06:07.031939+00:00
+  author: claude
+  text: |-
+    Review: blocking. A dyson thread that stops to ask a question strands its work on dyson.
+
+    **Blocking**
+    - `crates/lotar-agent/src/services/agent_job_service.rs:4238-4242` (`finish_on_host`): on `RunEnd::WaitingForAnswer`, lotar frees the dyson slot, closes the MCP bridge (`hosted.close()`, `hosted.rs:276`) and returns without `bring_back`. Results:
+      - Commits made before the question are never fetched or re-signed.
+      - After the owner answers in T3, the thread keeps working on dyson with no lotar MCP server, so it can't touch the ticket.
+      - Its commits never come back to the Mac either.
+      - It also doesn't count against dyson's `max_jobs`.
+      - A later job on the Mac starts without that work. A later job on dyson is refused by `clear_earlier_worktree` (`hosted.rs:163-166`: "has commits the Mac lacks"), because after a fetch HEAD still isn't an ancestor.
+      - The merge could land the branch without the dyson commits.
+      - This breaks the "Commits come back" and "nothing of the job keeps running on dyson" items in Done when.
+    - Fix: when a host job ends waiting, bring its commits back so far, or keep its worktree, slot and bridge for the answered thread. Either way, before the ticket's next job runs or merges, fetch, re-sign and fast-forward from the kept dyson worktree. Reset dyson's branch to the re-signed commits. Add a fake-ssh test for "waits, answered, commits come back".
+
+    **Minor (no ticket)**
+    - With no history, the expected duration is 60 min (`agent_hosts.rs:24`). The ticket says "else its timeout", but profiles have no job timeout (only `stall_timeout_seconds`), so 60 min is a fair stand-in. Docs say so.
+    - Main moved on: `Cargo.toml` and `Cargo.lock` conflict on harnessmux (main `0.4.0`, branch `0.5.0`). Trivial for the rebase.
+    - "Verified on dyson" in Done when is still open (fix comment: not run). The ticket shouldn't go Done until a daytime job has run on dyson and an after-21:00 job has stayed on the Mac.
+
+    **Read and reran**
+    - Read: the diff `e1bedb96f..8c1f4ba84` (config, `agent_hosts.rs`, `hosted.rs`, job/queue placement, T3 routing, docs, REST `host` in api_types/types.ts/openapi), the ticket, owner decisions and fix comment #12.
+    - Placement (Mac first, both `max_parallel_jobs`, hours, duration, cap), wake (once per 10 min, within hours only), version and environment probe, push/clone/worktree, MCP over a forwarded socket, re-sign by `rebase --force-rebase` and SIGTERM then SIGKILL all match the ticket.
+    - `npm ci`: passed.
+    - `cargo nextest run -p lotar-agent -p lotar-core -E 'test(agent_host) | test(hosted::) | test(agent_hosts) | test(update_header) | test(agent_queue_service)'`: 42 passed.
+    - `npm run lint`: passed. Worktree left clean.
+    - No UI changes; ui-review didn't apply.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acc67bf8b282f21aec9a87cf0dde7958bfe602b82fd437e452b0a7ea25c1de5ac
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abec78b7dede343dabc4a24b01ec89af6c7439e651553efd8262e3b2e4be05e86
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6bdec0e7bbf11d614f5531c0a45b8711e678e15e03baba9e8b31ea82500177a6
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afcc053a85093d1bc4939cef7df1d97cf2ee609c523de5c10c5a5a767cf06761c
 description: |-
   The owner decided on 2026-11-26 (local LOCA-631, INBOX-757) that the home desktop `dyson` (Debian 13, i5-2500K, 32 GB) takes "Lotar jobs with claude/codex signed in on dyson". lotar runs every job on the Mac today.
 
@@ -158,6 +187,7 @@ description: |-
   Prior art: openai/symphony (SPEC.md Appendix A), sortie-ai/sortie (`docs/architecture/27-appendix-a-ssh-worker-extension.md`).
 tags:
 - job-paused
+- review-returned
 history:
 - at: 2026-11-26T17:08:01.171137+00:00
   actor: claude
@@ -461,3 +491,33 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-27T10:06:07.031939+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T10:06:07.398136+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: job-paused
+    new: job-paused, review-blocked
+- at: 2026-11-27T10:06:17.505951+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: job-paused, review-blocked
+    new: job-paused, review-returned
+- at: 2026-11-27T10:06:20.631280+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-27T10:06:22.037809+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Afcc053a85093d1bc4939cef7df1d97cf2ee609c523de5c10c5a5a767cf06761c

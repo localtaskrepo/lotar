@@ -6,7 +6,9 @@
 //! ticket is settled: that job moved the ticket on. A new job settles the
 //! threads of the ticket's earlier jobs, and a done ticket all of its
 //! threads, whatever their run's outcome (DEV-876). A done ticket's job
-//! thread no job log names any more is found by its title (DEV-810).
+//! thread no job log names any more is found by its title (DEV-810). A
+//! thread whose run ended otherwise than `completed` is settled through T3
+//! Code's internal API, as harnessmux settles only completed ones (DEV-917).
 
 use super::{resumed, settle_session, ticket_done_state, workspace_root_of};
 use crate::config::types::AgentRunnerKind;
@@ -139,8 +141,8 @@ pub(super) fn settle(tasks_dir: &Path, mut threads: BTreeMap<String, Vec<Thread>
         let kept = |thread: &&Thread| unsettled(thread).is_some_and(|status| if done { ended(status) } else { status == "completed" });
         let upto =
             if done { threads.len() } else { threads.iter().rposition(|thread| listed.get(&thread.thread).is_some_and(|shown| shown.settled)).unwrap_or(0) };
-        let due: Vec<(&Thread, Option<&str>)> =
-            threads[..upto].iter().filter(kept).map(|thread| (thread, listed.get(&thread.thread).and_then(|shown| shown.link.as_deref()))).collect();
+        let due: Vec<(&Thread, &resumed::Listed)> =
+            threads[..upto].iter().filter(kept).filter_map(|thread| listed.get(&thread.thread).map(|shown| (thread, shown))).collect();
         if !due.is_empty() {
             settle_ticket(tasks_dir, &ticket_id, &due);
         }
@@ -174,19 +176,23 @@ fn unlogged(tasks_dir: &Path, logged: &BTreeMap<String, Vec<Thread>>, listed: &H
     found
 }
 
-/// Settle `threads` of the ticket, each with the link `t3 thread list` shows, under its lock, so one process at a time
-/// settles them; each one's newest job says how it went.
-fn settle_ticket(tasks_dir: &Path, ticket_id: &str, threads: &[(&Thread, Option<&str>)]) {
+/// Settle `threads` of the ticket, each with what `t3 thread list` shows of it, under its lock, so one process at a time
+/// settles them; each one's newest job says how it went. A `completed` thread is settled through harnessmux, which
+/// checks `t3 thread show` first; one whose run ended otherwise through T3 Code's internal API, as harnessmux refuses
+/// it (DEV-917).
+fn settle_ticket(tasks_dir: &Path, ticket_id: &str, threads: &[(&Thread, &resumed::Listed)]) {
     let Some(_lock) = crate::services::agent_active_jobs::lock_resumed_threads(tasks_dir, ticket_id) else { return };
     let prefix = crate::storage::TaskId::parse(ticket_id).ok().map(|parsed| parsed.project);
     let config = crate::config::resolution::config_for_project(tasks_dir, prefix.as_deref()).ok();
-    for &(thread, link) in threads {
+    for &(thread, shown) in threads {
         // A session a process follows runs the thread now.
         let record = resumed::session_of(&thread.thread);
         if record.as_ref().is_some_and(resumed::followed) {
             continue;
         }
+        let link = shown.link.as_deref();
         let settled = match config.as_ref() {
+            _ if shown.status != "completed" => settle_ended(tasks_dir, &thread.thread).map(|()| link.unwrap_or(&thread.thread).to_string()),
             Some(config) => record_for(tasks_dir, &thread.thread, record, thread.agent.as_deref(), config)
                 .and_then(|record| settle_session(&record, thread.agent.as_deref(), config)),
             None => Err(format!("{ticket_id}'s configuration can't be read")),
@@ -199,6 +205,12 @@ fn settle_ticket(tasks_dir: &Path, ticket_id: &str, threads: &[(&Thread, Option<
             Err(_) => {}
         }
     }
+}
+
+/// Settle `thread`, whose run ended otherwise than `completed`, through T3 Code's internal API (`thread.settle`).
+fn settle_ended(tasks_dir: &Path, thread: &str) -> Result<(), String> {
+    let (program, env, cwd) = super::t3_cli(tasks_dir).ok_or_else(|| "harnessmux has no t3 agent to reach T3 Code with".to_string())?;
+    crate::services::t3_thread_api::settle_thread(&program, &env, &cwd, thread)
 }
 
 /// The harnessmux record to settle `thread` with: the session that holds it, else one made for it, as a ticket's next
