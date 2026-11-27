@@ -347,15 +347,15 @@ fn comment(tasks_dir: &Path, ticket_id: &str, text: &str) {
     let _ = TaskService::add_comment_with_context(&mut Storage::new(tasks_dir), ticket_id, text, CommentContext::automation());
 }
 
-/// The request of a taken-over job when nothing holds the earlier one: a job
-/// taken over itself in another process, a log of an older build.
+/// The request of a taken-over job when nothing holds the earlier one: a log
+/// of an older build, or one without its `run_inputs` line.
 const GO_ON: &str = "Go on with the ticket's work in this thread, where it stopped.";
 
 /// What the job taking over the thread asks, should it run again (DEV-920):
 /// the request of the usage-limit retry it replaces, else the earlier job's
-/// from this process's record (a job taken over itself writes no prompt to
-/// its log), else from its log's prompt, else [`GO_ON`]. The job keeps the
-/// thread's profile.
+/// from this process's record, else from its log's `User request` (a job
+/// taken over itself writes the request it asks there, DEV-932), else
+/// [`GO_ON`]. The job keeps the thread's profile.
 fn takeover_request(
     resumed: &Resumed,
     ticket_id: &str,
@@ -427,6 +427,7 @@ fn adopt(
     // The job pauses like any other on a usage limit and runs again then
     // (DEV-912): without a request it failed into the failure rules.
     let request = takeover_request(resumed, ticket_id, retried, &workspace_root, agent_logs_dir.as_deref());
+    let asks = request.prompt.clone();
     {
         let mut registry = JOB_REGISTRY.lock().map_err(|_| "the job registry is unavailable".to_string())?;
         registry.active_by_ticket.insert(ticket_id.to_string(), job_id.clone());
@@ -504,6 +505,8 @@ fn adopt(
         if !start_job(job_id, AgentRunnerKind::T3, &profile, &tasks_dir, &ticket_id, &config, &started_at, Some(worktree)) {
             return;
         }
+        // What it asks, for a takeover of it in a process that has no record of it.
+        super::run_inputs::record(job_id, super::run_inputs::takeover_inputs(&asks, super::run_inputs::agent_profile_of(job_id), &profile, &name));
         // What the job paused on a usage limit recorded, as its retry would have.
         if let Some(carried) = carried_outcome {
             super::carry_outcome(job_id, &tasks_dir, &ticket_id, carried);

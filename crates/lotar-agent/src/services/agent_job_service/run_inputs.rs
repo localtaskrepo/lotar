@@ -169,6 +169,25 @@ pub(super) fn command_inputs(
     inputs(prompt, settings, env)
 }
 
+/// The `run_inputs` of a job that took over a thread T3 Code ran again
+/// (DEV-932): it sends no turn, so its prompt is the request it asks should
+/// it run again, which the next takeover reads in another process.
+pub(super) fn takeover_inputs(request: &str, agent_profile: Option<String>, profile: &AgentProfileDetail, session: &str) -> AgentJobRunInputs {
+    let mut prompt = JobPrompt::default();
+    prompt.section("User request");
+    prompt.push_str("User request:\n");
+    prompt.push_str(request);
+    let settings = AgentJobRunSettings {
+        runner: AgentRunnerKind::T3.as_str().to_string(),
+        agent_profile,
+        model: profile.model.clone(),
+        effort: profile.effort.clone(),
+        session: Some(AgentJobRunSession { name: session.to_string(), mode: "resumed".to_string(), configured: Some(session_label(profile).to_string()) }),
+        ..AgentJobRunSettings::default()
+    };
+    inputs(&prompt, settings, std::iter::empty())
+}
+
 fn inputs(prompt: &JobPrompt, settings: AgentJobRunSettings, env: impl Iterator<Item = String>) -> AgentJobRunInputs {
     AgentJobRunInputs {
         at: time::now_rfc3339(),

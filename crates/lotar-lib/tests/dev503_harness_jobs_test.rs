@@ -1871,6 +1871,53 @@ fn a_job_taken_over_from_a_taken_over_job_asks_the_first_jobs_request() {
     retry("the takeover of a completed takeover");
 }
 
+/// DEV-932: a taken-over job wrote no `run_inputs` line, so once the process that took it over had exited, the next
+/// takeover found no request and asked "Go on with the ticket's work". A queue worker in a process of its own takes
+/// the thread over here and exits after its run; the takeover in this process, whose registry has no record of that
+/// job, asks what the thread's first job asked, on its profile.
+#[test]
+fn a_takeover_of_a_job_another_process_took_over_asks_the_first_jobs_request() {
+    let (fixtures, _env) = t3_harness_with(&[("fix", "", "    continue_within_minutes: 0\n")]);
+    let root = fixtures.get_temp_path();
+    let tasks_dir = fixtures.tasks_root.clone();
+    let _queue = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", root.join("queue").to_str().unwrap());
+    let _wait = EnvVarGuard::set("LOTAR_AGENT_USAGE_LIMIT_WAIT_SECONDS", "1");
+    let _look = EnvVarGuard::set("LOTAR_AGENT_RESUMED_LOOK_SECONDS", "0");
+    run_t3(&fixtures, "fix").success();
+    std::fs::write(root.join("list-threads"), "").unwrap();
+
+    // T3 Code runs the thread again; a queue worker process takes it over, and the run ends without a usage limit.
+    std::fs::write(root.join("t3-threads/thread-0/latest"), "r1").unwrap();
+    std::fs::write(root.join("running-thread-0"), "").unwrap();
+    let mut worker = std::process::Command::new(crate::common::lotar_bin())
+        .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+        .current_dir(root)
+        .args(["--tasks-dir", tasks_dir.to_str().unwrap(), "agent", "worker"])
+        .spawn()
+        .unwrap();
+    wait_for("the worker's takeover", || lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").is_some());
+    let taken = lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").unwrap().job_id;
+    std::fs::remove_file(root.join("running-thread-0")).unwrap();
+    assert!(worker.wait().unwrap().success(), "the worker exits once the taken-over job ended");
+    assert!(AgentJobService::get_job(&taken).is_none(), "this process has no record of the worker's job");
+    assert!(AgentQueueService::list_pending(&tasks_dir).unwrap().is_empty(), "no retry is queued");
+
+    // T3 Code runs the thread once more; this process takes it over, and the run stops on a usage limit.
+    std::fs::write(root.join("t3-threads/thread-0/latest"), "r2").unwrap();
+    std::fs::write(root.join("running-thread-0"), "").unwrap();
+    AgentJobService::adopt_resumed_t3_threads(&tasks_dir);
+    let job = lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").expect("this process takes the thread over");
+    assert_ne!(job.job_id, taken);
+    for file in ["limit-thread-0", "failed-thread-0"] {
+        std::fs::write(root.join(file), "Claude API rate limit reached. Try again later.").unwrap();
+    }
+    std::fs::remove_file(root.join("running-thread-0")).unwrap();
+    wait_for_jobs_to_end(&tasks_dir);
+    let pending = AgentQueueService::list_pending(&tasks_dir).unwrap();
+    let retry = pending.iter().find(|entry| entry.ticket_id == "TEST-1").unwrap_or_else(|| panic!("a retry is queued: {pending:?}\n{}", job_logs(&fixtures)));
+    assert_eq!((retry.agent.as_str(), retry.prompt.as_str()), ("fix", "Work on it"), "the first job's request and profile");
+}
+
 /// DEV-600: a queue entry held by an earlier job's T3 Code thread waited without a word, retrying every few hundred
 /// milliseconds. Its ticket now gets one comment that says which thread holds it and what lets it go on.
 #[test]
