@@ -40,6 +40,8 @@ struct Resumed {
     ended_at: String,
     worktree_path: Option<String>,
     worktree_branch: Option<String>,
+    /// The agent host the thread runs on (DEV-901).
+    host: Option<String>,
 }
 
 impl Resumed {
@@ -121,6 +123,7 @@ fn ended_threads(tasks_dir: &Path) -> Vec<Resumed> {
             ended_at: status.at,
             worktree_path: status.worktree_path.or(job.header.worktree_path),
             worktree_branch: status.worktree_branch.or(job.header.worktree_branch),
+            host: job.header.host,
         };
         threads.insert(thread, resumed);
     }
@@ -154,7 +157,16 @@ pub(super) fn list_threads(program: &Path, env: &[(String, String)], cwd: &Path,
         .output()
         .ok()
         .filter(|output| output.status.success())?;
-    let listed: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
+    let mut listed: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
+    // The threads of host jobs are on the hosts' T3 Code, in a project at the same path (DEV-901).
+    for ssh in crate::services::agent_hosts::routed_hosts() {
+        let script = format!("t3 thread list --project {} --json", crate::services::agent_hosts::quote(&project.to_string_lossy()));
+        if let (Some(here), Some(serde_json::Value::Array(there))) =
+            (listed.as_array_mut(), ssh.run(&script).ok().and_then(|text| serde_json::from_str::<serde_json::Value>(text.trim()).ok()))
+        {
+            here.extend(there);
+        }
+    }
     let text = |thread: &serde_json::Value, key: &str| thread.get(key).and_then(|value| value.as_str()).unwrap_or_default().to_string();
     Some(
         listed
@@ -453,6 +465,7 @@ fn adopt(
     let (tasks_dir, ticket_id, old_job) = (tasks_dir.to_path_buf(), ticket_id.to_string(), resumed.job_id.clone());
     let new_job = job_id.clone();
     let worktree = (resumed.worktree_path.clone(), resumed.worktree_branch.clone());
+    let host = resumed.host.clone();
     std::thread::spawn(move || {
         let job_id = new_job.as_str();
         let _slot = RunningJobSlot { job_id, ticket_id: &ticket_id, tasks_dir: &tasks_dir };
@@ -476,7 +489,18 @@ fn adopt(
             record_and_emit(state, "agent_job_progress", Some(note));
         });
         let why = format!("T3 Code runs the thread of the job {old_job} again");
-        resume_session_to_end(job_id, AgentRunnerKind::T3, AgentRunnerKind::T3.as_str(), &name, &profile, &tasks_dir, &ticket_id, &config, &why);
+        resume_session_to_end(
+            job_id,
+            AgentRunnerKind::T3,
+            AgentRunnerKind::T3.as_str(),
+            &name,
+            &profile,
+            &tasks_dir,
+            &ticket_id,
+            &config,
+            &why,
+            host.as_deref(),
+        );
     });
     Ok(job_id)
 }

@@ -325,6 +325,11 @@ pub fn validate_effective_done_policy(config: &ResolvedConfig) -> Result<(), Con
     Ok(())
 }
 
+/// `agent.hosts` and the profiles' `host` (DEV-901) fail the config load.
+pub fn validate_resolved_agent_hosts(config: &ResolvedConfig) -> Result<(), ConfigError> {
+    crate::config::types::validate_agent_hosts(&config.agent_hosts, &config.agent_profiles).map_err(ConfigError::PolicyError)
+}
+
 pub fn load_and_merge_configs(tasks_dir: Option<&Path>) -> Result<ResolvedConfig, ConfigError> {
     // Fast path: return from cache if the config files are unchanged
     let key = cache_key_for(tasks_dir);
@@ -336,6 +341,7 @@ pub fn load_and_merge_configs(tasks_dir: Option<&Path>) -> Result<ResolvedConfig
         // Cached entries were validated when inserted; re-validate anyway
         // because the environment layer is not part of the file fingerprint.
         validate_effective_done_policy(&cached.resolved)?;
+        validate_resolved_agent_hosts(&cached.resolved)?;
         return Ok(cached.resolved.clone());
     }
 
@@ -347,6 +353,7 @@ pub fn load_and_merge_configs(tasks_dir: Option<&Path>) -> Result<ResolvedConfig
     // classifying nothing as terminal. Repair flows through the full
     // candidate pipeline, which loads raw configs and revalidates.
     validate_effective_done_policy(&resolved)?;
+    validate_resolved_agent_hosts(&resolved)?;
     if let Ok(mut guard) = config_cache().write() {
         guard.insert(key, CachedConfig { resolved: resolved.clone(), fingerprint });
     }
@@ -363,7 +370,9 @@ fn load_merged_global_chain(tasks_dir: Option<&Path>) -> ResolvedConfig {
 
     // 4. Global config (.tasks/config.yml or custom dir) - lowest priority (after defaults)
     let tasks_dir_buf = tasks_dir.map(|p| p.to_path_buf());
-    if let Ok(global_config) = crate::config::persistence::load_global_config(tasks_dir_buf.as_deref()) {
+    if let Ok(mut global_config) = crate::config::persistence::load_global_config(tasks_dir_buf.as_deref()) {
+        // A host's ssh target and wake command are the user's to set (DEV-901).
+        global_config.agent_hosts.clear();
         merge_global_config(&mut config, global_config);
     }
 
@@ -697,6 +706,9 @@ pub fn merge_global_config_with(base: &mut GlobalConfig, override_config: Global
     if keys.has("agent_job_history") || override_config.agent_job_history != defaults.agent_job_history {
         base.agent_job_history = override_config.agent_job_history;
     }
+    if keys.has("agent_hosts") || !override_config.agent_hosts.is_empty() {
+        base.agent_hosts = override_config.agent_hosts;
+    }
     if keys.has("scan_signal_words") || override_config.scan_signal_words != defaults.scan_signal_words {
         base.scan_signal_words = override_config.scan_signal_words;
     }
@@ -896,6 +908,9 @@ pub fn overlay_global_into_resolved_with(resolved: &mut ResolvedConfig, override
     if keys.has("agent_job_history") || override_config.agent_job_history != defaults.agent_job_history {
         resolved.agent_job_history = override_config.agent_job_history;
     }
+    if keys.has("agent_hosts") || !override_config.agent_hosts.is_empty() {
+        resolved.agent_hosts = override_config.agent_hosts;
+    }
     if keys.has("scan_signal_words") || override_config.scan_signal_words != defaults.scan_signal_words {
         resolved.scan_signal_words = override_config.scan_signal_words;
     }
@@ -954,6 +969,7 @@ pub fn get_project_config(_resolved_config: &ResolvedConfig, project_name: &str,
         // Cached entries were validated when inserted; re-validate anyway
         // because the environment layer is not part of the file fingerprint.
         validate_effective_done_policy(&cached.resolved)?;
+        validate_resolved_agent_hosts(&cached.resolved)?;
         return Ok(cached.resolved.clone());
     }
 
@@ -988,6 +1004,7 @@ pub fn get_project_config(_resolved_config: &ResolvedConfig, project_name: &str,
     // inspect effective views use this path directly). Invalid explicit
     // policies fail closed instead of caching an unclassifiable policy.
     validate_effective_done_policy(&resolved)?;
+    validate_resolved_agent_hosts(&resolved)?;
 
     if let Ok(mut guard) = config_cache().write() {
         // Hard cap: bounded memory even if many legitimate projects are queried.
@@ -1302,6 +1319,7 @@ impl ResolvedConfig {
             agent_memory_gate: global.agent_memory_gate,
             agent_disk_gate: global.agent_disk_gate,
             agent_job_history: global.agent_job_history,
+            agent_hosts: global.agent_hosts,
             remotes: global.remotes,
             ui: crate::config::types::UiSettings {
                 theme: global.ui_theme,

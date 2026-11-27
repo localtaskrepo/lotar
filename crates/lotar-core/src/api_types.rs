@@ -782,6 +782,9 @@ pub struct AgentJob {
     /// `on_permission: ask`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub question: Option<AgentJobQuestion>,
+    /// The agent host the job runs or ran on (DEV-901); none: this Mac.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
 }
 
 /// The T3 Code thread of a `t3` job and its state as T3 Code reports it now (DEV-849). This is

@@ -613,6 +613,9 @@ pub fn to_canonical_global_yaml_with(cfg: &GlobalConfig, options: GlobalYamlOpti
     if cfg.agent_job_history != defaults.agent_job_history {
         agent.insert(Y::String("job_history".into()), serde_yaml_ng::to_value(&cfg.agent_job_history).unwrap_or(Y::Null));
     }
+    if !cfg.agent_hosts.is_empty() {
+        agent.insert(Y::String("hosts".into()), serde_yaml_ng::to_value(&cfg.agent_hosts).unwrap_or(Y::Null));
+    }
     if !agent.is_empty() {
         root.insert(Y::String("agent".into()), Y::Mapping(agent));
     }
@@ -1035,5 +1038,57 @@ mod invalid_field_tests {
         let err = parse_global_from_yaml_str("agents:\n  good: claude\n  bad:\n    runner: claude\n    stall_timeout_seconds: notanumber\n").unwrap_err();
         assert_eq!(err.to_string(), "Parse Error: Invalid type for config field 'agents.bad.stall_timeout_seconds'");
         assert!(!err.to_string().contains("notanumber"));
+    }
+}
+
+#[cfg(test)]
+mod agent_hosts_tests {
+    use super::parse_global_from_yaml_str;
+    use crate::config::types::{HostHours, validate_agent_hosts};
+
+    const HOSTS: &str = "agent:\n  hosts:\n    dyson:\n      ssh: dyson\n      t3_environment: dyson\n      max_jobs: 2\n      hours: \"09:00-21:00\"\n      timezone: America/Los_Angeles\n      wake: wake-dyson\n";
+
+    fn check(yaml: &str) -> Result<(), String> {
+        let config = parse_global_from_yaml_str(yaml).map_err(|err| err.to_string())?;
+        validate_agent_hosts(&config.agent_hosts, &profiles(&config))
+    }
+
+    fn profiles(config: &crate::config::types::GlobalConfig) -> indexmap::IndexMap<String, crate::config::types::AgentProfileDetail> {
+        config.agents.iter().map(|(name, profile)| (name.clone(), profile.to_detail())).collect()
+    }
+
+    /// DEV-901: `agent.hosts` and a t3 profile's `host` load.
+    #[test]
+    fn a_host_and_a_t3_profile_on_it_load() {
+        let config = parse_global_from_yaml_str(&format!("{HOSTS}agents:\n  fix:\n    runner: t3\n    host: dyson\n")).expect("parses");
+        let dyson = &config.agent_hosts["dyson"];
+        assert_eq!((dyson.ssh.as_str(), dyson.max_jobs, dyson.wake.as_deref()), ("dyson", 2, Some("wake-dyson")));
+        assert_eq!(dyson.host_hours(), Ok(Some(HostHours { start: 540, end: 1260 })));
+        assert_eq!(profiles(&config)["fix"].host.as_deref(), Some("dyson"));
+        assert_eq!(validate_agent_hosts(&config.agent_hosts, &profiles(&config)), Ok(()));
+        let one = parse_global_from_yaml_str("agent:\n  hosts:\n    dyson:\n      ssh: dyson\n      t3_environment: dyson\n").expect("parses");
+        assert_eq!(one.agent_hosts["dyson"].max_jobs, 1);
+    }
+
+    #[test]
+    fn an_unknown_host_or_one_on_a_command_or_merge_profile_is_refused() {
+        assert_eq!(check(&format!("{HOSTS}agents:\n  fix:\n    runner: t3\n    host: nyx\n")), Err("agents.fix.host: 'nyx' is not in agent.hosts".to_string()));
+        assert_eq!(
+            check(&format!("{HOSTS}agents:\n  build:\n    runner: command\n    command: make\n    host: dyson\n")),
+            Err("agents.build.host: only t3 profiles run on a host, this one runs command".to_string())
+        );
+        assert_eq!(
+            check(&format!("{HOSTS}agents:\n  merge:\n    runner: t3\n    host: dyson\n")),
+            Err("agents.merge.host: a merge job runs on the Mac".to_string())
+        );
+    }
+
+    #[test]
+    fn bad_hours_or_timezone_are_refused() {
+        assert_eq!(check(&HOSTS.replace("09:00-21:00", "9-21")), Err("agent.hosts.dyson: hours '9-21' is not HH:MM-HH:MM".to_string()));
+        assert_eq!(
+            check(&HOSTS.replace("America/Los_Angeles", "Mars/Olympus")),
+            Err("agent.hosts.dyson: timezone 'Mars/Olympus' is not a known time zone".to_string())
+        );
     }
 }

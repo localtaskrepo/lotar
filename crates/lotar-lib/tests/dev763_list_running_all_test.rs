@@ -19,6 +19,7 @@ fn job(id: &str, ticket: &str, owner_pid: u32, started_at: &str) -> ActiveJob {
         assignee_at_start: None,
         in_setup: false,
         request: None,
+        host: Default::default(),
     }
 }
 

@@ -62,6 +62,7 @@ fn the_status_feed_shows_running_jobs_a_held_queue_and_who_a_ticket_waits_on() {
         assignee_at_start: None,
         in_setup: false,
         request: None,
+        host: Default::default(),
     };
     agent_active_jobs::register(&fixtures.tasks_root, &elsewhere);
 

@@ -66,6 +66,7 @@ fn make_resolver() -> ProjectResolver {
         agent_job_history: Default::default(),
         remotes: Default::default(),
         ui: Default::default(),
+        agent_hosts: Default::default(),
     };
     resolver_from_config(cfg, std::path::PathBuf::from("/tmp"))
 }

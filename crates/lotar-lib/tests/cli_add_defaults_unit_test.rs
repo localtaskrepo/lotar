@@ -69,6 +69,7 @@ fn make_cfg(priorities: Vec<Priority>, default_priority: Priority, statuses: Vec
         agent_job_history: Default::default(),
         remotes: Default::default(),
         ui: Default::default(),
+        agent_hosts: Default::default(),
     }
 }
 

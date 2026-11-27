@@ -104,6 +104,7 @@ fn fix_job(id: &str, ticket: &str, session: Option<&str>, merge: bool) -> Active
         assignee_at_start: None,
         in_setup: false,
         request: None,
+        host: Default::default(),
     }
 }
 

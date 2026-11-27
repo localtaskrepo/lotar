@@ -8,6 +8,10 @@
 //! from `t3 auth session issue`, a WebSocket to `/ws`, and the RPC
 //! `orchestration.dispatchCommand` with a `thread.metadata.update`,
 //! `thread.settle` or `thread.stop` command.
+//!
+//! A thread of a job on an agent host (DEV-901) is on that host's T3 Code:
+//! its runtime state is read, and the session issued and revoked, over ssh,
+//! and the WebSocket goes through an ssh forward that lasts the command.
 
 use std::io::ErrorKind;
 use std::net::{TcpStream, ToSocketAddrs};
@@ -41,10 +45,35 @@ pub(crate) fn stop_thread(program: &Path, env: &[(String, String)], cwd: &Path, 
 }
 
 fn send(program: &Path, env: &[(String, String)], cwd: &Path, command: &serde_json::Value) -> Result<(), String> {
+    let thread = command.get("threadId").and_then(serde_json::Value::as_str).unwrap_or_default();
+    if let Some(ssh) = crate::services::agent_hosts::thread_route(thread) {
+        return send_via(&ssh, command);
+    }
     let origin = server_origin(env)?;
     let (session_id, token) = issue_session(program, env, cwd)?;
     let sent = dispatch(&origin, &token, command);
     revoke_session(program, env, cwd, &session_id);
+    sent
+}
+
+/// [`send`] to the T3 Code of the host `ssh` reaches.
+fn send_via(ssh: &crate::services::agent_hosts::Ssh, command: &serde_json::Value) -> Result<(), String> {
+    let runtime = ssh
+        .run(r#"cat "${T3CODE_HOME:-$HOME/.t3}/userdata/server-runtime.json""#)
+        .map_err(|err| format!("T3 Code's server on {} isn't running: {err}", ssh.target))?;
+    let state: serde_json::Value =
+        serde_json::from_str(runtime.trim()).map_err(|err| format!("T3 Code's runtime state on {} isn't JSON: {err}", ssh.target))?;
+    let origin = state.get("origin").and_then(serde_json::Value::as_str).ok_or_else(|| format!("T3 Code's runtime state on {} names no origin", ssh.target))?;
+    let uri: tungstenite::http::Uri = origin.parse().map_err(|err| format!("bad T3 Code server address {origin} on {}: {err}", ssh.target))?;
+    let (host, port) = (uri.host().unwrap_or("127.0.0.1").to_string(), uri.port_u16().unwrap_or(80));
+    let issued = ssh.run("t3 auth session issue --scope orchestration:operate --ttl 2m --label 'lotar thread command' --json")?;
+    let issued: serde_json::Value =
+        serde_json::from_str(issued.trim()).map_err(|err| format!("`t3 auth session issue` on {} printed no JSON: {err}", ssh.target))?;
+    let field = |name: &str| issued.get(name).and_then(serde_json::Value::as_str).map(str::to_string);
+    let (session_id, token) = field("sessionId").zip(field("token")).ok_or("`t3 auth session issue` printed no sessionId and token")?;
+    let sent = crate::services::agent_hosts::Forward::open(ssh, &host, port)
+        .and_then(|forward| dispatch(&format!("http://127.0.0.1:{}", forward.port), &token, command));
+    let _ = ssh.run(&format!("t3 auth session revoke {}", crate::services::agent_hosts::quote(&session_id)));
     sent
 }
 

@@ -2379,6 +2379,7 @@ fn a_taken_over_merge_job_waits_for_the_check_lock_before_it_resumes_its_session
             assignee_at_start: None,
             in_setup: false,
             request: None,
+            host: None,
         },
     );
     AgentJobService::recover_orphaned_jobs(&tasks_dir);

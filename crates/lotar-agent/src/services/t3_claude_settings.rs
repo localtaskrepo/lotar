@@ -48,7 +48,7 @@ fn write_settings(worktree: &Path, deny: &[String], env: &BTreeMap<String, Strin
 }
 
 /// Add the deny rules the file lacks; the profile's env keys win.
-fn merge(settings: &mut serde_json::Value, deny: &[String], env: &BTreeMap<String, String>) -> Result<(), String> {
+pub(crate) fn merge(settings: &mut serde_json::Value, deny: &[String], env: &BTreeMap<String, String>) -> Result<(), String> {
     let root = settings.as_object_mut().ok_or("the file holds no JSON object")?;
     if !deny.is_empty() {
         let permissions = root.entry("permissions").or_insert_with(|| serde_json::json!({})).as_object_mut().ok_or("permissions isn't an object")?;

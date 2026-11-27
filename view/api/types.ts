@@ -1346,6 +1346,18 @@ export interface AgentDiskGateConfig {
     idle_hours: number
 }
 
+/** `agent.hosts.<name>` (DEV-901, the user's home config only): a second machine T3 jobs run on over ssh. */
+export interface AgentHostConfig {
+    ssh: string
+    t3_environment: string
+    max_jobs: number
+    /** `HH:MM-HH:MM` in `timezone`; unset: always. */
+    hours?: string | null
+    timezone?: string | null
+    /** Shell command that wakes the host. */
+    wake?: string | null
+}
+
 /** `agent.job_history` (DEV-693, global only): how long job logs are kept. */
 export interface AgentJobHistoryConfig {
     keep_days: number
@@ -1456,6 +1468,7 @@ export interface ResolvedConfigDTO {
     agent_memory_gate?: AgentMemoryGateConfig
     agent_disk_gate?: AgentDiskGateConfig
     agent_job_history?: AgentJobHistoryConfig
+    agent_hosts?: Record<string, AgentHostConfig>
     sprint_defaults?: SprintDefaultsConfig
     sprint_notifications?: { enabled: boolean }
     remotes?: Record<string, SyncRemoteConfig>
@@ -1792,6 +1805,8 @@ export interface AgentJob {
     usage?: AgentJobUsage | null
     /** The agent's permission request that waits for an answer (profile `on_permission: ask`). */
     question?: AgentJobQuestion | null
+    /** The agent host (`agent.hosts`) the job runs or ran on; missing: this machine. */
+    host?: string
 }
 
 /** A permission request of a job's agent, waiting for an answer. */

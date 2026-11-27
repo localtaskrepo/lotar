@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T17:08:01.064005+00:00
-modified: 2026-11-27T10:22:37.402475+00:00
+modified: 2026-11-27T10:44:52.863386+00:00
 relationships:
   depends_on:
   - harnessmux:HARN-33
@@ -23,6 +23,7 @@ relationships:
   - DEV-843
   - DEV-867
   - DEV-877
+  - DEV-841
 comments:
 - date: 2026-11-26T20:04:29.483394+00:00
   author: claude
@@ -223,6 +224,9 @@ comments:
     lotar's merge needs the merge agent: rebasing `agent/DEV-901` onto `main` conflicts in `Cargo.lock`, `Cargo.toml`; lotar aborted the rebase, `agent/DEV-901` is unchanged.
   report:
     next: The merge agent takes over in a new session
+- date: 2026-11-27T10:44:52.565031+00:00
+  author: automation
+  text: Waited 28 min for the machine's check lock, held by lotar's merge checks of DEV-841 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-841 (pid 61697), since 10:14 UTC; the merge agent starts now.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Acc67bf8b282f21aec9a87cf0dde7958bfe602b82fd437e452b0a7ea25c1de5ac
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abec78b7dede343dabc4a24b01ec89af6c7439e651553efd8262e3b2e4be05e86
@@ -638,3 +642,13 @@ history:
   - field: relationships
     old: '{"depends_on":["harnessmux:HARN-33"],"blocks":["DEV-911"],"related":["DEV-909","DEV-911","DEV-594","DEV-876","DEV-912","DEV-903","DEV-929","DEV-843","DEV-867","DEV-877"]}'
     new: '{"depends_on":["harnessmux:HARN-33"],"blocks":["DEV-911","DEV-929"],"related":["DEV-909","DEV-911","DEV-594","DEV-876","DEV-912","DEV-903","DEV-929","DEV-843","DEV-867","DEV-877"]}'
+- at: 2026-11-27T10:44:52.565031+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T10:44:52.863386+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["harnessmux:HARN-33"],"blocks":["DEV-911","DEV-929"],"related":["DEV-909","DEV-911","DEV-594","DEV-876","DEV-912","DEV-903","DEV-929","DEV-843","DEV-867","DEV-877"]}'
+    new: '{"depends_on":["harnessmux:HARN-33"],"blocks":["DEV-911","DEV-929"],"related":["DEV-909","DEV-911","DEV-594","DEV-876","DEV-912","DEV-903","DEV-929","DEV-843","DEV-867","DEV-877","DEV-841"]}'

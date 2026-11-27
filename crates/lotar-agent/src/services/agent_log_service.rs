@@ -56,6 +56,9 @@ pub struct JobLogHeader {
     /// thread (DEV-472).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub agent_profile: Option<String>,
+    /// The agent host the job ran on (DEV-901); none: this Mac.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub host: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -216,6 +219,28 @@ impl AgentLogService {
         let mut file = File::create(&path)?;
         let line = serde_json::to_string(&header).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
         writeln!(file, "{}", line)?;
+        Ok(())
+    }
+
+    /// Changes the header of an existing log in place and keeps its events.
+    pub fn update_header(workspace_root: &Path, logs_dir: Option<&str>, job_id: &str, change: impl FnOnce(&mut JobLogHeader)) -> LoTaRResult<()> {
+        let Some(logs_dir) = logs_dir else {
+            return Ok(());
+        };
+        let path = resolve_log_path(workspace_root, logs_dir, job_id)?;
+        if !path.exists() {
+            return Ok(());
+        }
+        let text = fs::read_to_string(&path)?;
+        let (first, rest) = text.split_once('\n').unwrap_or((text.as_str(), ""));
+        let Ok(JobLogLine::Header(mut header)) = serde_json::from_str::<JobLogLine>(first) else {
+            return Ok(());
+        };
+        change(&mut header);
+        let line = serde_json::to_string(&JobLogLine::Header(header)).map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+        let staged = path.with_extension("header.tmp");
+        fs::write(&staged, format!("{line}\n{rest}"))?;
+        fs::rename(&staged, &path)?;
         Ok(())
     }
 
@@ -531,6 +556,23 @@ mod tests {
         assert_eq!(effective_logs_dir(tasks, Some("None")), None);
     }
 
+    /// DEV-901: a job whose host setup fails runs on the Mac, so its header drops the host and keeps the events.
+    #[test]
+    fn update_header_changes_the_header_and_keeps_the_events() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+        let mut first = header("job-1", "T-1");
+        first.host = Some("dyson".to_string());
+        AgentLogService::init_log(root, Some("logs"), first).unwrap();
+        AgentLogService::append_event(root, Some("logs"), "job-1", entry("agent_job_started", "2026-11-26T10:00:00Z", None)).unwrap();
+        AgentLogService::update_header(root, Some("logs"), "job-1", |header| header.host = None).unwrap();
+        let header = AgentLogService::load_header(root, "logs", "job-1").unwrap().unwrap();
+        assert_eq!(header.host, None);
+        assert_eq!(header.ticket_id, "T-1");
+        let text = fs::read_to_string(resolve_log_path(root, "logs", "job-1").unwrap()).unwrap();
+        assert!(text.contains("agent_job_started"), "{text}");
+    }
+
     /// DEV-767: the `run_inputs` line reads back as written; a log without one (older lotar) has none, and the
     /// line doesn't disturb the header, events and status readers.
     #[test]
@@ -571,6 +613,7 @@ mod tests {
             model: None,
             effort: None,
             agent_profile: None,
+            host: Default::default(),
         }
     }
 
@@ -667,6 +710,7 @@ mod tests {
                 model: Some("sonnet".to_string()),
                 effort: None,
                 agent_profile: None,
+                host: Default::default(),
             },
         )
         .unwrap();
@@ -731,6 +775,7 @@ mod tests {
                 model: Some("sonnet".to_string()),
                 effort: None,
                 agent_profile: Some("fix".to_string()),
+                host: Default::default(),
             };
             AgentLogService::init_log(root, Some("logs"), header).unwrap();
             AgentLogService::append_event(root, Some("logs"), id, entry("agent_job_message", created, Some("Hello"))).unwrap();
@@ -768,6 +813,7 @@ mod tests {
                 model: None,
                 effort: None,
                 agent_profile: None,
+                host: Default::default(),
             },
         )
         .unwrap();

@@ -714,7 +714,15 @@ impl AgentQueueService {
     /// records of the other processes are added (DEV-630).
     pub fn slot_wait_reason(tasks_dir: &Path, ticket_id: &str, own_jobs: Vec<(String, String)>) -> LoTaRResult<Option<String>> {
         let project = ticket_project(ticket_id);
-        let slots = job_slots_for(tasks_dir, project.iter().cloned(), own_jobs)?;
+        let slots = job_slots_for(tasks_dir, project.iter().cloned(), own_jobs, None)?;
+        Ok(slots.wait_reason(project.as_deref()))
+    }
+
+    /// Why a job that already holds its record waits for a slot on the Mac,
+    /// itself not counted: a job its agent host couldn't take (DEV-901).
+    pub fn mac_slot_wait_reason(tasks_dir: &Path, ticket_id: &str, job_id: &str, own_jobs: Vec<(String, String)>) -> LoTaRResult<Option<String>> {
+        let project = ticket_project(ticket_id);
+        let slots = job_slots_for(tasks_dir, project.iter().cloned(), own_jobs, Some(job_id))?;
         Ok(slots.wait_reason(project.as_deref()))
     }
 
@@ -908,7 +916,10 @@ impl AgentQueueService {
                     let disk_held = crate::services::disk_gate::check(tasks_dir).is_some();
                     let entries = dequeue_startable(tasks_dir, disk_held)?;
                     for entry in entries {
-                        match start_entry(tasks_dir, entry.clone()) {
+                        let started = start_entry(tasks_dir, entry.clone());
+                        // A placement its job didn't take ends with the start.
+                        let _ = crate::services::agent_hosts::take_reserved(&entry.ticket_id);
+                        match started {
                             Ok(()) => settle_taken(tasks_dir, &entry, None)?,
                             // The ticket's previous job is still running
                             // (maybe in another process): wait for it rather
@@ -1056,7 +1067,12 @@ fn entries_wait_for(
             if let Some(slots) = slots.as_mut()
                 && !slots.take(entry)
             {
-                return slots.wait_reason(entry_project(entry).as_deref()).unwrap_or_default();
+                let reason = slots.wait_reason(entry_project(entry).as_deref()).unwrap_or_default();
+                match slots.place(tasks_dir, entry) {
+                    Some(Ok(host)) => return format!("starting on {host} with the worker's next round"),
+                    Some(Err(why)) => return format!("{reason}; {why}"),
+                    None => return reason,
+                }
             }
             if let Some(job) = running.get(&entry.ticket_id) {
                 return format!("waiting for its ticket's running job {job}");
@@ -1399,18 +1415,26 @@ fn dequeue_startable(tasks_dir: &Path, disk_held: bool) -> LoTaRResult<Vec<Agent
             let held: Vec<usize> = state.pauses.iter().enumerate().filter(|(_, pause)| pause.holds_entry(tasks_dir, &entry)).map(|(index, _)| index).collect();
             if !held.iter().all(|&index| retry_due[index]) {
                 keep.push(entry);
-            } else if slots.take(&entry) {
-                for index in held {
-                    retry_due[index] = false;
-                    state.pauses[index].next_try_at = next_try_at();
-                    state.pauses[index].trying = Some(entry.ticket_id.clone());
-                }
-                busy.push(entry.ticket_id.clone());
-                entry.taken_from = entry.pinned.then_some(keep.len());
-                take.push(entry);
-            } else {
-                keep.push(entry);
+                continue;
             }
+            // The Mac first; when it is full, the profile's agent host (DEV-901).
+            if !slots.take(&entry) {
+                match slots.place(tasks_dir, &entry) {
+                    Some(Ok(host)) => crate::services::agent_hosts::reserve(&entry.ticket_id, &host),
+                    _ => {
+                        keep.push(entry);
+                        continue;
+                    }
+                }
+            }
+            for index in held {
+                retry_due[index] = false;
+                state.pauses[index].next_try_at = next_try_at();
+                state.pauses[index].trying = Some(entry.ticket_id.clone());
+            }
+            busy.push(entry.ticket_id.clone());
+            entry.taken_from = entry.pinned.then_some(keep.len());
+            take.push(entry);
         }
         state.pending = keep;
         state.taken.extend(take.iter().cloned());
@@ -1432,6 +1456,8 @@ struct Slot {
 struct JobSlots {
     total: Slot,
     projects: HashMap<String, Slot>,
+    /// The entries this pass placed on each agent host.
+    hosts: HashMap<String, usize>,
 }
 
 impl JobSlots {
@@ -1447,6 +1473,17 @@ impl JobSlots {
             slot.running += 1;
         }
         true
+    }
+
+    /// The Mac has no slot for the entry: the agent host its profile may run
+    /// on now (DEV-901), else why not. `None`: its profile has no host.
+    fn place(&mut self, tasks_dir: &Path, entry: &AgentQueueEntry) -> Option<Result<String, String>> {
+        let agent = Some(entry.agent.as_str()).filter(|agent| !agent.is_empty());
+        let placed = crate::services::agent_job_service::place_on_host(tasks_dir, &entry.ticket_id, agent, &self.hosts)?;
+        if let Ok(host) = &placed {
+            *self.hosts.entry(host.clone()).or_insert(0) += 1;
+        }
+        Some(placed)
     }
 
     /// Why a job of the project waits, the global limit first.
@@ -1467,15 +1504,18 @@ impl JobSlots {
 }
 
 fn job_slots(tasks_dir: &Path, entries: &[AgentQueueEntry], own_jobs: Vec<(String, String)>) -> LoTaRResult<JobSlots> {
-    job_slots_for(tasks_dir, entries.iter().filter_map(entry_project), own_jobs)
+    job_slots_for(tasks_dir, entries.iter().filter_map(entry_project), own_jobs, None)
 }
 
 /// The slots for the projects. The jobs are counted in every process: this
 /// process's own, also before they record themselves, and the records of
 /// `lotar serve`, `agent run --wait` and taken-over jobs.
-fn job_slots_for(tasks_dir: &Path, projects: impl Iterator<Item = String>, own_jobs: Vec<(String, String)>) -> LoTaRResult<JobSlots> {
+fn job_slots_for(tasks_dir: &Path, projects: impl Iterator<Item = String>, own_jobs: Vec<(String, String)>, except: Option<&str>) -> LoTaRResult<JobSlots> {
     let mut jobs: HashSet<(String, String)> = own_jobs.into_iter().collect();
-    jobs.extend(crate::services::agent_active_jobs::list(tasks_dir).into_iter().map(|job| (job.ticket_id, job.job_id)));
+    let others = crate::services::agent_active_jobs::list(tasks_dir);
+    jobs.extend(others.iter().map(|job| (job.ticket_id.clone(), job.job_id.clone())));
+    // A job on an agent host holds a slot there, not here (DEV-901).
+    jobs.retain(|(_, job)| !crate::services::agent_hosts::on_host(job, &others) && Some(job.as_str()) != except);
     let global = ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir).map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
     let total = Slot { running: jobs.len(), limit: global.get_resolved_config().agent_worktree.max_parallel_jobs };
     let mut slots = HashMap::new();
@@ -1487,7 +1527,7 @@ fn job_slots_for(tasks_dir: &Path, projects: impl Iterator<Item = String>, own_j
         let running = jobs.iter().filter(|(ticket, _)| ticket_project(ticket).as_deref() == Some(project.as_str())).count();
         slots.insert(project, Slot { running, limit: config.agent_worktree.max_parallel_jobs });
     }
-    Ok(JobSlots { total, projects: slots })
+    Ok(JobSlots { total, projects: slots, hosts: HashMap::new() })
 }
 
 fn entry_project(entry: &AgentQueueEntry) -> Option<String> {
@@ -2346,6 +2386,7 @@ mod tests {
             assignee_at_start: None,
             in_setup: false,
             request: None,
+            host: Default::default(),
         };
         crate::services::agent_active_jobs::register(&tasks_dir, &elsewhere);
         let later = AgentQueueEntry { not_before: Some("2999-01-01T00:00:00Z".into()), ..entry("WFA-4") };
@@ -2552,6 +2593,7 @@ mod tests {
             assignee_at_start: None,
             in_setup: false,
             request: None,
+            host: Default::default(),
         };
         crate::services::agent_active_jobs::register(&tasks_dir, &running);
         let started = dequeue_startable(&tasks_dir, false).unwrap();

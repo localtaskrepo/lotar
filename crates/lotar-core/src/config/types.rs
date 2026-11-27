@@ -354,6 +354,10 @@ pub struct AgentProfileDetail {
     pub mcp: Option<AgentMcpConfig>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub instructions: Option<AgentInstructionsConfig>,
+    /// A host of `agent.hosts` (DEV-901) the profile's jobs may run on when
+    /// the Mac has no free slot. Only T3 profiles; never command or merge.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub host: Option<String>,
 }
 
 /// A map whose values may be written as YAML scalars (`fast: true`, `level: 2`);
@@ -594,6 +598,110 @@ const fn default_disk_gate_min_free_gb() -> u64 {
 
 const fn default_disk_gate_idle_hours() -> u64 {
     6
+}
+
+/// A second machine agent jobs run on over ssh (DEV-901): `agent.hosts.<name>`
+/// in the user's home config. A profile with `host: <name>` runs its jobs
+/// there when the Mac has no free slot.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentHostConfig {
+    /// The ssh destination, such as `dyson` or `user@host`.
+    pub ssh: String,
+    /// The host's T3 environment (id or label), as `t3 environment list` shows it.
+    pub t3_environment: String,
+    /// Jobs that may run on the host at once.
+    #[serde(default = "default_host_max_jobs")]
+    pub max_jobs: usize,
+    /// When jobs may run there, `HH:MM-HH:MM` in `timezone`. Unset: always.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub hours: Option<String>,
+    /// An IANA time zone such as `America/Los_Angeles`. Unset: the Mac's.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub timezone: Option<String>,
+    /// A shell command that wakes the host, run at most once per 10 minutes
+    /// while work waits for it within `hours`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub wake: Option<String>,
+}
+
+const fn default_host_max_jobs() -> usize {
+    1
+}
+
+/// `hours` of an agent host as minutes after midnight. `end` before `start`
+/// is a window past midnight.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HostHours {
+    pub start: u16,
+    pub end: u16,
+}
+
+impl HostHours {
+    pub fn parse(text: &str) -> Result<Self, String> {
+        let minutes = |part: &str| -> Option<u16> {
+            let (h, m) = part.trim().split_once(':')?;
+            if h.len() != 2 || m.len() != 2 {
+                return None;
+            }
+            let (h, m) = (h.parse::<u16>().ok()?, m.parse::<u16>().ok()?);
+            (m < 60 && h * 60 + m <= 24 * 60).then_some(h * 60 + m)
+        };
+        let invalid = || format!("hours '{text}' is not HH:MM-HH:MM");
+        let (start, end) = text.split_once('-').ok_or_else(invalid)?;
+        let (start, end) = (minutes(start).ok_or_else(invalid)?, minutes(end).ok_or_else(invalid)?);
+        if start == end {
+            return Err(format!("hours '{text}' is an empty window"));
+        }
+        Ok(Self { start, end })
+    }
+}
+
+impl AgentHostConfig {
+    /// The host's time zone; an unknown name is an error.
+    pub fn time_zone(&self) -> Result<jiff::tz::TimeZone, String> {
+        match self.timezone.as_deref().map(str::trim).filter(|zone| !zone.is_empty()) {
+            Some(name) => jiff::tz::TimeZone::get(name).map_err(|_| format!("timezone '{name}' is not a known time zone")),
+            None => Ok(jiff::tz::TimeZone::system()),
+        }
+    }
+
+    pub fn host_hours(&self) -> Result<Option<HostHours>, String> {
+        self.hours.as_deref().map(str::trim).filter(|hours| !hours.is_empty()).map(HostHours::parse).transpose()
+    }
+}
+
+/// Refuses `agent.hosts` and profile `host`s that cannot work (DEV-901): a
+/// bad `hours` or `timezone`, a profile naming an unknown host, or `host` on a
+/// command or merge profile.
+pub fn validate_agent_hosts(hosts: &BTreeMap<String, AgentHostConfig>, profiles: &IndexMap<String, AgentProfileDetail>) -> Result<(), String> {
+    for (name, host) in hosts {
+        let field = |detail: String| format!("agent.hosts.{name}: {detail}");
+        if host.ssh.trim().is_empty() {
+            return Err(field("ssh is empty".into()));
+        }
+        if host.t3_environment.trim().is_empty() {
+            return Err(field("t3_environment is empty".into()));
+        }
+        host.host_hours().map_err(field)?;
+        host.time_zone().map_err(field)?;
+    }
+    for (profile, detail) in profiles {
+        let Some(host) = detail.host.as_deref().map(str::trim).filter(|host| !host.is_empty()) else {
+            continue;
+        };
+        let field = |detail: String| format!("agents.{profile}.host: {detail}");
+        if !hosts.contains_key(host) {
+            return Err(field(format!("'{host}' is not in agent.hosts")));
+        }
+        if profile.eq_ignore_ascii_case("merge") {
+            return Err(field("a merge job runs on the Mac".into()));
+        }
+        if !matches!(detail.runner.trim().to_ascii_lowercase().as_str(), "t3" | "t3code") {
+            return Err(field(format!("only t3 profiles run on a host, this one runs {}", detail.runner.trim())));
+        }
+    }
+    Ok(())
 }
 
 /// How long job logs are kept (DEV-693): `agent.job_history` in the global
@@ -1179,6 +1287,9 @@ pub struct GlobalConfig {
     pub agent_disk_gate: AgentDiskGateConfig,
     #[serde(default)]
     pub agent_job_history: AgentJobHistoryConfig,
+    /// `agent.hosts` (DEV-901), read from the user's own layers only.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub agent_hosts: BTreeMap<String, AgentHostConfig>,
 
     /// Web UI branding (DEV-218): default theme, display name, and logo/icon
     /// images given as paths relative to the repository.
@@ -1298,6 +1409,9 @@ pub struct ResolvedConfig {
     pub agent_disk_gate: AgentDiskGateConfig,
     #[serde(default)]
     pub agent_job_history: AgentJobHistoryConfig,
+    /// `agent.hosts` (DEV-901), read from the user's own layers only.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub agent_hosts: BTreeMap<String, AgentHostConfig>,
 
     #[serde(skip_serializing_if = "BTreeMap::is_empty", default)]
     pub remotes: BTreeMap<String, SyncRemoteConfig>,
@@ -1561,6 +1675,7 @@ impl Default for GlobalConfig {
             agent_memory_gate: AgentMemoryGateConfig::default(),
             agent_disk_gate: AgentDiskGateConfig::default(),
             agent_job_history: AgentJobHistoryConfig::default(),
+            agent_hosts: BTreeMap::new(),
             ui_theme: None,
             ui_name: None,
             ui_logo: None,

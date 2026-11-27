@@ -46,6 +46,7 @@ fn the_jobs_route_shows_what_another_process_queued_and_runs() {
         assignee_at_start: None,
         in_setup: false,
         request: None,
+        host: Default::default(),
     };
     agent_active_jobs::register(&fixtures.tasks_root, &elsewhere);
 

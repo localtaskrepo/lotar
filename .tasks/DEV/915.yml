@@ -1,11 +1,11 @@
 title: combined_stats lost its doc comment to held_in_memory in agent_queue_service.rs
-status: Reviewing
+status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-27T00:04:01.449016+00:00
-modified: 2026-11-27T09:43:27.780583+00:00
+modified: 2026-11-27T10:36:42.055082+00:00
 relationships:
   depends_on:
   - DEV-910
@@ -13,6 +13,7 @@ relationships:
   - DEV-910
   - DEV-865
   - DEV-871
+  - DEV-843
 comments:
 - date: 2026-11-27T02:39:23.118727+00:00
   author: claude
@@ -46,6 +47,16 @@ comments:
       result: not_run
       reason: no behavior change
     next: merge agent lands d0cb52721
+- date: 2026-11-27T10:36:36.607676+00:00
+  author: claude
+  text: |-
+    Review: passed. `combined_stats` has its doc comment back; nothing else changed.
+
+    - **Read:** `git log main..HEAD` shows one commit, `d0cb52721`. It changes `crates/lotar-agent/src/services/agent_queue_service.rs`: 4 lines removed, 4 added, comments only. There is no newer rework on `agent/DEV-915`.
+    - **Done when is met:** the four DEV-865 lines now sit above `combined_stats` (line 1309). `held_in_memory` (line 1291) keeps only its own three lines (DEV-871/DEV-910). Both doc comments describe the function they sit on.
+    - **Main:** the last change to this file on main is DEV-843 (`03663babd`), and it is already in the branch base `706b1dfb7`. `git diff HEAD main` on the file shows only these 8 lines, so the merge has no conflict.
+    - **Reran:** `npm ci` passed. `rustfmt --edition 2024 --check` on the file passed. `cargo check -p lotar-agent` passed. No tests were needed, because only comments changed.
+    - No stray files, no second copy of the fix, and no owner decision touched. Nothing minor to file.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A680674b4bb9f3226a0545c290f9674bbc58c2d66158ba18bc621157fff9695be
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae11ac081715db83175eedd84fb9269b452365c2a14da9719298192f6e059691e
@@ -139,3 +150,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-27T10:36:36.607676+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T10:36:37.035792+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-910"],"related":["DEV-910","DEV-865","DEV-871"]}'
+    new: '{"depends_on":["DEV-910"],"related":["DEV-910","DEV-865","DEV-871","DEV-843"]}'
+- at: 2026-11-27T10:36:42.055082+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

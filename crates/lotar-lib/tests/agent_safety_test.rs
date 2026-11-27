@@ -539,6 +539,7 @@ mod git_required {
             assignee_at_start: None,
             in_setup: false,
             request: None,
+            host: Default::default(),
         };
         agent_active_jobs::register(&fixture.tasks_root, &busy);
         let output = run(&ticket);
@@ -1520,6 +1521,7 @@ fn build_output_stays_while_another_job_runs_in_the_worktree() {
         assignee_at_start: None,
         in_setup: false,
         request: None,
+        host: Default::default(),
     };
     agent_active_jobs::register(&fixture.tasks_root, &elsewhere);
     fs::write(&go, "").unwrap();

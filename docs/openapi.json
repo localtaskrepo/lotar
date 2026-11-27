@@ -10808,6 +10808,10 @@
           "question": {
             "$ref": "#/components/schemas/AgentJobQuestion",
             "description": "The agent's permission request that waits for an answer (profile on_permission: ask)."
+          },
+          "host": {
+            "type": "string",
+            "description": "The agent host (agent.hosts) the job runs or ran on; missing: this machine."
           }
         },
         "required": [

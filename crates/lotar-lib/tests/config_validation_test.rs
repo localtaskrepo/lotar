@@ -93,6 +93,7 @@ fn test_global_config_validation_valid() {
         ui_theme_file: None,
         remotes: Default::default(),
         auth_profiles: Default::default(),
+        agent_hosts: Default::default(),
     };
 
     let result = validator.validate_global_config(&config);
@@ -171,6 +172,7 @@ fn test_global_config_validation_privileged_port_warning() {
         ui_theme_file: None,
         remotes: Default::default(),
         auth_profiles: Default::default(),
+        agent_hosts: Default::default(),
     };
 
     let result = validator.validate_global_config(&config);
@@ -262,6 +264,7 @@ fn test_global_config_validation_empty_lists_error() {
         ui_theme_file: None,
         remotes: Default::default(),
         auth_profiles: Default::default(),
+        agent_hosts: Default::default(),
     };
 
     let result = validator.validate_global_config(&config);
@@ -349,6 +352,7 @@ fn test_global_config_validation_invalid_defaults() {
         ui_theme_file: None,
         remotes: Default::default(),
         auth_profiles: Default::default(),
+        agent_hosts: Default::default(),
     };
 
     let result = validator.validate_global_config(&config);
@@ -431,6 +435,7 @@ fn test_global_config_duplicate_entries_warning() {
         ui_theme_file: None,
         remotes: Default::default(),
         auth_profiles: Default::default(),
+        agent_hosts: Default::default(),
     };
 
     let result = validator.validate_global_config(&config);

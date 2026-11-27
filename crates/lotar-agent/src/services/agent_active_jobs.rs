@@ -46,6 +46,10 @@ pub struct ActiveJob {
     /// resumed runs the job again instead of failing it (DEV-734).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub request: Option<crate::api_types::AgentJobCreateRequest>,
+    /// The agent host the job runs on (DEV-901): it holds a slot there, none
+    /// on the Mac.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
 }
 
 /// What a ticket should be when its job ends, set while the job ran
@@ -557,6 +561,7 @@ mod tests {
             assignee_at_start: None,
             in_setup: false,
             request: None,
+            host: Default::default(),
         };
         register(tasks.path(), &job);
         assert_eq!(for_ticket(tasks.path(), "T-1"), Some(job.clone()));

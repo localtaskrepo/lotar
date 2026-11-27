@@ -27,6 +27,7 @@ use std::time::{Duration, Instant};
 
 mod check_lock;
 mod follow;
+mod hosted;
 mod kept;
 mod merge;
 mod resumed;
@@ -511,13 +512,22 @@ impl AgentJobService {
             }
 
             // The limits are the queue worker's, counting every process's jobs (DEV-646).
+            // The Mac first; when it is full, the profile's agent host (DEV-901).
             let slot_wait = match mode {
-                JobStartMode::RespectLimits => slot_wait_reason(&registry, tasks_dir, &ticket_id)?,
-                JobStartMode::Immediate => None,
+                JobStartMode::RespectLimits => host_or_wait(&registry, tasks_dir, &ticket_id, req.agent.as_deref(), &job_id)?,
+                JobStartMode::Immediate => {
+                    if let Some(host) = crate::services::agent_hosts::take_reserved(&ticket_id) {
+                        crate::services::agent_hosts::assign(&job_id, &host);
+                    }
+                    None
+                }
             };
             let merge_slot_busy = is_merge_job && has_active_merge_job(&registry);
 
             should_queue = matches!(mode, JobStartMode::RespectLimits) && (memory_hold || held || slot_wait.is_some() || merge_slot_busy);
+            if should_queue {
+                crate::services::agent_hosts::release(&job_id);
+            }
             queued_at = queued_from.or_else(|| should_queue.then(|| created_at.clone()));
             registry.max_parallel_jobs =
                 crate::config::resolution::config_for_project(tasks_dir, None).ok().and_then(|global| global.agent_worktree.max_parallel_jobs);
@@ -627,6 +637,7 @@ impl AgentJobService {
             effort: job_effort,
             usage: None,
             question: None,
+            host: None,
         }))
     }
 
@@ -973,6 +984,7 @@ impl AgentJobRecord {
             effort: self.effort.clone(),
             usage: self.usage.clone(),
             question: self.question.clone(),
+            host: crate::services::agent_hosts::job_host(&self.id),
         }
     }
 
@@ -1012,7 +1024,9 @@ fn workspace_root_of(tasks_dir: &std::path::Path) -> std::path::PathBuf {
 
 fn saved_jobs(tasks_dir: &std::path::Path) -> Vec<crate::services::agent_log_service::SavedJob> {
     let root = workspace_root_of(tasks_dir);
-    job_log_dirs(tasks_dir).iter().flat_map(|dir| AgentLogService::load_jobs(&root, dir)).collect()
+    let jobs: Vec<_> = job_log_dirs(tasks_dir).iter().flat_map(|dir| AgentLogService::load_jobs(&root, dir)).collect();
+    crate::services::agent_hosts::route_saved(tasks_dir, &jobs);
+    jobs
 }
 
 fn saved_job(tasks_dir: &std::path::Path, id: &str) -> Option<crate::services::agent_log_service::SavedJob> {
@@ -1073,6 +1087,7 @@ fn saved_job_dto(saved: &crate::services::agent_log_service::SavedJob, running: 
         effort: header.effort.clone(),
         usage: status.and_then(|status| status.usage.clone()),
         question: logged_question(saved, running),
+        host: header.host.clone(),
     }
 }
 
@@ -2410,6 +2425,7 @@ fn adopt_orphaned_job(tasks_dir: &std::path::Path, orphan: &crate::services::age
             model: profile.model.clone(),
             effort: profile.effort.clone(),
             agent_profile: job.agent.clone(),
+            host: job.host.clone(),
         };
         if AgentLogService::init_log(&workspace_root, agent_logs_dir.as_deref(), setup_header.clone()).is_ok() {
             header = Some(setup_header);
@@ -2519,7 +2535,7 @@ fn finish_orphaned_job(
         return;
     };
     let why = "The lotar process running the job exited before its turn ended";
-    resume_session_to_end(job_id, runner_kind, agent, name, profile, tasks_dir, ticket_id, config, why);
+    resume_session_to_end(job_id, runner_kind, agent, name, profile, tasks_dir, ticket_id, config, why, job.host.as_deref());
 }
 
 /// Resume the session `name` in this process and end the job with its turn:
@@ -2537,6 +2553,7 @@ fn resume_session_to_end(
     ticket_id: &str,
     config: &ResolvedConfig,
     why: &str,
+    host: Option<&str>,
 ) {
     // A merge agent holds the machine's check lock until its job ends; the
     // OS freed it with the process that held it, so the takeover takes it
@@ -2585,8 +2602,13 @@ fn resume_session_to_end(
     update_job(job_id, |state| {
         record_and_emit(state, "agent_job_progress", Some(note.clone()));
     });
+    let on_host = if runner_kind == AgentRunnerKind::T3 { resumed_on_host(job_id, ticket_id, host, tasks_dir, config) } else { None };
     let mut context_messages = Vec::new();
     let end = drive_session(job_id, tasks_dir, &session, prompt, &[], profile, &mut context_messages);
+    let end = match on_host {
+        Some(hosted) => finish_on_host(job_id, ticket_id, hosted, end, name),
+        None => end,
+    };
     end_job(job_id, ticket_id, end, &context_messages, tasks_dir, config);
 }
 
@@ -3755,6 +3777,7 @@ fn init_job_log(
             model: profile.model.clone(),
             effort: profile.effort.clone(),
             agent_profile: JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(job_id).and_then(|state| state.record.agent_profile.clone())),
+            host: crate::services::agent_hosts::job_host(job_id),
         },
     );
     if let Some(dir) = logs_dir.as_deref() {
@@ -3965,6 +3988,30 @@ fn run_job(
         handoff_from = continued.take();
         handoff_why = "its T3 Code thread runs in a worktree T3 Code made";
     }
+    // A job on an agent host continues only a thread that runs there, and
+    // a job on the Mac only one here (DEV-901); else a new one, with a handoff.
+    let placed = crate::services::agent_hosts::job_host(&job_id).and_then(|name| {
+        let host = config.agent_hosts.get(&name).cloned();
+        if host.is_none() {
+            crate::services::agent_hosts::release(&job_id);
+        }
+        Some((name, host?))
+    });
+    if let Some(record) = continued.as_ref() {
+        let wanted = placed.as_ref().map(|(_, host)| host.t3_environment.as_str());
+        let had = record.profile.environment.as_deref();
+        if had != wanted {
+            let machine = |environment: Option<&str>| environment.map_or_else(|| "on this Mac".to_string(), |environment| format!("on {environment}"));
+            session_reason = Some(format!(
+                "The session {}'s thread runs {}, this job {}; it starts a new thread with a handoff.",
+                record.name,
+                machine(had),
+                machine(wanted)
+            ));
+            handoff_from = continued.take();
+            handoff_why = "its thread runs on another machine";
+        }
+    }
     // A resumed session runs on the model and effort it started with, also
     // a merge that continues the reviewer's (DEV-672): the job shows those.
     if let Some(record) = continued.as_ref() {
@@ -4101,6 +4148,56 @@ fn run_job(
     if in_check_lock {
         env.insert(check_lock::HELD_ENV.to_string(), "1".to_string());
     }
+    collect_waiting_on_host(&job_id, &ticket_id);
+    // A job on an agent host readies the host; one it can't take runs here
+    // once the Mac has a slot (DEV-901).
+    let mut on_host = None;
+    if let Some((host_name, host)) = placed {
+        let set_up = match (worktree_context.worktree_path.as_ref(), worktree_context.worktree_branch.as_ref(), resolve_repo_root(&tasks_dir)) {
+            _ if commit_retry.is_some() => Err("the job only makes a commit".to_string()),
+            (Some(worktree), Some(branch), Some(root)) => hosted::Hosted::set_up(
+                &job_id,
+                &host_name,
+                &host,
+                &hosted::Checkout { repo_root: &root, worktree, branch },
+                &host_thread_settings(&profile),
+                Some(host_mcp_server(&tasks_dir, &env, lost_host_connection(&job_id, &name, crate::services::agent_hosts::Ssh::new(&host.ssh)))),
+                local_t3(),
+            ),
+            _ => Err("the job has no worktree to push there".to_string()),
+        };
+        match set_up {
+            Ok((hosted, notes)) => {
+                for note in notes {
+                    update_job(&job_id, |state| {
+                        record_and_emit(state, "agent_job_progress", Some(note.clone()));
+                    });
+                }
+                on_host = Some(hosted);
+            }
+            Err(why) => {
+                crate::services::agent_hosts::release(&job_id);
+                crate::services::agent_hosts::forget_probe(&host_name, &host);
+                let workspace_root = tasks_dir.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| tasks_dir.clone());
+                let logs_dir = crate::services::agent_log_service::effective_logs_dir(&tasks_dir, config.agent_logs_dir.as_deref());
+                let _ = AgentLogService::update_header(&workspace_root, logs_dir.as_deref(), &job_id, |header| header.host = None);
+                let note = format!("Runs on this Mac, not on {host_name}: {why}");
+                update_job(&job_id, |state| {
+                    record_and_emit(state, "agent_job_progress", Some(note.clone()));
+                });
+                if let Some(record) = JOB_REGISTRY
+                    .lock()
+                    .ok()
+                    .and_then(|registry| registry.jobs.get(&job_id).map(|state| active_record_of(state, &ticket_id, &started_at, agent.map(|_| name.clone()))))
+                {
+                    crate::services::agent_active_jobs::register(&tasks_dir, &record);
+                }
+                if !wait_for_mac_slot(&job_id, &tasks_dir, &ticket_id) {
+                    return;
+                }
+            }
+        }
+    }
     let end = match agent {
         _ if commit_retry.is_some() => RunEnd::Exited(Some(0)),
         None => run_command(&job_id, &profile, &prompt, env, &worktree_context.working_dir, &tasks_dir, &ticket_id, active_record),
@@ -4113,11 +4210,200 @@ fn run_job(
                 resume: continued.is_some(),
                 cwd: &worktree_context.working_dir,
                 writable_dirs: extra_writable_dirs(&worktree_context.working_dir, &tasks_dir, is_merge_job),
+                hosted: on_host.as_ref(),
             };
             run_session(&job_id, &launch, &profile, &prompt, env, &tasks_dir, &ticket_id, &mut context_messages)
         }
     };
+    let end = match on_host {
+        Some(hosted) => finish_on_host(&job_id, &ticket_id, hosted, end, &name),
+        None => end,
+    };
     end_job(&job_id, &ticket_id, end, &context_messages, &tasks_dir, &config);
+}
+
+/// What a host's thread gets of the profile (DEV-901): its deny rules, env
+/// and whether it has lotar's MCP server.
+fn host_thread_settings(profile: &AgentProfileDetail) -> hosted::ThreadSettings {
+    hosted::ThreadSettings {
+        deny: profile.tools.as_ref().map(|tools| tools.disallowed.clone()).unwrap_or_default(),
+        env: crate::services::agent_runner::expand_env_map(&profile.env).into_iter().collect(),
+        lotar_mcp: profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar),
+    }
+}
+
+/// The lotar MCP server a host's thread reaches on this Mac: the job's env,
+/// so it knows the job, and the job server's tools.
+fn host_mcp_server(tasks_dir: &std::path::Path, env: &HashMap<String, String>, on_lost: Box<dyn Fn(&str) + Send>) -> hosted::McpServer {
+    let program = current_lotar_binary().unwrap_or_else(|| std::path::PathBuf::from("lotar"));
+    let mut server_env: std::collections::BTreeMap<String, String> = env.iter().map(|(key, value)| (key.clone(), value.clone())).collect();
+    if let harnessmux::McpServer::Stdio { env, .. } = crate::services::agent_runner::lotar_mcp_server(&program.to_string_lossy(), tasks_dir) {
+        server_env.extend(env);
+    }
+    hosted::McpServer { program, env: server_env, on_lost }
+}
+
+/// What a broken connection to the host does: the job notes it and its
+/// thread stops (DEV-901).
+fn lost_host_connection(job_id: &str, session: &str, ssh: crate::services::agent_hosts::Ssh) -> Box<dyn Fn(&str) + Send> {
+    let (job_id, session) = (job_id.to_string(), session.to_string());
+    Box::new(move |why: &str| {
+        let mut note = format!("{why}; the thread stops.");
+        if let Some(thread) = host_thread(&session, &ssh)
+            && let Err(err) = crate::services::t3_thread_api::stop_thread(std::path::Path::new("t3"), &[], std::path::Path::new("/"), &thread, why)
+        {
+            note = format!("{why}; stopping its thread on {} failed: {err}", ssh.target);
+        }
+        update_job(&job_id, |state| {
+            record_and_emit(state, "agent_job_progress", Some(note.clone()));
+        });
+    })
+}
+
+/// The thread of the job's session on its host, routed there.
+fn host_thread(session: &str, ssh: &crate::services::agent_hosts::Ssh) -> Option<String> {
+    let thread = crate::services::agent_runner::registry().load(session).ok()?.agent_session?;
+    crate::services::agent_hosts::route_thread(&thread, ssh);
+    Some(thread)
+}
+
+/// The end of a job on a host (DEV-901): a stopped job's thread stops there,
+/// and the commits come back to the Mac. A thread that waits for an answer
+/// keeps its worktree there; commits that can't come back hand the ticket
+/// back with why.
+fn finish_on_host(job_id: &str, ticket_id: &str, mut hosted: hosted::Hosted, end: RunEnd, session: &str) -> RunEnd {
+    let progress = |note: &str| {
+        update_job(job_id, |state| {
+            record_and_emit(state, "agent_job_progress", Some(note.to_string()));
+        });
+    };
+    let thread = host_thread(session, &hosted.ssh);
+    crate::services::agent_hosts::release(job_id);
+    if let RunEnd::WaitingForAnswer(message) = end {
+        let name = hosted.name.clone();
+        let note = match hosted.bring_back_so_far(ticket_id) {
+            Ok(notes) => {
+                for note in notes {
+                    progress(&note);
+                }
+                format!("Its commits so far are on this Mac; its worktree and lotar's MCP connection stay on {name} for the answer.")
+            }
+            Err(err) => format!("Its commits didn't come back to the Mac: {err}. Its worktree stays on {name}."),
+        };
+        wait_on_host(ticket_id, hosted);
+        return RunEnd::WaitingForAnswer(format!("{message}\n\nThe thread runs on {name}. {note}"));
+    }
+    let lost = hosted.lost();
+    if (lost.is_some() || should_stop_job(job_id) || matches!(end, RunEnd::Stopped))
+        && let Some(thread) = thread.as_ref()
+        && let Err(err) = crate::services::t3_thread_api::stop_thread(std::path::Path::new("t3"), &[], std::path::Path::new("/"), thread, "lotar's job stopped")
+    {
+        progress(&format!("Could not stop the thread {thread} on {}: {err}", hosted.name));
+    }
+    let good = matches!(end, RunEnd::Exited(Some(0))) && lost.is_none() && !should_stop_job(job_id);
+    match hosted.bring_back(ticket_id, good) {
+        Ok(notes) => {
+            for note in notes {
+                progress(&note);
+            }
+            end
+        }
+        Err(err) => {
+            let message = format!("The commits of {ticket_id} on {} didn't come back to the Mac: {err}. Its worktree stays there.", hosted.name);
+            if good {
+                RunEnd::HandedBack(message)
+            } else {
+                progress(&message);
+                end
+            }
+        }
+    }
+}
+
+/// Host jobs whose thread waits for an answer, by ticket (DEV-901): the job
+/// that takes the answered thread over gets its worktree and MCP connection
+/// on the host and brings its commits back at its end.
+static WAITING_ON_HOST: LazyLock<Mutex<HashMap<String, hosted::Hosted>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn wait_on_host(ticket_id: &str, hosted: hosted::Hosted) {
+    if let Ok(mut waiting) = WAITING_ON_HOST.lock() {
+        waiting.insert(ticket_id.to_string(), hosted);
+    }
+}
+
+fn take_waiting_on_host(ticket_id: &str) -> Option<hosted::Hosted> {
+    let mut waiting = WAITING_ON_HOST.lock().ok()?;
+    let key = waiting.keys().find(|key| crate::storage::identity::aliases_match(key, ticket_id))?.clone();
+    waiting.remove(&key)
+}
+
+/// A new job of a ticket whose thread waited for an answer on a host and
+/// wasn't taken over (DEV-901): what that thread committed there since
+/// comes back first, and its MCP connection closes.
+fn collect_waiting_on_host(job_id: &str, ticket_id: &str) {
+    let Some(mut waiting) = take_waiting_on_host(ticket_id) else {
+        return;
+    };
+    let notes = waiting.bring_back(ticket_id, false).unwrap_or_else(|err| {
+        vec![format!(
+            "What the earlier thread of {ticket_id} committed on {} after its question didn't come back: {err}. Its commits up to the question are here.",
+            waiting.name
+        )]
+    });
+    for note in notes {
+        update_job(job_id, |state| {
+            record_and_emit(state, "agent_job_progress", Some(note.clone()));
+        });
+    }
+}
+
+/// The host a taken-over `t3` thread runs on (DEV-901): the waiting job's
+/// worktree and MCP connection there, else (lotar restarted meanwhile) its
+/// worktree alone. The job holds a slot there and brings the commits back.
+fn resumed_on_host(job_id: &str, ticket_id: &str, host: Option<&str>, tasks_dir: &std::path::Path, config: &ResolvedConfig) -> Option<hosted::Hosted> {
+    let hosted = take_waiting_on_host(ticket_id).or_else(|| {
+        let name = host?;
+        let host = config.agent_hosts.get(name)?;
+        let (worktree, branch) =
+            JOB_REGISTRY.lock().ok()?.jobs.get(job_id).and_then(|state| Some((state.record.worktree_path.clone()?, state.record.worktree_branch.clone()?)))?;
+        let root = resolve_repo_root(tasks_dir)?;
+        let checkout = hosted::Checkout { repo_root: &root, worktree: std::path::Path::new(&worktree), branch: &branch };
+        hosted::Hosted::attach(name, host, &checkout)
+            .map_err(|err| {
+                update_job(job_id, |state| {
+                    record_and_emit(state, "agent_job_progress", Some(format!("Its commits on {name} can't come back: {err}")));
+                });
+            })
+            .ok()
+    })?;
+    crate::services::agent_hosts::assign(job_id, &hosted.name);
+    let workspace_root = tasks_dir.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| tasks_dir.to_path_buf());
+    let logs_dir = crate::services::agent_log_service::effective_logs_dir(tasks_dir, config.agent_logs_dir.as_deref());
+    let _ = AgentLogService::update_header(&workspace_root, logs_dir.as_deref(), job_id, |header| header.host = Some(hosted.name.clone()));
+    Some(hosted)
+}
+
+/// Wait for a slot on the Mac for a job its agent host couldn't take
+/// (DEV-901); `false` when it was cancelled meanwhile.
+fn wait_for_mac_slot(job_id: &str, tasks_dir: &std::path::Path, ticket_id: &str) -> bool {
+    let mut noted = false;
+    loop {
+        let own = JOB_REGISTRY.lock().map(|registry| slot_jobs(&registry)).unwrap_or_default();
+        match crate::services::agent_queue_service::AgentQueueService::mac_slot_wait_reason(tasks_dir, ticket_id, job_id, own) {
+            Ok(None) | Err(_) => return true,
+            Ok(Some(why)) if !noted => {
+                noted = true;
+                update_job(job_id, |state| {
+                    record_and_emit(state, "agent_job_progress", Some(format!("Waits for a slot on this Mac: {why}")));
+                });
+            }
+            Ok(Some(_)) => {}
+        }
+        if wait_cancelled(job_id, tasks_dir) {
+            return false;
+        }
+        std::thread::sleep(Duration::from_secs(5));
+    }
 }
 
 /// How long a `session: continue` job resumes its session after the
@@ -4332,6 +4618,9 @@ enum RunEnd {
     Failed(String),
     /// The agent waits for an answer in its own app; the message names where.
     WaitingForAnswer(String),
+    /// The run ended well, but its work isn't on the Mac (a host job's
+    /// commits didn't come back, DEV-901): the ticket goes back with why.
+    HandedBack(String),
 }
 
 fn end_job(
@@ -4351,6 +4640,10 @@ fn end_job(
         RunEnd::WaitingForAnswer(message) if !should_stop_job(job_id) => {
             hand_back_waiting_job(job_id, ticket_id, &message, tasks_dir, config);
             finalize_job(job_id, ticket_id, Some(WAITS_FOR_ANSWER), context_messages, tasks_dir, config);
+        }
+        RunEnd::HandedBack(message) if !should_stop_job(job_id) => {
+            hand_back_waiting_job(job_id, ticket_id, &message, tasks_dir, config);
+            finalize_job(job_id, ticket_id, Some(1), context_messages, tasks_dir, config);
         }
         _ => {
             let _ = AgentContextService::append_messages(tasks_dir, config, ticket_id, context_messages.to_vec(), None);
@@ -4687,6 +4980,8 @@ struct SessionLaunch<'a> {
     resume: bool,
     cwd: &'a std::path::Path,
     writable_dirs: Vec<std::path::PathBuf>,
+    /// The agent host the thread runs on (DEV-901).
+    hosted: Option<&'a hosted::Hosted>,
 }
 
 /// Run the job as a turn of its harnessmux session (DEV-503).
@@ -4709,7 +5004,12 @@ fn run_session(
     if session_profile.permissions == harnessmux::Permissions::Workspace {
         session_profile.add_dirs = launch.writable_dirs.clone();
     }
-    if profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar) {
+    let mut host_prompt = None;
+    if let Some(hosted) = launch.hosted {
+        session_profile.environment = Some(hosted.host.t3_environment.clone());
+        host_prompt = Some(host_note(&hosted.name, profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar)));
+    }
+    if profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar) && launch.hosted.is_none() {
         if crate::services::agent_runner::takes_mcp_servers(launch.runner_kind) {
             let bin = current_lotar_binary().map(|bin| bin.to_string_lossy().to_string()).unwrap_or_else(|| "lotar".to_string());
             session_profile.mcp_servers.insert("lotar".to_string(), crate::services::agent_runner::lotar_mcp_server(&bin, tasks_dir));
@@ -4728,7 +5028,7 @@ fn run_session(
         }
         session_profile.title = Some(title);
         // A new thread's Claude settings (DEV-618), in the worktree lotar made.
-        if !launch.resume && worktree_context_at(tasks_dir, launch.cwd).worktree_path.is_some() {
+        if !launch.resume && launch.hosted.is_none() && worktree_context_at(tasks_dir, launch.cwd).worktree_path.is_some() {
             notes.extend(write_t3_claude_settings(launch.cwd, profile, session_profile.provider.as_deref()));
         }
     }
@@ -4747,6 +5047,9 @@ fn run_session(
     let fallback_profile = (launch.resume && launch.runner_kind != AgentRunnerKind::T3).then(|| session_profile.clone());
     let mut resumed = launch.resume;
     let mut prompt = std::borrow::Cow::Borrowed(prompt);
+    if let Some(note) = host_prompt {
+        prompt.to_mut().append("Agent host", &note);
+    }
     let failed = |err: &dyn std::fmt::Display| RunEnd::Failed(format!("Could not start the {} session {}: {err}", launch.agent, launch.name));
     // The run's inputs are recorded once the session is open, with the prompt
     // and session mode it really got (DEV-767).
@@ -4815,6 +5118,21 @@ fn run_session(
     drive_session(job_id, tasks_dir, &session, &prompt.text, &working_dir_prefixes(launch.cwd), profile, context_messages)
 }
 
+/// What a thread on an agent host reads (DEV-901): the tickets stay on the
+/// Mac, so it changes them through lotar's MCP tools; the host has no
+/// secrets.
+fn host_note(host: &str, lotar_mcp: bool) -> String {
+    let tickets = if lotar_mcp {
+        "Read and change tickets only through the lotar MCP tools: the tickets live on the Mac, and the lotar CLI there sees none."
+    } else {
+        "The tickets live on the Mac, and the lotar CLI there sees none: report what you would change on the ticket in your last message."
+    };
+    format!(
+        "\nAgent host:\nThis thread runs on {host}, a second machine, in a worktree at the same path as on the Mac; lotar brings your commits back. {tickets} \
+{host} holds no secrets, credentials or opgate: when the work needs one, stop and say so in your last message.\n"
+    )
+}
+
 /// Write the profile's `tools.disallowed` and `env` into the Claude settings
 /// of a new thread's worktree (DEV-618) before the thread starts: T3's CLI
 /// takes no Claude settings, and T3's Claude sessions read the worktree's
@@ -4868,6 +5186,11 @@ fn t3_thread_title(ticket_id: &str, task: Option<&crate::api_types::TaskDTO>, th
 
 /// The `thread` object of `t3 thread show <thread> --json`.
 fn t3_thread_show(program: &std::path::Path, env: &[(String, String)], cwd: &std::path::Path, thread: &str) -> Option<serde_json::Value> {
+    if let Some(ssh) = crate::services::agent_hosts::thread_route(thread) {
+        let shown = ssh.run(&format!("t3 thread show {} --json --messages 0", crate::services::agent_hosts::quote(thread))).ok()?;
+        let mut shown: serde_json::Value = serde_json::from_str(shown.trim()).ok()?;
+        return shown.get_mut("thread").map(serde_json::Value::take);
+    }
     let output = Command::new(program)
         .args(["thread", "show", thread, "--json", "--messages", "0"])
         .envs(env.iter().map(|(key, value)| (key, value)))
@@ -6693,6 +7016,7 @@ fn active_record_of(state: &AgentJobState, ticket_id: &str, started_at: &str, se
         assignee_at_start: recorded_assignee(state.assignee_at_start.clone()),
         in_setup: false,
         request: state.request.clone(),
+        host: crate::services::agent_hosts::job_host(&state.record.id),
     }
 }
 
@@ -6745,14 +7069,19 @@ fn process_pending_queue() {
             // jobs in its scope until it ends, but one of them takes its due
             // try when no queue entry waits for it (DEV-604).
             let next = registry.pending_queue.iter().position(|pending| {
-                !(pending.is_merge_job && merge_busy)
-                    && matches!(slot_wait_reason(&registry, &pending.tasks_dir, &pending.ticket_id), Ok(None))
+                let free = !(pending.is_merge_job && merge_busy)
+                    && matches!(host_or_wait(&registry, &pending.tasks_dir, &pending.ticket_id, pending.agent.as_deref(), &pending.job_id), Ok(None));
+                let starts = free
                     && crate::services::memory_gate::check(&pending.tasks_dir).is_none()
                     && (pending.is_merge_job || crate::services::disk_gate::check(&pending.tasks_dir).is_none())
                     && (AgentQueueService::holding(&pending.tasks_dir, &pending.scope).is_none()
                         || AgentQueueService::take_held_try(&pending.tasks_dir, &pending.ticket_id, &pending.scope, |ticket| {
                             registry.active_by_ticket.contains_key(ticket) && !registry.pending_queue.iter().any(|queued| queued.ticket_id == ticket)
-                        }))
+                        }));
+                if free && !starts {
+                    crate::services::agent_hosts::release(&pending.job_id);
+                }
+                starts
             });
             let Some(pending) = next.and_then(|index| registry.pending_queue.remove(index)) else {
                 break;
@@ -6795,6 +7124,40 @@ fn job_provider(profile: &AgentProfileDetail) -> String {
 /// the queue worker's rule, with the jobs that hold this process's slots.
 fn slot_wait_reason(registry: &JobRegistry, tasks_dir: &std::path::Path, ticket_id: &str) -> LoTaRResult<Option<String>> {
     crate::services::agent_queue_service::AgentQueueService::slot_wait_reason(tasks_dir, ticket_id, slot_jobs(registry))
+}
+
+/// [`slot_wait_reason`], but a job the Mac has no slot for runs on its
+/// profile's agent host when that has room (DEV-901): `None`, and the job
+/// holds a slot there. Else why it waits, with why not on the host.
+fn host_or_wait(registry: &JobRegistry, tasks_dir: &std::path::Path, ticket_id: &str, agent: Option<&str>, job_id: &str) -> LoTaRResult<Option<String>> {
+    let Some(reason) = slot_wait_reason(registry, tasks_dir, ticket_id)? else {
+        return Ok(None);
+    };
+    Ok(match place_on_host(tasks_dir, ticket_id, agent, &HashMap::new()) {
+        Some(Ok(host)) => {
+            crate::services::agent_hosts::assign(job_id, &host);
+            None
+        }
+        Some(Err(why)) => Some(format!("{reason}; {why}")),
+        None => Some(reason),
+    })
+}
+
+/// Where a job of `agent` on the ticket may run now the Mac is full (see
+/// [`crate::services::agent_hosts::place`]); `taken` holds the placements
+/// a queue pass made so far.
+pub(crate) fn place_on_host(
+    tasks_dir: &std::path::Path,
+    ticket_id: &str,
+    agent: Option<&str>,
+    taken: &HashMap<String, usize>,
+) -> Option<Result<String, String>> {
+    crate::services::agent_hosts::place(tasks_dir, ticket_id, agent, taken, || saved_jobs(tasks_dir), local_t3)
+}
+
+/// This Mac's `t3` CLI, as harnessmux runs it.
+fn local_t3() -> Option<crate::services::agent_hosts::LocalT3> {
+    t3_launch().map(|(program, env)| crate::services::agent_hosts::LocalT3 { program, env })
 }
 
 /// The jobs (ticket, job id) that hold one of this process's slots: those
@@ -8119,6 +8482,7 @@ mod tests {
                 model: None,
                 effort: None,
                 agent_profile: None,
+                host: Default::default(),
             },
         )
         .expect("init log");
@@ -8146,6 +8510,7 @@ mod tests {
             in_setup: false,
             request: None,
             merge,
+            host: Default::default(),
         }
     }
 
@@ -8173,6 +8538,7 @@ mod tests {
                 model: None,
                 effort: None,
                 agent_profile: Some("review".to_string()),
+                host: Default::default(),
             },
         )
         .expect("init log");
@@ -8243,6 +8609,7 @@ mod tests {
                 model: None,
                 effort: None,
                 agent_profile: Some("fix".to_string()),
+                host: Default::default(),
             },
         )
         .expect("init log");
@@ -8335,6 +8702,7 @@ mod tests {
                 model: None,
                 effort: None,
                 agent_profile: None,
+                host: Default::default(),
             },
         )
         .unwrap();
@@ -8665,6 +9033,7 @@ mod dev21_ticket_done_state_tests {
                 model: None,
                 effort: None,
                 agent_profile: None,
+                host: Default::default(),
             };
             AgentLogService::init_log(root, logs.to_str(), header).unwrap();
             let path = logs.join(format!("{job}.jsonl"));
@@ -8711,6 +9080,7 @@ mod dev21_ticket_done_state_tests {
                 model: None,
                 effort: None,
                 agent_profile: None,
+                host: Default::default(),
             };
             AgentLogService::init_log(&root_a, logs.to_str(), header).unwrap();
             let path = logs.join(format!("{job}.jsonl"));
@@ -8760,6 +9130,7 @@ mod dev21_ticket_done_state_tests {
                 model: None,
                 effort: None,
                 agent_profile: None,
+                host: Default::default(),
             };
             AgentLogService::init_log(root, logs.to_str(), header).unwrap();
             let path = logs.join(format!("{job}.jsonl"));
@@ -9154,6 +9525,7 @@ mod dev520_session_events_tests {
             model: None,
             effort: None,
             agent_profile: None,
+            host: Default::default(),
         };
         super::AgentLogService::init_log(dir.path(), Some("logs"), header).unwrap();
         super::JOB_REGISTRY.lock().unwrap().jobs.insert(job_id.to_string(), state);
