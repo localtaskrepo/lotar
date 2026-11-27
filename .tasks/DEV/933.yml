@@ -1,16 +1,19 @@
 title: 'Hosted claude/codex takeover: no test drives resume_session_to_end on a host'
-status: Blocked
+status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-27T13:36:18.043765+00:00
-modified: 2026-11-27T14:04:56.390739+00:00
+modified: 2026-11-27T15:19:38.574741+00:00
 relationships:
   depends_on:
   - DEV-931
+  blocks:
+  - DEV-936
   related:
   - DEV-931
+  - DEV-936
 comments:
 - date: 2026-11-27T14:04:47.494084+00:00
   author: claude
@@ -20,8 +23,46 @@ comments:
     - `0d04ac1fd` (DEV-931, status Merging) is not an ancestor of `main`; on `main`, `resume_session_to_end` still calls `job_agent_table` and `resumed_on_host` runs only for `t3` (`crates/lotar-agent/src/services/agent_job_service.rs:2568`, `:2605`).
     - A test of the hosted headless takeover would fail on main, so no change on `agent/DEV-933` yet.
     - Next: once DEV-931 is on main, rebase this branch and add the two tests from "Done when".
+- date: 2026-11-27T15:15:10.011329+00:00
+  author: claude
+  text: |-
+    Two tests now drive `resume_session_to_end` for a claude job on a host; rebased onto main with DEV-931.
+
+    - `a_taken_over_headless_job_resumes_its_session_on_the_host_and_brings_its_commits_back` (`crates/lotar-agent/src/services/agent_job_service/hosted.rs`): a session started on dyson through the fake `LOTAR_SSH` and a fake ACP agent; the takeover resumes it. Checks: `ssh.log` has the `cd <worktree> && exec env` launch, the agent ran in the host's worktree and got `session/resume` and a prompt, and its commit, the earlier commit and the leftover are on the Mac worktree, signed. The host's worktree is gone, the host slot is free, the job is `completed`.
+    - `a_taken_over_headless_job_whose_session_cant_be_resumed_brings_its_work_back_and_runs_again`: dyson's agent refuses `session/resume`. Checks: the commit and the leftover came back, the host's worktree is gone, the job is `paused` and queued again first with `session: fresh`.
+    - Checked that the tests catch the bugs: with the Mac's agent table instead of `host_agent_table`, test 1 fails; without `finish_on_host`, test 1 fails; without `bring_back` in the failure branch, test 2 fails.
+    - Not covered: a cancel during the takeover (`finish_on_host(.., Stopped, ..)`). "Done when" doesn't ask for it.
+  report:
+    commits:
+    - hash: '159432151'
+      what: two tests drive resume_session_to_end for a headless job on a host
+    checks:
+    - command: 'cargo nextest run -p lotar-agent --lib hosted::'
+      result: passed
+      reason: 22 tests
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it
+    next: Merge agent lands agent/DEV-933 on main
+- date: 2026-11-27T15:18:11.752956+00:00
+  author: claude
+  text: |-
+    Review: passed. `159432151` adds the two tests "Done when" asks for, and they catch the bug.
+
+    - Read: the diff (one file, `crates/lotar-agent/src/services/agent_job_service/hosted.rs`, tests only), `resume_session_to_end` (`agent_job_service.rs:2546`), the fake `LOTAR_SSH` fixture, DEV-931's commit `11cb38081` on main.
+    - Done when 1: the takeover test resumes the session through the fake ssh and the agent runs in the host's worktree. It checks that the commits and the leftover came back signed, the host's worktree is gone, the slot is free and the job is `completed`.
+    - Done when 2: in the "could not be resumed" test, the commit and leftover come back and the job is `paused` and queued again with `session: fresh`.
+    - Reran: `npm ci` (ok); `cargo nextest run -p lotar-agent -E 'test(/a_taken_over_headless_job/) | test(/hosted::/)'`, 22 passed; `npm run lint` passed.
+    - Mutation: I used the Mac's agent table in place of `host_agent_table` and test 1 failed. I put the file back and the worktree is clean.
+    - Minor, filed: [DEV-936](https://lotar.pyxzl.net/task/DEV-936). No test covers a cancel during the takeover (`finish_on_host(.., Stopped, ..)`). The ticket names this branch in "Found", but "Done when" doesn't ask for it.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A284391c1577bda911e913ca36f1acdb09d7eac6415b551a410bc6bebcbcf4f35
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2cbcb448b502c80965540ebeaf4189b636e63964d66597cb13424c0012d58d48
 description: |-
   Found in the review of DEV-931 (`0d04ac1fd`).
 
@@ -35,7 +76,6 @@ description: |-
   - [ ] A test covers the "could not be resumed" branch on a host: the commits and leftovers come back and the job is queued again.
 tags:
 - agent
-- waits
 history:
 - at: 2026-11-27T13:36:19.278614+00:00
   actor: claude
@@ -75,3 +115,58 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-27T15:08:43.237911+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, waits
+    new: agent
+- at: 2026-11-27T15:08:45.708847+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-27T15:08:47.203675+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2cbcb448b502c80965540ebeaf4189b636e63964d66597cb13424c0012d58d48
+- at: 2026-11-27T15:15:10.011329+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T15:15:21.658762+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T15:18:02.695040+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-931"],"related":["DEV-931"]}'
+    new: '{"depends_on":["DEV-931"],"related":["DEV-931","DEV-936"]}'
+- at: 2026-11-27T15:18:11.752956+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T15:18:18.173372+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'
+- at: 2026-11-27T15:19:38.574741+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-931"],"related":["DEV-931","DEV-936"]}'
+    new: '{"depends_on":["DEV-931"],"blocks":["DEV-936"],"related":["DEV-931","DEV-936"]}'

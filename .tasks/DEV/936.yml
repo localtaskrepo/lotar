@@ -1,0 +1,135 @@
+title: 'Hosted claude/codex takeover: no test cancels a job while resume_session_to_end takes it over on a host'
+status: Blocked
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@review'
+created: 2026-11-27T15:18:02.306993+00:00
+modified: 2026-11-27T15:22:23.705282+00:00
+relationships:
+  depends_on:
+  - DEV-933
+  related:
+  - DEV-933
+comments:
+- date: 2026-11-27T15:22:13.719566+00:00
+  author: claude
+  text: |-
+    A new test covers cancelling a headless dyson job during its takeover. It builds on DEV-933, so this branch holds DEV-933's commit.
+
+    - `a_headless_job_cancelled_during_its_takeover_brings_its_commits_back_and_frees_the_host` in `hosted.rs`: the job is marked Cancelled before `resume_session_to_end` runs. Its session resumes on dyson, the agent gets no `session/prompt`, its commits come back signed and its slot is free.
+    - Corrected the Done-when to match the code. A stopped run doesn't commit what the agent left uncommitted (`bring_back(.., good = false)`). So `left.txt` stays in dyson's worktree, that worktree is kept, and the log says "Kept the worktree". The test checks this, not that the leftover came back.
+    - Built on `agent/DEV-933` (`159432151`, which is Merging) for `headless_job_to_take_over`. Added depends-on DEV-933. When DEV-933 lands, the rebase drops the duplicate commit.
+    - Dropping the `finish_on_host` call in the cancel branch makes the test fail (line 1480).
+    - 38 lines changed, so no `small-diff` tag.
+  report:
+    commits:
+    - hash: 198bb9316
+      what: test for a headless host job cancelled during its takeover
+    checks:
+    - command: cargo nextest run -p lotar-agent --lib -E 'test(/agent_job_service::hosted::/)'
+      result: passed
+      reason: 23 tests
+    - command: 'mutation: finish_on_host dropped from the cancel branch'
+      result: passed
+      reason: the new test fails
+    - command: npm run lint
+      result: passed
+    - command: npm test, npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    next: Review; merge after DEV-933 lands (this branch holds its commit 159432151)
+- date: 2026-11-27T15:22:23.705282+00:00
+  author: automation
+  text: 'The @review job waits for its open prerequisites: DEV-933. It starts once they are done.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad3c6ee465ab88ef270a37b30447963869604cff25e074986fc0dbef2fcc9c8f5
+description: |-
+  Found in the review of DEV-933 (`159432151`).
+
+  ## Found
+  - `resume_session_to_end` (`crates/lotar-agent/src/services/agent_job_service.rs:2611`): when `publish_session` sees the job cancelled during the takeover, a job on a host ends with `finish_on_host(.., RunEnd::Stopped, ..)`, which frees the host slot and brings its commits back.
+  - DEV-933's tests cover the resumed and the "could not be resumed" branches only; dropping this `finish_on_host` fails no test.
+  - A stopped run doesn't commit what the agent left uncommitted (`bring_back(.., good = false)`, "only after a run that ended well"): the leftover stays in dyson's worktree, which is kept.
+
+  ## Done when
+  - [ ] A test in `hosted.rs` cancels a headless job on dyson before `publish_session` (its session resumes there, the job is already Cancelled).
+  - [ ] It checks that the job's commits came back to the Mac worktree, signed there.
+  - [ ] It checks that the uncommitted leftover stays in dyson's worktree, which is kept (not committed, not on the Mac), and the job log says so.
+  - [ ] It checks that the agent got no turn (no `session/prompt`) and its slot on dyson is free.
+  - [ ] Builds on DEV-933's `headless_job_to_take_over`: this branch holds DEV-933's commit until it lands on main.
+tags:
+- agent
+history:
+- at: 2026-11-27T15:18:03.349784+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-27T15:18:08.104354+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T15:18:08.794573+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad3c6ee465ab88ef270a37b30447963869604cff25e074986fc0dbef2fcc9c8f5
+- at: 2026-11-27T15:19:38.243206+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the review of DEV-933 (`159432151`).
+
+      ## Found
+      - `resume_session_to_end` (`crates/lotar-agent/src/services/agent_job_service.rs:2611`): when `publish_session` sees the job cancelled during the takeover, a job on a host ends with `finish_on_host(.., RunEnd::Stopped, ..)`, which frees the host slot and brings its commits back.
+      - DEV-933's tests cover the resumed and the "could not be resumed" branches only; dropping this `finish_on_host` fails no test.
+
+      ## Done when
+      - [ ] A test in `hosted.rs` cancels a headless job on dyson before `publish_session` and checks that its commits and leftovers came back to the Mac worktree, the host's worktree is gone and its slot on dyson is free.
+    new: |-
+      Found in the review of DEV-933 (`159432151`).
+
+      ## Found
+      - `resume_session_to_end` (`crates/lotar-agent/src/services/agent_job_service.rs:2611`): when `publish_session` sees the job cancelled during the takeover, a job on a host ends with `finish_on_host(.., RunEnd::Stopped, ..)`, which frees the host slot and brings its commits back.
+      - DEV-933's tests cover the resumed and the "could not be resumed" branches only; dropping this `finish_on_host` fails no test.
+      - A stopped run doesn't commit what the agent left uncommitted (`bring_back(.., good = false)`, "only after a run that ended well"): the leftover stays in dyson's worktree, which is kept.
+
+      ## Done when
+      - [ ] A test in `hosted.rs` cancels a headless job on dyson before `publish_session` (its session resumes there, the job is already Cancelled).
+      - [ ] It checks that the job's commits came back to the Mac worktree, signed there.
+      - [ ] It checks that the uncommitted leftover stays in dyson's worktree, which is kept (not committed, not on the Mac), and the job log says so.
+      - [ ] It checks that the agent got no turn (no `session/prompt`) and its slot on dyson is free.
+      - [ ] Builds on DEV-933's `headless_job_to_take_over`: this branch holds DEV-933's commit until it lands on main.
+- at: 2026-11-27T15:19:38.575203+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-933"]}'
+    new: '{"depends_on":["DEV-933"],"related":["DEV-933"]}'
+- at: 2026-11-27T15:22:13.719566+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T15:22:23.260043+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T15:22:23.632095+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Blocked
+- at: 2026-11-27T15:22:23.705282+00:00
+  actor: automation
+  changes:
+  - field: comment_added

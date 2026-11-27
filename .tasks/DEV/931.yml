@@ -1,11 +1,11 @@
 title: 'Hosted claude/codex job: lotar restart takeover and answer wait strand work on the host'
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T11:16:51.136837+00:00
-modified: 2026-11-27T15:01:06.222690+00:00
+modified: 2026-11-27T15:21:44.655257+00:00
 relationships:
   blocks:
   - DEV-933
@@ -17,6 +17,8 @@ relationships:
   - DEV-928
   - DEV-826
   - DEV-918
+  - DEV-808
+  - DEV-932
 comments:
 - date: 2026-11-27T13:30:27.971541+00:00
   author: claude
@@ -80,6 +82,27 @@ comments:
 - date: 2026-11-27T15:01:06.222690+00:00
   author: automation
   text: Waited 19 min for the machine's check lock, held by lotar's merge checks of STD-385 in /Users/mallox/Development/.lotar-worktrees/standards/STD-385 (pid 95753), since 14:36 UTC; the merge agent starts now.
+- date: 2026-11-27T15:08:34.716738+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `11cb38081` is on `main` and `origin/main`.
+
+    - `main` moved on (DEV-928, DEV-808) after lotar's last checks: rebased `dd96a85af` → `e7752094c`, no conflicts
+    - `npm ci` ok; reran `lint:agent`, `test:agent`, `smoke` on `e7752094c`: all passed (smoke 415/415)
+    - `git merge --ff-only` ok; `.tasks` changes (808, 931) amended in → `11cb38081`
+    - No rules or profiles changed: no `lotar trust` needed
+    - Pushed `3063322d9..11cb38081`; main checkout clean, nothing else unpushed
+  report:
+    commits:
+    - hash: 11cb38081
+      what: DEV-931 hosted claude/codex takeover and answer wait bring work back
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A609c84c563d445759d43a78c6c108a2f5c69d4df44be9371c0aeb335f5e8a5d6
 description: |-
@@ -175,3 +198,25 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T15:08:34.716738+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T15:08:35.010190+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-933"],"related":["DEV-911","DEV-901","DEV-933","DEV-934","DEV-928","DEV-826","DEV-918"]}'
+    new: '{"blocks":["DEV-933"],"related":["DEV-911","DEV-901","DEV-933","DEV-934","DEV-928","DEV-826","DEV-918","DEV-808"]}'
+- at: 2026-11-27T15:08:42.583560+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-27T15:21:44.655257+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-933"],"related":["DEV-911","DEV-901","DEV-933","DEV-934","DEV-928","DEV-826","DEV-918","DEV-808"]}'
+    new: '{"blocks":["DEV-933"],"related":["DEV-911","DEV-901","DEV-933","DEV-934","DEV-928","DEV-826","DEV-918","DEV-808","DEV-932"]}'

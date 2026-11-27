@@ -1245,6 +1245,210 @@ T3CODE_HOME="{root}/host-t3" PATH="{root}/host-bin:$PATH" exec sh -c "$cmd"
         JOB_REGISTRY.lock().expect("registry").jobs.remove(job_id);
     }
 
+    /// An ACP agent on stdio: it logs where it runs and each method it gets
+    /// to `$FAKE_LOG`, refuses `session/resume` with `$FAKE_NO_RESUME`, and
+    /// answers a prompt after a commit of `resumed.txt` when it runs in the
+    /// host's worktree.
+    const FAKE_ACP_AGENT: &str = r#"#!/bin/sh
+printf 'runs in %s\n' "$PWD" >> "$FAKE_LOG"
+respond() { printf '{"jsonrpc":"2.0","id":%s,"result":%s}\n' "$1" "$2"; }
+while IFS= read -r line; do
+  id=$(printf '%s' "$line" | sed -nE 's/.*"id":("[^"]*"|[0-9]+).*/\1/p')
+  method=$(printf '%s' "$line" | sed -nE 's/.*"method":"([^"]*)".*/\1/p')
+  printf '%s\n' "$method" >> "$FAKE_LOG"
+  case "$method" in
+    initialize) respond "$id" '{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"sessionCapabilities":{"resume":{}}},"agentInfo":{"name":"fake-acp","version":"1.0.0"},"authMethods":[]}' ;;
+    session/new) respond "$id" '{"sessionId":"fake-1"}' ;;
+    session/resume|session/load)
+      if [ -n "$FAKE_NO_RESUME" ]; then
+        printf '{"jsonrpc":"2.0","id":%s,"error":{"code":-32002,"message":"Resource not found: sessionId fake-1"}}\n' "$id"
+      else
+        respond "$id" '{}'
+      fi ;;
+    session/prompt)
+      case "$PWD" in */host/wt) echo resumed > resumed.txt && git add resumed.txt && git -c commit.gpgsign=false commit -q -m 'DEV-1 resumed' >/dev/null 2>&1 ;; esac
+      printf '{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"fake-1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Done"}}}}\n'
+      respond "$id" '{"stopReason":"end_turn"}' ;;
+    *) if [ -n "$id" ]; then respond "$id" '{}'; fi ;;
+  esac
+done
+"#;
+
+    /// DEV-933: a headless job on dyson whose lotar exited mid-turn, as
+    /// `finish_orphaned_job` hands it to `resume_session_to_end`: its
+    /// session started there (by the fake agent, `env` its profile's), the
+    /// host's worktree holds a commit and a leftover, and the job's record
+    /// names the Mac worktree. Returns the tasks directory, the session's
+    /// name and the job's profile; `ssh.log` starts empty.
+    fn headless_job_to_take_over(fixture: &Fixture, job_id: &str, env: &[(&str, &str)]) -> (PathBuf, String, crate::config::types::AgentProfileDetail) {
+        use crate::services::agent_job_service::{JOB_REGISTRY, tests::unit_job_state};
+        use crate::services::agent_runner::{block_on, open_session, registry, session_profile};
+        let (repo, worktree) = (fixture.root.join("mac/repo"), fixture.root.join("mac/wt"));
+        let agent = fixture.root.join("bin/fake-acp");
+        script(&agent, FAKE_ACP_AGENT);
+        // SAFETY: nextest runs each test in its own process.
+        unsafe { std::env::set_var("HARNESSMUX_HOME", fixture.root.join("harnessmux")) };
+        let log = fixture.root.join("agent.log");
+        let mut profile_env = vec![("FAKE_LOG".to_string(), log.to_string_lossy().into_owned())];
+        profile_env.extend(env.iter().map(|(key, value)| ((*key).to_string(), (*value).to_string())));
+        let profile = crate::config::types::AgentProfileDetail {
+            runner: "claude".to_string(),
+            command: Some(agent.to_string_lossy().into_owned()),
+            env: profile_env.into_iter().collect(),
+            ..Default::default()
+        };
+
+        // The job before the restart: its session starts on dyson.
+        let settings = ThreadSettings { deny: Vec::new(), env: BTreeMap::new(), lotar_mcp: false };
+        let checkout = Checkout { repo_root: &repo, worktree: &worktree, branch: "agent/DEV-1" };
+        let (hosted, _) = Hosted::set_up(job_id, "dyson", &dyson(), &checkout, &settings, None, Ok(Check::Programs(vec!["sh".to_string()]))).expect("set up");
+        let table = crate::services::agent_job_service::host_agent_table(
+            &hosted,
+            crate::services::agent_runner::job_agent_table("claude", &profile).expect("table"),
+            "claude",
+            &profile,
+        )
+        .expect("host table");
+        let name = format!("lotar-dev933-{job_id}");
+        let session = open_session(&name, "claude", &worktree, &table, session_profile(&profile, std::collections::HashMap::new()).expect("profile"), false)
+            .expect("session");
+        drop(session);
+        // lotar exits: its session closes, the agent's work stays on dyson.
+        block_on(harnessmux::client::request(&registry(), &name, &harnessmux::ipc::Request::Close)).expect("close");
+        // Its record stays resumable, as a process that exits leaves it.
+        let mut record = registry().load(&name).expect("record");
+        record.state = harnessmux::SessionState::Idle;
+        registry().save(&record).expect("save");
+        drop(hosted);
+        crate::services::agent_hosts::release(job_id);
+        commit_on_host(fixture, "work.txt");
+        std::fs::write(fixture.root.join("host/wt/left.txt"), "uncommitted\n").expect("leftover");
+        std::fs::write(fixture.root.join("ssh.log"), "").expect("clear the ssh log");
+        std::fs::write(&log, "").expect("clear the agent log");
+
+        // In the Mac's repository, as the takeover finds the checkout from it.
+        let tasks_dir = repo.join(".tasks");
+        std::fs::create_dir_all(&tasks_dir).expect("tasks");
+        std::fs::write(tasks_dir.join("config.yml"), "default:\n  project: DEV\n").expect("config");
+        let task = crate::api_types::TaskCreate { title: "Runs on dyson".to_string(), project: Some("DEV".to_string()), ..Default::default() };
+        crate::services::task_service::TaskService::create(&mut crate::storage::manager::Storage::new(&tasks_dir), task).expect("ticket");
+        let mut state = unit_job_state(job_id);
+        state.record.ticket_id = "DEV-1".to_string();
+        state.record.tasks_dir = tasks_dir.clone();
+        state.record.runner = "claude".to_string();
+        state.record.worktree_path = Some(worktree.to_string_lossy().into_owned());
+        state.record.worktree_branch = Some("agent/DEV-1".to_string());
+        state.request = Some(crate::api_types::AgentJobCreateRequest {
+            ticket_id: "DEV-1".to_string(),
+            prompt: "Fix it".to_string(),
+            agent: Some("fix".to_string()),
+            ..Default::default()
+        });
+        JOB_REGISTRY.lock().expect("registry").jobs.insert(job_id.to_string(), state);
+        (tasks_dir, name, profile)
+    }
+
+    fn config_with_dyson() -> crate::config::types::ResolvedConfig {
+        let mut config = crate::config::types::ResolvedConfig::from_global(crate::config::types::GlobalConfig::default());
+        config.agent_hosts.insert("dyson".to_string(), dyson());
+        config
+    }
+
+    fn progress(job_id: &str) -> Vec<String> {
+        crate::services::agent_job_service::AgentJobService::events_for(job_id)
+            .into_iter()
+            .filter(|event| event.kind == "agent_job_progress")
+            .filter_map(|event| event.message)
+            .collect()
+    }
+
+    /// DEV-933: the takeover resumes a headless job's session over dyson's
+    /// ssh, in the worktree there, and its commits come back to the Mac.
+    #[test]
+    fn a_taken_over_headless_job_resumes_its_session_on_the_host_and_brings_its_commits_back() {
+        use crate::config::types::AgentRunnerKind;
+        use crate::services::agent_job_service::{AgentJobService, resume_session_to_end};
+        let fixture = fixture();
+        let job_id = "job-dev933-resumed";
+        let (tasks_dir, name, profile) = headless_job_to_take_over(&fixture, job_id, &[]);
+
+        resume_session_to_end(
+            job_id,
+            AgentRunnerKind::Claude,
+            "claude",
+            &name,
+            &profile,
+            &tasks_dir,
+            "DEV-1",
+            &config_with_dyson(),
+            "lotar exited",
+            Some("dyson"),
+        );
+
+        let host_tree = fixture.root.join("host/wt");
+        let agent_log = std::fs::read_to_string(fixture.root.join("agent.log")).expect("agent log");
+        assert!(agent_log.contains(&format!("runs in {}", host_tree.display())), "the agent ran in dyson's worktree: {agent_log}");
+        assert!(agent_log.contains("session/resume") && agent_log.contains("session/prompt"), "{agent_log}");
+        let worktree = fixture.root.join("mac/wt");
+        let ssh_log = std::fs::read_to_string(fixture.root.join("ssh.log")).expect("ssh log");
+        let launch = format!("sh -lc 'cd '\\''{}'\\'' && exec env", worktree.display());
+        assert!(ssh_log.contains(&launch) && ssh_log.contains("bin/fake-acp"), "it started over dyson's ssh: {ssh_log}");
+        for file in ["work.txt", "left.txt", "resumed.txt"] {
+            assert!(worktree.join(file).is_file(), "{file} came back: {:?}", progress(job_id));
+        }
+        assert!(run_git(&worktree, &["cat-file", "commit", "HEAD"]).contains("gpgsig"), "signed here");
+        assert!(!host_tree.exists(), "the host's worktree went");
+        assert_eq!(agent_hosts::job_host(job_id), None, "its slot on dyson is free");
+        let job = AgentJobService::get_job(job_id).expect("job");
+        assert_eq!(job.status, "completed", "{job:?}");
+    }
+
+    /// DEV-933: a headless job on dyson whose session can't be resumed
+    /// brings its commits and leftovers back and is queued again.
+    #[test]
+    fn a_taken_over_headless_job_whose_session_cant_be_resumed_brings_its_work_back_and_runs_again() {
+        use crate::config::types::AgentRunnerKind;
+        use crate::services::agent_job_service::{AgentJobService, resume_session_to_end};
+        let fixture = fixture();
+        let queue = fixture.root.join("queue");
+        // SAFETY: nextest runs each test in its own process.
+        unsafe {
+            std::env::set_var("LOTAR_AGENT_QUEUE_DIR", &queue);
+            std::env::set_var("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        }
+        let job_id = "job-dev933-not-resumed";
+        let (tasks_dir, name, profile) = headless_job_to_take_over(&fixture, job_id, &[("FAKE_NO_RESUME", "1")]);
+
+        resume_session_to_end(
+            job_id,
+            AgentRunnerKind::Claude,
+            "claude",
+            &name,
+            &profile,
+            &tasks_dir,
+            "DEV-1",
+            &config_with_dyson(),
+            "lotar exited",
+            Some("dyson"),
+        );
+
+        let job = AgentJobService::get_job(job_id).expect("job");
+        assert_eq!(job.status, "paused", "{job:?}");
+        let reason = job.summary.unwrap_or_default();
+        assert!(reason.contains("could not be resumed") && reason.contains("runs again in a new session"), "{reason}");
+        let worktree = fixture.root.join("mac/wt");
+        assert!(worktree.join("work.txt").is_file() && worktree.join("left.txt").is_file(), "its commits and leftovers came back: {:?}", progress(job_id));
+        let agent_log = std::fs::read_to_string(fixture.root.join("agent.log")).expect("agent log");
+        assert!(agent_log.contains("session/resume") && !agent_log.contains("session/prompt"), "dyson's agent refused the resume: {agent_log}");
+        assert!(!worktree.join("resumed.txt").exists(), "the agent got no turn");
+        assert!(!fixture.root.join("host/wt").exists(), "the host's worktree went");
+        assert_eq!(agent_hosts::job_host(job_id), None, "its slot on dyson is free");
+        let pending = crate::services::agent_queue_service::AgentQueueService::list_pending(&tasks_dir).expect("queue");
+        let retry = pending.iter().find(|entry| entry.ticket_id == "DEV-1").unwrap_or_else(|| panic!("the job is queued again: {pending:?}"));
+        assert_eq!((retry.agent.as_str(), retry.prompt.as_str()), ("fix", "Fix it"), "{retry:?}");
+        assert_eq!(retry.session, Some(crate::config::types::AgentSession::Fresh), "{retry:?}");
+    }
+
     /// DEV-931: a headless agent that asks a question has ended its turn:
     /// its leftovers are committed there, all comes back, nothing waits.
     #[test]
