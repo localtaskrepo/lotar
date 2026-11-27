@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T01:02:35.316395+00:00
-modified: 2026-11-27T03:46:15.603266+00:00
+modified: 2026-11-27T09:33:23.743680+00:00
 relationships:
   depends_on:
   - DEV-909
@@ -31,7 +31,6 @@ description: |-
   - Fix: accept `base != name` only when `base` is exactly 47 characters, the cut length. Add a test with a kept copy of a prefix-named session.
 tags:
 - agent
-- waits
 history:
 - at: 2026-11-27T01:02:36.682811+00:00
   actor: claude
@@ -71,3 +70,9 @@ history:
   - field: status
     old: InProgress
     new: Blocked
+- at: 2026-11-27T09:33:23.743680+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: agent, waits
+    new: agent

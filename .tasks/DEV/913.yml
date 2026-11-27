@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T23:36:28.876091+00:00
-modified: 2026-11-27T09:23:51.357039+00:00
+modified: 2026-11-27T09:33:30.797930+00:00
 relationships:
   related:
   - DEV-875
@@ -15,6 +15,7 @@ relationships:
   - DEV-925
   - DEV-867
   - DEV-843
+  - DEV-909
 comments:
 - date: 2026-11-27T00:41:30.804276+00:00
   author: claude
@@ -59,6 +60,9 @@ comments:
     - command: npm run -s smoke
       result: passed
     next: The merge agent takes over in a new session
+- date: 2026-11-27T09:33:30.797930+00:00
+  author: automation
+  text: Waited 17 min for the machine's check lock, held by lotar's merge checks of DEV-843 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-843 (pid 61697), since 09:11 UTC; the merge agent starts now.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A9bdfff5233fa41857cf5b0bbce4be80150b72e5a1be11133a3ef7cb291b3a540
 description: 'Found: reviewing DEV-888. smoke/tests/ui.agent-jobs.smoke.spec.ts:307-308 on main (cb61901d7, DEV-875) says the loaded log replaces the loading-state Instructions button ''closing a panel opened there''. Once DEV-888 lands, the panel stays open, so the comment describes a bug that no longer exists. Check: read the comment after DEV-888 is on main. Done: the comment says why the test waits for the log header (it checks the header button), without claiming the panel closes.'
@@ -150,3 +154,13 @@ history:
   - field: relationships
     old: '{"related":["DEV-875","DEV-888","DEV-908","TEST-1","DEV-925","DEV-867"]}'
     new: '{"related":["DEV-875","DEV-888","DEV-908","TEST-1","DEV-925","DEV-867","DEV-843"]}'
+- at: 2026-11-27T09:33:17.028934+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-875","DEV-888","DEV-908","TEST-1","DEV-925","DEV-867","DEV-843"]}'
+    new: '{"related":["DEV-875","DEV-888","DEV-908","TEST-1","DEV-925","DEV-867","DEV-843","DEV-909"]}'
+- at: 2026-11-27T09:33:30.797930+00:00
+  actor: automation
+  changes:
+  - field: comment_added

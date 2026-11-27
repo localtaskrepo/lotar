@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T07:45:41.052287+00:00
-modified: 2026-11-27T09:17:33.242039+00:00
+modified: 2026-11-27T09:33:28.746603+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -181,6 +181,12 @@ comments:
     - **Reran:** `npm ci` passed. `cargo nextest run --cargo-profile dev --test integration` on the dev503 merge, takeover and resume tests: 16 of 18 passed. The 2 that failed (`a_continued_merge_in_the_reviews_process_…`, `a_continued_merge_without_a_session_…`) were waiting on the real port 47586, which DEV-913's merge held. With `LOTAR_CHECK_LOCK_HELD=1` both pass. This predates the change: [DEV-925](https://lotar.pyxzl.net/task/DEV-925). `npm run lint` passed. The worktree is clean.
     - **Merge note:** the branch is behind `main`. `dev503_harness_jobs_test.rs` conflicts only because both sides add tests at the end of the file: keep both. `ActiveJob` is unchanged on main, so the new test's struct literal still compiles.
     - **Not run:** full suites and smoke (the merge runs them). No UI in the diff.
+- date: 2026-11-27T09:33:28.746603+00:00
+  author: automation
+  text: |
+    lotar's merge needs the merge agent: rebasing `agent/DEV-867` onto `main` conflicts in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`; lotar aborted the rebase, `agent/DEV-867` is unchanged.
+  report:
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adb0a7e19c4da46432e915e480cfbd0fde092aff11314dfcb741be1bdda65d119
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A28118acf01dea3aac80b4fc195bac1b28817edc83e4f78d9cbce250ea5431ce1
@@ -478,3 +484,7 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T09:33:28.746603+00:00
+  actor: automation
+  changes:
+  - field: comment_added

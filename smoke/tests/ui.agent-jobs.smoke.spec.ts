@@ -358,8 +358,8 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                     await withPage(`${server.url}/agents`, async (page) => {
                         await page.waitForSelector('.job-card', { timeout: 15_000 });
                         await page.getByRole('button', { name: 'Show logs', exact: true }).click();
-                        // While the logs load, the card shows its own Instructions button; the loaded log replaces
-                        // it, closing a panel opened there. Wait for the log and use the button in its header.
+                        // While the logs load, the card shows its own Instructions button. This test checks the
+                        // button in the loaded log's header, so wait for that header first.
                         const header = page.locator('.job-log__header');
                         await header.waitFor({ state: 'visible', timeout: 15_000 });
                         const toggle = header.getByRole('button', { name: 'Instructions', exact: true });

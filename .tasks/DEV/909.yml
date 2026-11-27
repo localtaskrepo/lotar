@@ -1,11 +1,11 @@
 title: 'Timeline: read a job''s conversation inline from its harnessmux event log'
-status: Merging
+status: Done
 priority: Medium
 type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T19:31:53.927572+00:00
-modified: 2026-11-27T09:23:50.830837+00:00
+modified: 2026-11-27T09:33:23.046505+00:00
 relationships:
   blocks:
   - DEV-918
@@ -23,6 +23,7 @@ relationships:
   - DEV-910
   - DEV-912
   - DEV-843
+  - DEV-913
 comments:
 - date: 2026-11-26T21:07:08.577168+00:00
   author: automation
@@ -180,6 +181,32 @@ comments:
 - date: 2026-11-27T09:23:50.528315+00:00
   author: automation
   text: Waited 7 min for the machine's check lock, held by lotar's merge checks of DEV-843 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-843 (pid 61697), since 09:11 UTC; the merge agent starts now.
+- date: 2026-11-27T09:33:16.736809+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `1ee3ef1f4` is on `main` and `origin/main`.
+
+    - Rebased onto `main` (`03663babd`). The three conflicts were each side adding a field or import, so I kept both:
+      - `TurnSettings` in `agent_job_service.rs`: main's `asks_result` and this branch's `agent_session`, also in the test setups. Main's new T3 test `TurnSettings` also needed `agent_session: None` to compile.
+      - `kept.rs`: main's `logs_dir`/`job_id` and this branch's `transcript: None`.
+      - `view/api/client.ts`: both imports.
+    - `npm ci`, `lint:agent`, `test:agent` and `smoke` passed on the rebased commit (smoke: 119 files, 415 tests).
+    - Fast-forwarded the main checkout, then folded its `.tasks` changes (DEV-843, DEV-909, DEV-913) into the commit.
+    - No rule or config files changed, so I didn't run `lotar trust`.
+    - Pushed `8efc6c8aa..1ee3ef1f4`, including DEV-843's commit, which had already landed.
+  report:
+    commits:
+    - hash: 1ee3ef1f4
+      what: 'DEV-909 Timeline: read a job''s conversation inline from its harnessmux event log (rebased onto main)'
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7143b46bbd3ddfe5ad20074d6ebde47c173ed5b407d1270ea3e88107f01c75f3
 - attachment: dev909-before-thread.fd9f40c2dae2d70b7b0c5e2368ddefcf.png
@@ -227,8 +254,6 @@ description: |-
 tags:
 - agent
 - ui
-- job-paused
-- review-returned
 history:
 - at: 2026-11-26T19:31:54.873044+00:00
   actor: claude
@@ -482,3 +507,22 @@ history:
   - field: relationships
     old: '{"blocks":["DEV-918"],"related":["DEV-849","DEV-850","DEV-782","DEV-867","DEV-901","DEV-918","DEV-786","DEV-797","DEV-810","DEV-888","DEV-910","DEV-912"]}'
     new: '{"blocks":["DEV-918"],"related":["DEV-849","DEV-850","DEV-782","DEV-867","DEV-901","DEV-918","DEV-786","DEV-797","DEV-810","DEV-888","DEV-910","DEV-912","DEV-843"]}'
+- at: 2026-11-27T09:33:16.736809+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T09:33:17.028215+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-918"],"related":["DEV-849","DEV-850","DEV-782","DEV-867","DEV-901","DEV-918","DEV-786","DEV-797","DEV-810","DEV-888","DEV-910","DEV-912","DEV-843"]}'
+    new: '{"blocks":["DEV-918"],"related":["DEV-849","DEV-850","DEV-782","DEV-867","DEV-901","DEV-918","DEV-786","DEV-797","DEV-810","DEV-888","DEV-910","DEV-912","DEV-843","DEV-913"]}'
+- at: 2026-11-27T09:33:23.046505+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: agent, ui, job-paused, review-returned
+    new: agent, ui
