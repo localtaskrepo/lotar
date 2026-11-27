@@ -5,13 +5,14 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T10:16:41.486933+00:00
-modified: 2026-11-27T11:55:26.544676+00:00
+modified: 2026-11-27T12:16:08.232239+00:00
 relationships:
   depends_on:
   - DEV-901
   related:
   - DEV-901
   - DEV-797
+  - DEV-930
 comments:
 - date: 2026-11-27T10:22:38.218814+00:00
   author: claude
@@ -157,6 +158,26 @@ comments:
     - A cancelled waiting job is now treated as `Stopped` (`finish_on_host`), which the earlier review asked for. Docs agree.
     - Reran: `npm ci` ok; `cargo nextest run -p lotar-agent --lib agent_job_service` 139 passed; `cargo nextest run --test integration dev626` 13 passed; `cargo clippy -p lotar-agent --all-targets -- -D warnings` clean. Worktree unchanged. Full suites not run: the merge runs them (DEV-797).
     - No UI changes, no stray files, no second branch. No tickets filed.
+- date: 2026-11-27T12:16:07.936607+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: rebasing `agent/DEV-929` onto `main` conflicts in `crates/lotar-agent/src/services/agent_job_service/resumed.rs`; lotar aborted the rebase, `agent/DEV-929` is unchanged.
+
+    - Rebased `agent/DEV-929` onto `main` (`dad3376d8781`): `7de0af42b92d`
+    - Waited 14 min for the machine's check lock, held by lotar's merge checks of DEV-930 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-930 (pid 61697), since 11:42 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d2e62d982215986aed328bbaa591da39294156cb58b013d72219b1068dbb561
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af37effbe0d34fe08e5d043fb7402bfa58480661953e75ddf34acf58f3bd8c798
@@ -364,3 +385,13 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T12:16:07.936607+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T12:16:08.232239+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-797"]}'
+    new: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-797","DEV-930"]}'

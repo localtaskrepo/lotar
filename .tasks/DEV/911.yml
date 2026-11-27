@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T23:14:46.615229+00:00
-modified: 2026-11-27T12:01:58.798648+00:00
+modified: 2026-11-27T12:16:08.286355+00:00
 relationships:
   depends_on:
   - DEV-901
@@ -15,6 +15,7 @@ relationships:
   - DEV-916
   - DEV-930
   - DEV-801
+  - DEV-920
 comments:
 - date: 2026-11-26T23:56:13.506951+00:00
   author: automation
@@ -80,6 +81,9 @@ comments:
     - command: npm run -s smoke
       result: passed
     next: The merge agent takes over in a new session
+- date: 2026-11-27T12:16:08.286355+00:00
+  author: automation
+  text: Waited 15 min for the machine's check lock, held by lotar's merge checks of DEV-920 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-920 (pid 61697), since 11:59 UTC; the merge agent starts now.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A516d0b27722fd34b3ce0f2f549950eacbd305944dc80892f651586002d0fbb2f
 description: |-
@@ -226,3 +230,13 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-931","DEV-916","DEV-930"]}'
     new: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-931","DEV-916","DEV-930","DEV-801"]}'
+- at: 2026-11-27T12:09:59.619438+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-931","DEV-916","DEV-930","DEV-801"]}'
+    new: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-931","DEV-916","DEV-930","DEV-801","DEV-920"]}'
+- at: 2026-11-27T12:16:08.286355+00:00
+  actor: automation
+  changes:
+  - field: comment_added

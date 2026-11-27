@@ -6,6 +6,11 @@
 //! socket that an ssh connection lotar holds for the job forwards here. The
 //! tickets stay on the Mac.
 //!
+//! A `claude` or `codex` job (DEV-911) runs its agent over ssh, in the same
+//! worktree: [`Hosted::agent_table`] makes ssh the agent's program, with
+//! [`GUARD`] around the agent there. Its MCP server is the same bridge, given
+//! with the ACP session instead of a `.mcp.json`.
+//!
 //! When the thread ends, what it left uncommitted is committed there, the
 //! branch fetched, fast-forwarded into the Mac worktree and its new commits
 //! signed again here. Then the host's worktree goes. A thread that waits for
@@ -13,7 +18,7 @@
 //! worktree and MCP connection there for the answer.
 
 use crate::config::types::AgentHostConfig;
-use crate::services::agent_hosts::{self, LocalT3, Probe, Ssh, quote, stop_child};
+use crate::services::agent_hosts::{self, Check, Probe, Ssh, quote, stop_child};
 use std::collections::BTreeMap;
 use std::io::{Read as _, Write as _};
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -47,11 +52,88 @@ while True:
     os.write(1, data)
 ";
 
+/// Seconds the agent's process group has on the host after SIGTERM before
+/// SIGKILL.
+const GRACE_SECONDS: u32 = 10;
+
+/// Runs a `claude`/`codex` agent on the host (DEV-911): `python3 -c GUARD
+/// <grace> <agent command>`. The agent gets a process group of its own and
+/// the guard passes stdin and stdout through. When stdin closes (the ssh
+/// connection broke, or lotar ended the session) or the guard gets SIGHUP
+/// or SIGTERM, the group gets SIGTERM, then SIGKILL after `grace` seconds;
+/// so does what is left of it when the agent exits by itself.
+pub(super) const GUARD: &str = r"import os, signal, subprocess, sys, threading, time
+grace = float(sys.argv[1])
+agent = subprocess.Popen(sys.argv[2:], stdin=subprocess.PIPE, stdout=subprocess.PIPE, start_new_session=True)
+lock, done = threading.Lock(), []
+def stop(*_):
+    with lock:
+        if done:
+            return
+        done.append(1)
+        try:
+            os.killpg(agent.pid, signal.SIGTERM)
+        except OSError:
+            return
+        end = time.monotonic() + grace
+        while time.monotonic() < end:
+            try:
+                os.killpg(agent.pid, 0)
+            except OSError:
+                return
+            time.sleep(0.1)
+        try:
+            os.killpg(agent.pid, signal.SIGKILL)
+        except OSError:
+            pass
+def later(*_):
+    threading.Thread(target=stop).start()
+signal.signal(signal.SIGHUP, later)
+signal.signal(signal.SIGTERM, later)
+def up():
+    while True:
+        try:
+            data = os.read(0, 65536)
+        except OSError:
+            data = b''
+        if not data:
+            break
+        try:
+            agent.stdin.write(data)
+            agent.stdin.flush()
+        except OSError:
+            return
+    try:
+        agent.stdin.close()
+    except OSError:
+        pass
+    stop()
+def down():
+    while True:
+        data = os.read(agent.stdout.fileno(), 65536)
+        if not data:
+            return
+        try:
+            os.write(1, data)
+        except OSError:
+            stop()
+            return
+threading.Thread(target=up, daemon=True).start()
+out = threading.Thread(target=down, daemon=True)
+out.start()
+code = agent.wait()
+stop()
+out.join(5)
+sys.exit(code if code >= 0 else 128 - code)
+";
+
 /// A job's run on a host, from its setup until its commits are back.
 pub(super) struct Hosted {
     pub name: String,
     pub host: AgentHostConfig,
     pub ssh: Ssh,
+    /// It runs a T3 Code thread there; else a headless agent over ssh.
+    pub thread: bool,
     repo_root: PathBuf,
     worktree: PathBuf,
     branch: String,
@@ -83,9 +165,10 @@ pub(super) struct Checkout<'a> {
 }
 
 impl Hosted {
-    /// Ready the host for the job: it answers with this Mac's T3 Code, its
-    /// clone has the branch, its worktree the settings. Any failure leaves
-    /// the job to the Mac, with why.
+    /// Ready the host for the job: it answers `check` (this Mac's T3 Code,
+    /// or a `claude`/`codex` agent's programs), its clone has the branch,
+    /// its worktree a thread's settings. Any failure leaves the job to the
+    /// Mac, with why.
     pub fn set_up(
         job_id: &str,
         name: &str,
@@ -93,11 +176,12 @@ impl Hosted {
         checkout: &Checkout<'_>,
         settings: &ThreadSettings,
         mcp: Option<McpServer>,
-        local: Option<LocalT3>,
+        check: Option<Check>,
     ) -> Result<(Self, Vec<String>), String> {
         let Checkout { repo_root, worktree, branch } = *checkout;
-        let local = local.ok_or("no t3 CLI on this Mac to compare versions with")?;
-        match agent_hosts::probe(host, &local) {
+        let check = check.ok_or("no t3 CLI on this Mac to compare versions with")?;
+        let thread = matches!(check, Check::T3(_));
+        match check.run(host) {
             Probe::Ready => {}
             Probe::Down(why) | Probe::Refused(why) => return Err(why),
             Probe::Unknown => return Err("it didn't answer".to_string()),
@@ -108,6 +192,7 @@ impl Hosted {
             name: name.to_string(),
             host: host.clone(),
             ssh,
+            thread,
             repo_root: repo_root.to_path_buf(),
             worktree: worktree.to_path_buf(),
             branch: branch.to_string(),
@@ -123,10 +208,12 @@ impl Hosted {
         hosted.push()?;
         let parent = worktree.parent().map_or_else(|| "/".to_string(), |parent| hosted.remote(parent));
         hosted.ssh.run(&format!("mkdir -p {parent} && git -C {repo} worktree prune && git -C {repo} worktree add -q {tree} {}", quote(branch)))?;
-        match hosted.ssh.run(&format!("t3 project add {repo}")) {
-            Ok(_) => {}
-            Err(err) if err.contains("already") || err.contains("exists") => {}
-            Err(err) => return Err(format!("`t3 project add` failed there: {err}")),
+        if thread {
+            match hosted.ssh.run(&format!("t3 project add {repo}")) {
+                Ok(_) => {}
+                Err(err) if err.contains("already") || err.contains("exists") => {}
+                Err(err) => return Err(format!("`t3 project add` failed there: {err}")),
+            }
         }
         let socket = match mcp.filter(|_| settings.lotar_mcp) {
             Some(server) => {
@@ -137,9 +224,52 @@ impl Hosted {
             }
             None => None,
         };
-        hosted.write_settings(settings, socket.as_deref())?;
+        // A headless agent takes its rules and MCP servers with its ACP session.
+        if thread {
+            hosted.write_settings(settings, socket.as_deref())?;
+        }
         notes.push(format!("Runs on {name}: pushed {branch} to {} there, in the worktree {} at the same path.", repo_root.display(), worktree.display()));
         Ok((hosted, notes))
+    }
+
+    /// lotar's MCP server for a headless agent there (DEV-911): the bridge to
+    /// the socket the job's ssh connection forwards to this Mac.
+    pub fn lotar_mcp_server(&self) -> Option<harnessmux::McpServer> {
+        let socket = self.bridge.as_ref()?.remote.clone();
+        Some(harnessmux::McpServer::Stdio { command: "python3".to_string(), args: vec!["-c".to_string(), BRIDGE.to_string(), socket], env: BTreeMap::new() })
+    }
+
+    /// The job's agent table with `agent` run on the host over ssh
+    /// (DEV-911), in the job's worktree there, with its table env and `env`. A profile's own
+    /// `command` (already in `table`) runs as it is; else the agent's pinned
+    /// adapter through npx.
+    pub fn agent_table(&self, mut table: harnessmux::AgentTable, agent: &str, env: &BTreeMap<String, String>) -> Result<harnessmux::AgentTable, String> {
+        let mut spec = table.get(agent).map_err(|err| err.to_string())?.clone();
+        // The agent's env from the table and the profile go there; the Mac's
+        // own (PATH, LOTAR_*) stays with the local ssh.
+        let mut remote_env = std::mem::take(&mut spec.env);
+        remote_env.extend(env.iter().map(|(key, value)| (key.clone(), value.clone())));
+        spec.command = self.agent_over_ssh(&remote_agent_command(&spec), &remote_env);
+        spec.adapter = None;
+        table.insert(spec).map_err(|err| err.to_string())?;
+        Ok(table)
+    }
+
+    /// `ssh ... <target> -- sh -lc 'cd <worktree> && exec env <env> python3 -c <guard> 10 <command>'`.
+    fn agent_over_ssh(&self, command: &[String], env: &BTreeMap<String, String>) -> Vec<String> {
+        let mut script = format!("cd {} && exec env", self.remote(&self.worktree));
+        for (key, value) in env {
+            script.push_str(&format!(" {}", quote(&format!("{key}={value}"))));
+        }
+        script.push_str(&format!(" python3 -c {} {GRACE_SECONDS}", quote(GUARD)));
+        for part in command {
+            script.push_str(&format!(" {}", quote(part)));
+        }
+        let mut line =
+            vec![Ssh::program().to_string_lossy().into_owned(), "-T".into(), "-o".into(), "ControlMaster=no".into(), "-o".into(), "ControlPath=none".into()];
+        line.extend(Ssh::options().iter().map(|option| (*option).to_string()));
+        line.extend([self.ssh.target.clone(), "--".to_string(), format!("sh -lc {}", quote(&script))]);
+        line
     }
 
     fn remote(&self, path: &Path) -> String {
@@ -234,6 +364,7 @@ impl Hosted {
             name: name.to_string(),
             host: host.clone(),
             ssh: Ssh::new(&host.ssh),
+            thread: true,
             repo_root: repo_root.to_path_buf(),
             worktree: worktree.to_path_buf(),
             branch: branch.to_string(),
@@ -329,6 +460,34 @@ impl Drop for Hosted {
     fn drop(&mut self) {
         self.close();
     }
+}
+
+/// The agent's command on the host: the table's command when it has no
+/// pinned adapter (a profile's own `command`), else the adapter through npx,
+/// which the host has no harnessmux to install.
+pub(super) fn remote_agent_command(spec: &harnessmux::AgentSpec) -> Vec<String> {
+    let rest = spec.command.iter().skip(1).cloned();
+    match &spec.adapter {
+        Some(adapter) => ["npx", "--yes"]
+            .into_iter()
+            .map(str::to_string)
+            .chain([format!("--package={}@{}", adapter.npm, adapter.version), "--".to_string(), adapter.bin.clone()])
+            .chain(rest)
+            .collect(),
+        None => spec.command.clone(),
+    }
+}
+
+/// The programs a headless agent needs on the host: the guard's python3,
+/// its command's program and, for the adapter, the agent's own CLI.
+pub(super) fn remote_programs(spec: &harnessmux::AgentSpec) -> Vec<String> {
+    let mut programs = vec!["python3".to_string()];
+    programs.extend(remote_agent_command(spec).into_iter().next());
+    if spec.adapter.is_some() {
+        programs.extend(spec.requires.clone());
+    }
+    programs.dedup();
+    programs
 }
 
 /// `git <args>` in `dir`: its trimmed stdout, or its error.
@@ -482,6 +641,7 @@ fn serve(stream: UnixStream, (program, env): &(PathBuf, BTreeMap<String, String>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::agent_hosts::LocalT3;
     use std::os::unix::fs::PermissionsExt as _;
 
     /// A Mac checkout and a "host" in one temp folder: the fake ssh runs each
@@ -515,11 +675,12 @@ mod tests {
 while [ $# -gt 0 ]; do
   case "$1" in
     -o|-R|-L) shift 2 ;;
-    -N) shift ;;
+    -N|-T) shift ;;
     *) break ;;
   esac
 done
 shift
+[ "$1" = "--" ] && shift
 cmd="$*"
 case "$cmd" in "sh -lc "*) cmd="sh -c ${{cmd#sh -lc }}" ;; esac
 cmd=$(printf '%s' "$cmd" | sed "s#{root}/mac#{root}/host#g")
@@ -574,7 +735,145 @@ PATH="{root}/host-bin:$PATH" exec sh -c "$cmd"
             lotar_mcp: false,
         };
         let checkout = Checkout { repo_root: &repo, worktree: &worktree, branch: "agent/DEV-1" };
-        Hosted::set_up("job-1", "dyson", &dyson(), &checkout, &settings, None, Some(fixture.local.clone()))
+        Hosted::set_up("job-1", "dyson", &dyson(), &checkout, &settings, None, Some(Check::T3(fixture.local.clone())))
+    }
+
+    #[test]
+    fn a_headless_agents_host_job_gets_the_worktree_without_thread_settings() {
+        let fixture = fixture();
+        let (repo, worktree) = (fixture.root.join("mac/repo"), fixture.root.join("mac/wt"));
+        let settings = ThreadSettings { deny: vec!["mcp__claude_ai_Gmail".to_string()], env: BTreeMap::new(), lotar_mcp: false };
+        let checkout = Checkout { repo_root: &repo, worktree: &worktree, branch: "agent/DEV-1" };
+        script(&fixture.root.join("host-bin/t3"), &format!("#!/bin/sh\ntouch {}/t3-called\n", fixture.root.display()));
+        let (hosted, _) =
+            Hosted::set_up("job-1", "dyson", &dyson(), &checkout, &settings, None, Some(Check::Programs(vec!["sh".to_string()]))).expect("set up");
+        assert!(!hosted.thread);
+        let host_tree = fixture.root.join("host/wt");
+        assert_eq!(run_git(&host_tree, &["rev-parse", "HEAD"]), run_git(&worktree, &["rev-parse", "HEAD"]));
+        assert!(!host_tree.join(SETTINGS_FILE).exists() && !host_tree.join(".mcp.json").exists());
+        assert!(!fixture.root.join("t3-called").exists(), "no `t3 project add` for a headless agent");
+
+        let refused = Hosted::set_up("job-2", "dyson", &dyson(), &checkout, &settings, None, Some(Check::Programs(vec!["no-such-agent".to_string()])));
+        assert_eq!(refused.err().as_deref(), Some("no-such-agent is not on its PATH"));
+    }
+
+    fn headless(fixture: &Fixture, command: &[&str], env: &[(&str, &str)]) -> Vec<String> {
+        let (repo, worktree) = (fixture.root.join("mac/repo"), fixture.root.join("mac/wt"));
+        let settings = ThreadSettings { deny: Vec::new(), env: BTreeMap::new(), lotar_mcp: false };
+        let checkout = Checkout { repo_root: &repo, worktree: &worktree, branch: "agent/DEV-1" };
+        let (hosted, _) =
+            Hosted::set_up("job-1", "dyson", &dyson(), &checkout, &settings, None, Some(Check::Programs(vec!["sh".to_string()]))).expect("set up");
+        let mut table = crate::services::agent_runner::agent_table().expect("table");
+        let mut spec = table.get("claude").expect("claude").clone();
+        if !command.is_empty() {
+            spec.command = command.iter().map(|part| (*part).to_string()).collect();
+            spec.adapter = None;
+        }
+        table.insert(spec).expect("insert");
+        let env = env.iter().map(|(key, value)| ((*key).to_string(), (*value).to_string())).collect();
+        hosted.agent_table(table, "claude", &env).expect("table").get("claude").expect("claude").command.clone()
+    }
+
+    #[test]
+    fn a_headless_agent_runs_over_ssh_in_the_worktree_there_with_the_profile_env() {
+        let fixture = fixture();
+        let line = headless(&fixture, &[], &[("CLAUDE_CODE_EFFORT", "high")]);
+        assert_eq!(line[1..6], ["-T", "-o", "ControlMaster=no", "-o", "ControlPath=none"]);
+        let script = line.last().expect("script");
+        let target = line.iter().position(|part| part == "dyson").expect("target");
+        assert_eq!(line[target + 1], "--");
+        assert!(script.starts_with("sh -lc "), "{script}");
+        assert!(script.contains(&format!("cd '\\''{}'\\'' && exec env", fixture.root.join("mac/wt").display())), "{script}");
+        assert!(script.contains("CLAUDE_CODE_EFFORT=high"), "{script}");
+        assert!(
+            script.contains("npx") && script.contains("--package=@agentclientprotocol/claude-agent-acp@") && script.contains("claude-agent-acp"),
+            "{script}"
+        );
+        assert!(!script.contains("PATH=") && !script.contains("LOTAR_"), "{script}");
+
+        let spec = crate::services::agent_runner::agent_table().expect("table").get("claude").expect("claude").clone();
+        assert_eq!(remote_programs(&spec), ["python3", "npx", "claude"]);
+        let own = headless(&fixture, &["my-claude", "--fast"], &[]);
+        let script = own.last().expect("script");
+        assert!(script.contains("my-claude") && script.contains("--fast") && !script.contains("npx"), "{script}");
+    }
+
+    /// The launch line, run through the fake ssh: the guard passes stdin and
+    /// stdout through, in the host's worktree.
+    #[test]
+    fn the_guard_passes_the_agents_stdio_through() {
+        let fixture = fixture();
+        let line = headless(&fixture, &["sh", "-c", "pwd; echo \"$GREETING\"; head -n 1"], &[("GREETING", "hi there")]);
+        let mut child = Command::new(&line[0]).args(&line[1..]).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().expect("spawn");
+        // The connection stays open until the agent is done: closing it stops the agent.
+        let mut stdin = child.stdin.take().expect("stdin");
+        stdin.write_all(b"from lotar\n").expect("write");
+        let mut stdout = child.stdout.take().expect("stdout");
+        let mut text = String::new();
+        stdout.read_to_string(&mut text).expect("read");
+        drop(stdin);
+        let output = child.wait_with_output().expect("wait");
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert_eq!(text, format!("{}\nhi there\nfrom lotar\n", fixture.root.join("host/wt").display()));
+    }
+
+    fn alive(pid: &str) -> bool {
+        Command::new("kill").args(["-0", pid.trim()]).stderr(Stdio::null()).status().is_ok_and(|status| status.success())
+    }
+
+    fn guard(args: &[&str]) -> Child {
+        Command::new("python3").args(["-c", GUARD, "1"]).args(args).stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().expect("python3")
+    }
+
+    fn wait_for(path: &Path) -> String {
+        let end = Instant::now() + Duration::from_secs(10);
+        while Instant::now() < end {
+            if let Ok(text) = std::fs::read_to_string(path)
+                && text.ends_with('\n')
+            {
+                return text;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        panic!("{} never came", path.display());
+    }
+
+    /// A closed connection (stdin) stops the agent's whole process group:
+    /// SIGTERM, then SIGKILL for what ignores it.
+    #[test]
+    fn the_guard_stops_the_agents_group_when_the_connection_closes() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let pids = dir.path().join("pids");
+        let program = format!("trap '' TERM; sleep 60 & echo $! > {}; wait", pids.display());
+        let mut child = guard(&["sh", "-c", &program]);
+        let pid = wait_for(&pids);
+        assert!(alive(&pid));
+        drop(child.stdin.take());
+        let status = child.wait().expect("wait");
+        assert!(!status.success(), "the agent was killed");
+        let end = Instant::now() + Duration::from_secs(5);
+        while alive(&pid) && Instant::now() < end {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(!alive(&pid), "the agent's child that ignored SIGTERM got SIGKILL");
+    }
+
+    /// An agent that exits leaves nothing behind there.
+    #[test]
+    fn the_guard_stops_what_the_agent_leaves_running() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let pids = dir.path().join("pids");
+        let program = format!("sleep 60 & echo $! > {}; exit 3", pids.display());
+        let mut child = guard(&["sh", "-c", &program]);
+        // Its connection stays open: `wait` alone would close stdin first.
+        let _stdin = child.stdin.take();
+        assert_eq!(child.wait().expect("wait").code(), Some(3));
+        let pid = wait_for(&pids);
+        let end = Instant::now() + Duration::from_secs(5);
+        while alive(&pid) && Instant::now() < end {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(!alive(&pid));
     }
 
     fn commit_on_host(fixture: &Fixture, file: &str) {

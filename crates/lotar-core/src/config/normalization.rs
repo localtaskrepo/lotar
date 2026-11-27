@@ -1072,10 +1072,17 @@ mod agent_hosts_tests {
 
     #[test]
     fn an_unknown_host_or_one_on_a_command_or_merge_profile_is_refused() {
+        for runner in ["claude", "codex"] {
+            assert_eq!(check(&format!("{HOSTS}agents:\n  review:\n    runner: {runner}\n    host: dyson\n")), Ok(()), "DEV-911: {runner} runs there");
+        }
         assert_eq!(check(&format!("{HOSTS}agents:\n  fix:\n    runner: t3\n    host: nyx\n")), Err("agents.fix.host: 'nyx' is not in agent.hosts".to_string()));
         assert_eq!(
             check(&format!("{HOSTS}agents:\n  build:\n    runner: command\n    command: make\n    host: dyson\n")),
-            Err("agents.build.host: only t3 profiles run on a host, this one runs command".to_string())
+            Err("agents.build.host: only t3, claude and codex profiles run on a host, this one runs command".to_string())
+        );
+        assert_eq!(
+            check(&format!("{HOSTS}agents:\n  ask:\n    runner: copilot\n    host: dyson\n")),
+            Err("agents.ask.host: only t3, claude and codex profiles run on a host, this one runs copilot".to_string())
         );
         assert_eq!(
             check(&format!("{HOSTS}agents:\n  merge:\n    runner: t3\n    host: dyson\n")),

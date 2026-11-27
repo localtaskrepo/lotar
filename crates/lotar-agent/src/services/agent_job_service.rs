@@ -4161,8 +4161,12 @@ fn run_job(
                 &host,
                 &hosted::Checkout { repo_root: &root, worktree, branch },
                 &host_thread_settings(&profile),
-                Some(host_mcp_server(&tasks_dir, &env, lost_host_connection(&job_id, &name, crate::services::agent_hosts::Ssh::new(&host.ssh)))),
-                local_t3(),
+                Some(host_mcp_server(
+                    &tasks_dir,
+                    &env,
+                    lost_host_connection(&job_id, &name, crate::services::agent_hosts::Ssh::new(&host.ssh), runner_kind == AgentRunnerKind::T3),
+                )),
+                host_check(&profile),
             ),
             _ => Err("the job has no worktree to push there".to_string()),
         };
@@ -4244,12 +4248,14 @@ fn host_mcp_server(tasks_dir: &std::path::Path, env: &HashMap<String, String>, o
 }
 
 /// What a broken connection to the host does: the job notes it and its
-/// thread stops (DEV-901).
-fn lost_host_connection(job_id: &str, session: &str, ssh: crate::services::agent_hosts::Ssh) -> Box<dyn Fn(&str) + Send> {
+/// thread stops (DEV-901). A headless agent there (DEV-911) has no thread:
+/// its guard stops it once the connection is gone.
+fn lost_host_connection(job_id: &str, session: &str, ssh: crate::services::agent_hosts::Ssh, thread: bool) -> Box<dyn Fn(&str) + Send> {
     let (job_id, session) = (job_id.to_string(), session.to_string());
     Box::new(move |why: &str| {
-        let mut note = format!("{why}; the thread stops.");
-        if let Some(thread) = host_thread(&session, &ssh)
+        let mut note = if thread { format!("{why}; the thread stops.") } else { format!("{why}; the agent there stops.") };
+        if thread
+            && let Some(thread) = host_thread(&session, &ssh)
             && let Err(err) = crate::services::t3_thread_api::stop_thread(std::path::Path::new("t3"), &[], std::path::Path::new("/"), &thread, why)
         {
             note = format!("{why}; stopping its thread on {} failed: {err}", ssh.target);
@@ -4277,7 +4283,7 @@ fn finish_on_host(job_id: &str, ticket_id: &str, mut hosted: hosted::Hosted, end
             record_and_emit(state, "agent_job_progress", Some(note.to_string()));
         });
     };
-    let thread = host_thread(session, &hosted.ssh);
+    let thread = if hosted.thread { host_thread(session, &hosted.ssh) } else { None };
     crate::services::agent_hosts::release(job_id);
     if let RunEnd::WaitingForAnswer(message) = end {
         let name = hosted.name.clone();
@@ -4290,8 +4296,9 @@ fn finish_on_host(job_id: &str, ticket_id: &str, mut hosted: hosted::Hosted, end
             }
             Err(err) => format!("Its commits didn't come back to the Mac: {err}. Its worktree stays on {name}."),
         };
+        let what = if hosted.thread { "thread" } else { "session" };
         wait_on_host(ticket_id, hosted);
-        return RunEnd::WaitingForAnswer(format!("{message}\n\nThe thread runs on {name}. {note}"));
+        return RunEnd::WaitingForAnswer(format!("{message}\n\nThe {what} runs on {name}. {note}"));
     }
     let lost = hosted.lost();
     if (lost.is_some() || should_stop_job(job_id) || matches!(end, RunEnd::Stopped))
@@ -5037,10 +5044,24 @@ fn run_session(
             record_and_emit(state, "agent_job_progress", Some(note.clone()));
         });
     }
-    let table = match crate::services::agent_runner::job_agent_table(launch.agent, profile) {
+    let mut table = match crate::services::agent_runner::job_agent_table(launch.agent, profile) {
         Ok(table) => table,
         Err(err) => return RunEnd::Failed(err.to_string()),
     };
+    // A headless agent on a host runs over ssh there (DEV-911), with the
+    // profile's env but not the Mac's PATH and lotar paths.
+    if let Some(hosted) = launch.hosted.filter(|hosted| !hosted.thread) {
+        let env = crate::services::agent_runner::expand_env_map(&profile.env).into_iter().collect();
+        table = match hosted.agent_table(table, launch.agent, &env) {
+            Ok(table) => table,
+            Err(err) => return RunEnd::Failed(format!("Could not run {} on {}: {err}", launch.agent, hosted.name)),
+        };
+        if profile.mcp.as_ref().is_some_and(|mcp| mcp.lotar)
+            && let Some(server) = hosted.lotar_mcp_server()
+        {
+            session_profile.mcp_servers.insert("lotar".to_string(), server);
+        }
+    }
     let t3_profile_env = session_profile.env.clone();
     // A session the agent can't resume gets a new one with a handoff (DEV-757);
     // not a t3 one, whose thread may still run in T3 Code (DEV-738).
@@ -7152,7 +7173,21 @@ pub(crate) fn place_on_host(
     agent: Option<&str>,
     taken: &HashMap<String, usize>,
 ) -> Option<Result<String, String>> {
-    crate::services::agent_hosts::place(tasks_dir, ticket_id, agent, taken, || saved_jobs(tasks_dir), local_t3)
+    crate::services::agent_hosts::place(tasks_dir, ticket_id, agent, taken, || saved_jobs(tasks_dir), host_check)
+}
+
+/// What a host needs to take a job of the profile: this Mac's T3 Code for a
+/// `t3` thread (DEV-901), the programs of a `claude`/`codex` agent run there
+/// over ssh (DEV-911).
+fn host_check(profile: &AgentProfileDetail) -> Option<crate::services::agent_hosts::Check> {
+    let kind = profile.runner.parse().ok()?;
+    if kind == AgentRunnerKind::T3 {
+        return local_t3().map(crate::services::agent_hosts::Check::T3);
+    }
+    let agent = harness_agent(kind)?;
+    let table = crate::services::agent_runner::job_agent_table(agent, profile).ok()?;
+    let spec = table.get(agent).ok()?;
+    Some(crate::services::agent_hosts::Check::Programs(hosted::remote_programs(spec)))
 }
 
 /// This Mac's `t3` CLI, as harnessmux runs it.

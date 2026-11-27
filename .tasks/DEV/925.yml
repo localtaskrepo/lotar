@@ -1,16 +1,34 @@
 title: Merge-agent tests in dev503 wait on the machine's real check lock and time out while a real merge runs
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-27T09:17:10.615601+00:00
-modified: 2026-11-27T09:17:12.051476+00:00
+modified: 2026-11-27T12:12:18.481698+00:00
 relationships:
   related:
   - DEV-867
   - DEV-797
   - DEV-913
+  - DEV-890
+  - DEV-908
+comments:
+- date: 2026-11-27T12:12:09.210091+00:00
+  author: claude
+  text: |-
+    Already fixed on main: both tests pass while a real lotar holds port 47586, no change needed.
+
+    - `t3_harness_with` in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs` sets `LOTAR_CHECK_LOCK_HELD=1` since DEV-908 (`8f8365754`, 2026-11-26).
+    - The test ctor in `crates/lotar-lib/tests/common/mod.rs` sets it for every integration test since DEV-890 (`d1061401e`); tests that need the lock set their own `LOTAR_CHECK_LOCK_PORT` and clear it (DEV-867, DEV-797).
+    - The DEV-867 review that found this most likely ran on a branch from before those commits.
+    - Check: with `LOTAR_CHECK_LOCK_HELD` unset in the parent and `127.0.0.1:47586` held by a real lotar (pid 61697), both tests passed in 1.8 s.
+  report:
+    checks:
+    - command: env -u LOTAR_CHECK_LOCK_HELD cargo nextest run -p lotar-lib --test integration -E 'test(a_continued_merge_in_the_reviews_process) | test(a_continued_merge_without_a_session_of_its_own)'
+      result: passed
+      reason: 2 passed in 1.8 s while lotar pid 61697 listened on 47586
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3b93868ddae9a7d3fe0f2de616f91fb61fe88cd5dc4ead363fb89d0dee2cc64e
 description: |-
   Found in the DEV-867 review (2026-11-27).
 
@@ -34,3 +52,32 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T12:10:49.248945+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T12:10:50.057825+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3b93868ddae9a7d3fe0f2de616f91fb61fe88cd5dc4ead363fb89d0dee2cc64e
+- at: 2026-11-27T12:12:09.210091+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T12:12:09.508254+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-867","DEV-797","DEV-913"]}'
+    new: '{"related":["DEV-867","DEV-797","DEV-913","DEV-890","DEV-908"]}'
+- at: 2026-11-27T12:12:18.481698+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

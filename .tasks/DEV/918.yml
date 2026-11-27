@@ -1,11 +1,11 @@
 title: Transcript reader takes a kept copy of a longer-named session for the job's own
-status: Blocked
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-27T01:02:35.316395+00:00
-modified: 2026-11-27T09:33:23.743680+00:00
+modified: 2026-11-27T12:16:45.577240+00:00
 relationships:
   depends_on:
   - DEV-909
@@ -20,8 +20,44 @@ comments:
     - `crates/lotar-agent/src/services/agent_job_service/transcript.rs` and its `candidates()` exist only on `agent/DEV-909` (`865efba73`), which is in Reviewing.
     - Fixing it here would conflict with DEV-909's own commit; this branch has no commits.
     - Next: once DEV-909 is on main, rebase onto it, accept `base != name` only when `base` is 47 chars (the `keep_session` cut), add a test with a kept copy of a prefix-named session.
+- date: 2026-11-27T12:15:30.354282+00:00
+  author: claude
+  text: |-
+    Fixed: a kept copy of a shorter, prefix-named session no longer counts as the job's.
+
+    - Rebased `agent/DEV-918` onto main (DEV-909 `1ee3ef1f4` is in).
+    - `candidates()` in `crates/lotar-agent/src/services/agent_job_service/transcript.rs` takes a kept `<base>.<stamp>` only when `base == name`, or `base` is exactly `KEPT_BASE_CHARS` (47) and the name starts with it.
+    - `KEPT_BASE_CHARS` is a new const in `crates/lotar-agent/src/services/agent_runner.rs`; `keep_session` cuts with it, so the two can't drift.
+    - New tests: `a_kept_copy_of_a_prefix_named_session_is_not_the_jobs` (`lotar-x-DEV-1-fix` copy vs session `lotar-x-DEV-1-fix-ui`: expired; failed on the old check) and `a_kept_copy_of_a_long_name_answers_with_its_cut_base`.
+  report:
+    commits:
+    - hash: 8da6f888b
+      what: kept copy counts only when its base is the name or the 47-char cut
+    checks:
+    - command: cargo nextest run -p lotar-agent transcript keep
+      result: passed
+      reason: 30 tests
+    - command: npm run lint
+      result: passed
+    - command: npm test, npm run smoke
+      result: not_run
+      reason: the merge runs the full suites
+    next: Merge agent lands agent/DEV-918
+- date: 2026-11-27T12:16:38.531139+00:00
+  author: claude
+  text: |-
+    Review: passed. `8da6f888b` does what the ticket asks and nothing else.
+
+    - Read: the ticket, both comments, DEV-909 (`1ee3ef1f4`, the latest commit to both files on main), and the diff in `transcript.rs` and `agent_runner.rs`.
+    - `candidates()` now takes a kept `<base>.<stamp>` only when `base == name`, or when `base` is exactly `KEPT_BASE_CHARS` (47) long and the name starts with it. That is the fix the ticket asked for.
+    - `keep_session` now cuts names with the same `KEPT_BASE_CHARS` const (64 − 16-character stamp − 1 = 47, the same value as before), so the cut and the check can't drift apart.
+    - Failing test first: with the old check put back, `a_kept_copy_of_a_prefix_named_session_is_not_the_jobs` fails; with the fix it passes. I restored the file afterwards and the tree is clean.
+    - Reran: `npm ci` passed; `cargo nextest run -p lotar-agent transcript` passed (7/7); `rustfmt --edition 2024 --check` on both files passed; `cargo clippy -p lotar-agent --all-targets -- -D warnings` passed.
+    - Not run: the full suites, which the merge runs. No UI change, so no screenshots needed.
+    - No stray files and no second branch. No findings, no tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae1a29fbe4bcea30c3959670eaf07e248ec106b3f020c832392f7dedd633c4061
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3de5e9c7f46b9b8e194c9aedb1fc604ecb9c0980300ab125696a391f079510ba
 description: |-
   Found in the DEV-909 review.
 
@@ -76,3 +112,40 @@ history:
   - field: tags
     old: agent, waits
     new: agent
+- at: 2026-11-27T12:12:20.563264+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-27T12:12:22.038815+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A3de5e9c7f46b9b8e194c9aedb1fc604ecb9c0980300ab125696a391f079510ba
+- at: 2026-11-27T12:15:30.354282+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T12:15:44.481611+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T12:16:38.531139+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T12:16:45.577240+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -1,17 +1,18 @@
 title: 'A takeover of a taken-over T3 job loses the original request: its retry asks only ''Go on with the ticket''s work in this thread'''
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T03:13:30.591400+00:00
-modified: 2026-11-27T11:59:15.940305+00:00
+modified: 2026-11-27T12:10:00.341617+00:00
 relationships:
   depends_on:
   - DEV-912
   related:
   - DEV-912
   - DEV-932
+  - DEV-911
 comments:
 - date: 2026-11-27T04:15:13.565659+00:00
   author: claude
@@ -64,6 +65,30 @@ comments:
     - Reran: `cargo nextest run -p lotar-lib --test integration -E 'test(/taken_over|resumed/)'` passed (24 tests). `npm run lint` passed. Worktree is still clean.
     - Minor, filed as [DEV-932](https://lotar.pyxzl.net/task/DEV-932): a taken-over job still writes no `run_inputs` line. So once the process that took it over is gone and no limit retry is queued, the next takeover still gets `GO_ON`. The fix agent named this gap and the doc says "in the same process".
     - `LOTAR_AGENT_RESUMED_LOOK_SECONDS` is a new env var added for the test. It is documented in `docs/help/agent.md`, and the default behaviour is unchanged.
+- date: 2026-11-27T12:09:59.300244+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-920` is in `main`.
+
+    - Rebased `agent/DEV-920` onto `main` (`e1e10870ea19`): `15fbb001f061`
+    - Waited 3 min for the machine's check lock, held by lotar's merge checks of DEV-911 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-911 (pid 61697), since 11:49 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `15fbb001f061`
+    - Amended the pending `.tasks` changes into the merged commit: `a6e2d9daed0e`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: a6e2d9dae
+      what: 'DEV-920 A takeover of a taken-over T3 job loses the original request: its retry asks only ''Go on with the ticket''s work in this thread'''
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A102957e71acb447fb921535ef72d6677575feaa9e48a008cb057c55367da89de
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A31aeb13728de19838393fbf93a18602c8a4268cc7b411ab47e7d6c05a5a446da
@@ -170,3 +195,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T12:09:59.300244+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T12:09:59.619920+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-912"],"related":["DEV-912","DEV-932"]}'
+    new: '{"depends_on":["DEV-912"],"related":["DEV-912","DEV-932","DEV-911"]}'
+- at: 2026-11-27T12:10:00.341617+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

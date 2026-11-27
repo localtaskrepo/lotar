@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T10:20:52.236519+00:00
-modified: 2026-11-27T11:56:06.175489+00:00
+modified: 2026-11-27T12:16:08.232858+00:00
 relationships:
   depends_on:
   - DEV-801
@@ -16,6 +16,7 @@ relationships:
   - DEV-888
   - DEV-913
   - DEV-911
+  - DEV-929
 comments:
 - date: 2026-11-27T10:24:10.666877+00:00
   author: claude
@@ -210,3 +211,9 @@ history:
   - field: status
     old: Merging
     new: Done
+- at: 2026-11-27T12:16:08.232858+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-801"],"related":["DEV-801","DEV-875","DEV-832","DEV-888","DEV-913","DEV-911"]}'
+    new: '{"depends_on":["DEV-801"],"related":["DEV-801","DEV-875","DEV-832","DEV-888","DEV-913","DEV-911","DEV-929"]}'

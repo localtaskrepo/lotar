@@ -3,8 +3,9 @@
 //!
 //! The Mac comes first. A job of a profile with a `host` goes there only
 //! when the Mac has no free slot, the host is within its `hours`, has a free
-//! slot of its own (`max_jobs`), answers with the Mac's T3 Code version, and
-//! the job's expected duration ends before the window closes. Otherwise the
+//! slot of its own (`max_jobs`), answers with the Mac's T3 Code version (a
+//! `claude` or `codex` job: with the programs it runs, DEV-911), and the
+//! job's expected duration ends before the window closes. Otherwise the
 //! job waits for the Mac and the queue says why. While work waits for a host
 //! that doesn't answer within its hours, its `wake` command runs, once per
 //! ten minutes.
@@ -12,7 +13,7 @@
 //! What a host answered is kept for a minute and asked again in the
 //! background, so placing a job never waits for ssh.
 
-use crate::config::types::{AgentHostConfig, HostHours};
+use crate::config::types::{AgentHostConfig, AgentProfileDetail, HostHours};
 use jiff::{SignedDuration, Timestamp, tz::TimeZone};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -337,6 +338,45 @@ impl LocalT3 {
     }
 }
 
+/// What a job needs of the host besides ssh.
+#[derive(Debug, Clone)]
+pub(crate) enum Check {
+    /// A T3 Code thread: the host's `t3 --version` is this Mac's and its
+    /// environment is reachable.
+    T3(LocalT3),
+    /// A `claude` or `codex` agent over ssh (DEV-911): these programs are
+    /// on the host's login PATH.
+    Programs(Vec<String>),
+}
+
+impl Check {
+    /// Tells the cached answers of a host apart.
+    fn key(&self) -> String {
+        match self {
+            Self::T3(_) => "t3".to_string(),
+            Self::Programs(programs) => programs.join(" "),
+        }
+    }
+
+    pub fn run(&self, host: &AgentHostConfig) -> Probe {
+        match self {
+            Self::T3(local) => probe(host, local),
+            Self::Programs(programs) => probe_programs(host, programs),
+        }
+    }
+}
+
+/// Ask the host: ssh gets through and has `programs` on its login PATH.
+pub(crate) fn probe_programs(host: &AgentHostConfig, programs: &[String]) -> Probe {
+    let names: Vec<String> = programs.iter().map(|program| quote(program)).collect();
+    let script = format!("for p in {}; do command -v \"$p\" >/dev/null || {{ echo \"$p is not on its PATH\" >&2; exit 3; }}; done", names.join(" "));
+    match Ssh::new(&host.ssh).run(&script) {
+        Ok(_) => Probe::Ready,
+        Err(err) if err.contains("doesn't answer") => Probe::Down(err),
+        Err(err) => Probe::Refused(err),
+    }
+}
+
 /// Ask the host: ssh gets through, its `t3 --version` is this Mac's, and
 /// this Mac's T3 Code reaches its environment.
 pub(crate) fn probe(host: &AgentHostConfig, local: &LocalT3) -> Probe {
@@ -383,24 +423,28 @@ struct Asked {
 
 static PROBES: LazyLock<Mutex<HashMap<String, Asked>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-/// What the host last answered; asks it again in the background once that
-/// answer is older than a minute.
-pub(crate) fn cached_probe(name: &str, host: &AgentHostConfig, local: impl FnOnce() -> Option<LocalT3>) -> Probe {
+fn probe_key(name: &str, host: &AgentHostConfig) -> String {
+    format!("{name}\u{0}{}\u{0}", host.ssh)
+}
+
+/// What the host last answered to `check`; asks it again in the background
+/// once that answer is older than a minute.
+pub(crate) fn cached_probe(name: &str, host: &AgentHostConfig, check: Option<Check>) -> Probe {
+    let Some(check) = check else {
+        return Probe::Refused("no t3 CLI on this Mac".to_string());
+    };
     let Ok(mut probes) = PROBES.lock() else {
         return Probe::Unknown;
     };
-    let key = format!("{name}\u{0}{}", host.ssh);
+    let key = format!("{}{}", probe_key(name, host), check.key());
     let asked = probes.entry(key.clone()).or_insert(Asked { probe: Probe::Unknown, at: Instant::now(), asking: false });
     let stale = asked.probe == Probe::Unknown || asked.at.elapsed() >= PROBE_TTL;
     let answer = asked.probe.clone();
     if stale && !asked.asking {
-        let Some(local) = local() else {
-            return Probe::Refused("no t3 CLI on this Mac".to_string());
-        };
         asked.asking = true;
         let host = host.clone();
         std::thread::spawn(move || {
-            let probe = probe(&host, &local);
+            let probe = check.run(&host);
             if let Ok(mut probes) = PROBES.lock() {
                 probes.insert(key, Asked { probe, at: Instant::now(), asking: false });
             }
@@ -412,7 +456,8 @@ pub(crate) fn cached_probe(name: &str, host: &AgentHostConfig, local: impl FnOnc
 /// Forget what the host answered, so the next placement asks it again.
 pub(crate) fn forget_probe(name: &str, host: &AgentHostConfig) {
     if let Ok(mut probes) = PROBES.lock() {
-        probes.remove(&format!("{name}\u{0}{}", host.ssh));
+        let prefix = probe_key(name, host);
+        probes.retain(|key, _| !key.starts_with(&prefix));
     }
 }
 
@@ -556,16 +601,17 @@ pub(crate) fn expected_duration(tasks_dir: &Path, profile: &str, jobs: impl FnOn
 
 /// The host a job of `agent` (a profile) on the ticket may run on: the
 /// profile's `host` and its config, from the ticket's project.
-pub(crate) fn profile_host(tasks_dir: &Path, ticket_id: &str, agent: Option<&str>) -> Option<(String, String, AgentHostConfig)> {
+pub(crate) fn profile_host(tasks_dir: &Path, ticket_id: &str, agent: Option<&str>) -> Option<(String, AgentProfileDetail, String, AgentHostConfig)> {
     let profile = agent?.trim().trim_start_matches('@').to_string();
     if profile.is_empty() {
         return None;
     }
     let project = crate::storage::TaskId::parse(ticket_id).ok().map(|id| id.project);
     let config = crate::config::resolution::config_for_project(tasks_dir, project.as_deref()).ok()?;
-    let host = config.agent_profiles.get(&profile)?.host.clone()?.trim().to_string();
+    let detail = config.agent_profiles.get(&profile)?.clone();
+    let host = detail.host.clone()?.trim().to_string();
     let host_config = config.agent_hosts.get(&host)?.clone();
-    Some((profile, host, host_config))
+    Some((profile, detail, host, host_config))
 }
 
 /// Where a job of `agent` on the ticket may run now that the Mac is full:
@@ -577,14 +623,14 @@ pub(crate) fn place(
     agent: Option<&str>,
     taken: &HashMap<String, usize>,
     jobs: impl FnOnce() -> Vec<crate::services::agent_log_service::SavedJob>,
-    local: impl FnOnce() -> Option<LocalT3>,
+    check: impl FnOnce(&AgentProfileDetail) -> Option<Check>,
 ) -> Option<Result<String, String>> {
-    let (profile, name, host) = profile_host(tasks_dir, ticket_id, agent)?;
+    let (profile, detail, name, host) = profile_host(tasks_dir, ticket_id, agent)?;
     let others = crate::services::agent_active_jobs::list(tasks_dir);
     let running = running_per_host(&others).get(&name).copied().unwrap_or(0) + taken.get(&name).copied().unwrap_or(0);
     let now = Timestamp::now();
     let expected = expected_duration(tasks_dir, &profile, jobs);
-    let probe = if within_hours(&host, now) && running < host.max_jobs { cached_probe(&name, &host, local) } else { Probe::Unknown };
+    let probe = if within_hours(&host, now) && running < host.max_jobs { cached_probe(&name, &host, check(&detail)) } else { Probe::Unknown };
     let decided = decide(&name, &host, running, &probe, now, expected);
     if matches!(probe, Probe::Down(_)) && wake(&name, &host, now) {
         return Some(Err(format!("{name}: doesn't answer; woken at {}", clock(now, &host.time_zone().unwrap_or(TimeZone::UTC)))));
@@ -727,6 +773,29 @@ mod tests {
         assert_eq!(probe(&host(None), &local), Probe::Refused("it runs t3 0.1.12, this Mac 0.1.13".to_string()));
         let local = fake_ssh(dir.path(), None);
         assert_eq!(probe(&host(None), &local), Probe::Down("dyson doesn't answer over ssh: connect: down".to_string()));
+    }
+
+    /// DEV-911: a claude/codex job needs its programs there, not T3 Code.
+    #[test]
+    fn the_probe_of_a_headless_agent_looks_for_its_programs() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let dir = tempfile::tempdir().expect("tempdir");
+        let ssh = dir.path().join("ssh");
+        // Runs the script here, with only `python3` and `claude` on PATH.
+        let bin = dir.path().join("bin");
+        std::fs::create_dir_all(&bin).expect("bin");
+        for program in ["python3", "claude"] {
+            std::fs::write(bin.join(program), "#!/bin/sh\n").expect("program");
+            std::fs::set_permissions(bin.join(program), std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        }
+        let fake = format!("#!/bin/sh\nfor last; do :; done\nPATH={} exec /bin/sh -c \"/bin/sh -c ${{last#sh -lc }}\"\n", bin.display());
+        std::fs::write(&ssh, fake).expect("ssh");
+        std::fs::set_permissions(&ssh, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        // SAFETY: nextest runs each test in its own process.
+        unsafe { std::env::set_var("LOTAR_SSH", &ssh) };
+        let programs = |list: &[&str]| Check::Programs(list.iter().map(|program| (*program).to_string()).collect());
+        assert_eq!(programs(&["python3", "claude"]).run(&host(None)), Probe::Ready);
+        assert_eq!(programs(&["python3", "codex"]).run(&host(None)), Probe::Refused("codex is not on its PATH".to_string()));
     }
 
     #[test]

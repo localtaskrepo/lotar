@@ -673,7 +673,7 @@ impl AgentHostConfig {
 
 /// Refuses `agent.hosts` and profile `host`s that cannot work (DEV-901): a
 /// bad `hours` or `timezone`, a profile naming an unknown host, or `host` on a
-/// command or merge profile.
+/// merge profile or on a runner other than `t3`, `claude` and `codex` (DEV-911).
 pub fn validate_agent_hosts(hosts: &BTreeMap<String, AgentHostConfig>, profiles: &IndexMap<String, AgentProfileDetail>) -> Result<(), String> {
     for (name, host) in hosts {
         let field = |detail: String| format!("agent.hosts.{name}: {detail}");
@@ -697,8 +697,8 @@ pub fn validate_agent_hosts(hosts: &BTreeMap<String, AgentHostConfig>, profiles:
         if profile.eq_ignore_ascii_case("merge") {
             return Err(field("a merge job runs on the Mac".into()));
         }
-        if !matches!(detail.runner.trim().to_ascii_lowercase().as_str(), "t3" | "t3code") {
-            return Err(field(format!("only t3 profiles run on a host, this one runs {}", detail.runner.trim())));
+        if !matches!(detail.runner.parse(), Ok(AgentRunnerKind::T3 | AgentRunnerKind::Claude | AgentRunnerKind::Codex)) {
+            return Err(field(format!("only t3, claude and codex profiles run on a host, this one runs {}", detail.runner.trim())));
         }
     }
     Ok(())
