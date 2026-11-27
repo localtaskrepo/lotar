@@ -1,16 +1,18 @@
 title: 'Hosted claude/codex takeover: no test cancels a job while resume_session_to_end takes it over on a host'
-status: Blocked
+status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-27T15:18:02.306993+00:00
-modified: 2026-11-27T15:22:23.705282+00:00
+modified: 2026-11-27T15:46:23.734260+00:00
 relationships:
   depends_on:
   - DEV-933
   related:
   - DEV-933
+  - DEV-931
+  - DEV-932
 comments:
 - date: 2026-11-27T15:22:13.719566+00:00
   author: claude
@@ -42,6 +44,17 @@ comments:
 - date: 2026-11-27T15:22:23.705282+00:00
   author: automation
   text: 'The @review job waits for its open prerequisites: DEV-933. It starts once they are done.'
+- date: 2026-11-27T15:46:15.118651+00:00
+  author: claude
+  text: |-
+    Review: passed. The new test covers the cancel branch of `resume_session_to_end` on a host and catches its removal.
+
+    - Read: `198bb9316` (one test, +38 lines in `hosted.rs`), the ticket and the fix comment, DEV-933, and the cancel branch in `agent_job_service.rs` (`publish_session` false → `finish_on_host(.., RunEnd::Stopped, ..)`).
+    - DEV-933 has landed on main as `1fcdd4ae8`, with the same code as the branch's `159432151`. `198bb9316` cherry-picks cleanly onto main `c1862fa84`, which already has DEV-932. The merge's rebase drops the duplicate commit.
+    - Done when: all four points are met. The fix agent's change to the leftover point matches the existing code (`bring_back(.., good = false)` only commits after a run that ended well, from DEV-931). The ticket's own "Found" already said the leftover stays on dyson, so the change describes the code as it is and decides nothing new.
+    - Reran on main plus the fix, in a detached copy: `cargo nextest run -p lotar-agent -E 'test(/hosted::/)'` passed 23/23. `rustfmt --check` on `hosted.rs` passed, and `cargo clippy -p lotar-agent --tests` gave no warnings.
+    - Mutation check: replacing the cancel branch's `finish_on_host` call makes the test fail at `hosted.rs:1480`. Code put back.
+    - `npm ci` passed. No stray files and no second branch. No tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad3c6ee465ab88ef270a37b30447963869604cff25e074986fc0dbef2fcc9c8f5
 description: |-
@@ -133,3 +146,28 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T15:43:34.841544+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: Reviewing
+- at: 2026-11-27T15:46:15.118651+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T15:46:15.429101+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-933"],"related":["DEV-933"]}'
+    new: '{"depends_on":["DEV-933"],"related":["DEV-933","DEV-931","DEV-932"]}'
+- at: 2026-11-27T15:46:23.734260+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

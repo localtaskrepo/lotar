@@ -1,11 +1,11 @@
 title: 'A takeover of a job another process took over still asks ''Go on with the ticket''s work'': a taken-over job writes no run_inputs line'
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T11:58:59.845101+00:00
-modified: 2026-11-27T15:28:25.704865+00:00
+modified: 2026-11-27T15:46:15.428668+00:00
 relationships:
   related:
   - DEV-920
@@ -13,6 +13,7 @@ relationships:
   - DEV-928
   - DEV-931
   - DEV-933
+  - DEV-936
 comments:
 - date: 2026-11-27T13:47:56.642583+00:00
   author: claude
@@ -70,6 +71,27 @@ comments:
 - date: 2026-11-27T15:28:25.398529+00:00
   author: automation
   text: Waited 7 min for the machine's check lock, held by lotar's merge checks of DEV-933 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-933 (pid 61697), since 15:18 UTC; the merge agent starts now.
+- date: 2026-11-27T15:36:01.843713+00:00
+  author: claude
+  text: |-
+    Merged into `main` as `c1862fa84` and pushed.
+
+    - `main` had moved on to `1fcdd4ae8` (DEV-933); rebased cleanly to `f3007f56c`, `npm ci` ok (lockfile unchanged).
+    - Checks reran on the rebased commit, all passed: `npm run -s lint:agent`, `npm run -s test:agent` (2711 Rust tests), `npm run -s smoke` (415).
+    - `git merge --ff-only agent/DEV-932` in the main checkout, then `.tasks` changes (DEV-932, DEV-933) amended in.
+    - No rules or agent profiles changed: no `lotar trust` needed.
+    - Pushed `11cb38081..c1862fa84`, including DEV-933's landed commit `1fcdd4ae8`.
+  report:
+    commits:
+    - hash: c1862fa84
+      what: DEV-932 a taken-over job writes a run_inputs line
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae198604b4f163166e3cbb9ead47ce120cf1d76a8daef1ea66b1f2dda05c0e8a5
 description: |-
@@ -171,3 +193,19 @@ history:
   - field: relationships
     old: '{"related":["DEV-920","DEV-808","DEV-928","DEV-931"]}'
     new: '{"related":["DEV-920","DEV-808","DEV-928","DEV-931","DEV-933"]}'
+- at: 2026-11-27T15:36:01.843713+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T15:36:09.856080+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+- at: 2026-11-27T15:46:15.428668+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-920","DEV-808","DEV-928","DEV-931","DEV-933"]}'
+    new: '{"related":["DEV-920","DEV-808","DEV-928","DEV-931","DEV-933","DEV-936"]}'

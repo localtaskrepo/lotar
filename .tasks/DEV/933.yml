@@ -1,11 +1,11 @@
 title: 'Hosted claude/codex takeover: no test drives resume_session_to_end on a host'
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T13:36:18.043765+00:00
-modified: 2026-11-27T15:28:25.914888+00:00
+modified: 2026-11-27T15:43:34.185794+00:00
 relationships:
   depends_on:
   - DEV-931
@@ -89,6 +89,29 @@ comments:
     - command: npm run -s smoke
       result: passed
     next: The merge agent takes over in a new session
+- date: 2026-11-27T15:43:06.313381+00:00
+  author: automation
+  text: Waited 15 min for the machine's check lock, held by the merge agent of DEV-932 (job job-20261127T135210.194Z-77, pid 61697), since 15:21 UTC; the merge agent starts now.
+- date: 2026-11-27T15:43:26.931044+00:00
+  author: claude
+  text: |-
+    Merged into `main` as `1fcdd4ae8` and pushed.
+
+    - lotar's merge ran the checks (all passed), fast-forwarded `main` and amended `.tasks` into `1fcdd4ae8`; I redid none of it.
+    - DEV-932's merge then landed `c1862fa84` on top and pushed `11cb38081..c1862fa84`, which includes this commit: `origin/main` = `c1862fa84`.
+    - No rules or agent profiles changed in `11cb38081..main`: no `lotar trust` needed.
+    - The main checkout's `.tasks` changes (DEV-932, DEV-933 status) came after `c1862fa84`, which isn't this ticket's commit, so I left them uncommitted.
+  report:
+    commits:
+    - hash: 1fcdd4ae8
+      what: DEV-933 tests drive resume_session_to_end on a host
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A284391c1577bda911e913ca36f1acdb09d7eac6415b551a410bc6bebcbcf4f35
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2cbcb448b502c80965540ebeaf4189b636e63964d66597cb13424c0012d58d48
@@ -209,3 +232,17 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T15:43:06.313381+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T15:43:26.931044+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T15:43:34.185794+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

@@ -17,7 +17,8 @@ use crate::types::{TaskChange, TaskChangeLogEntry};
 /// (DEV-466).
 pub struct BlobBatch {
     child: std::process::Child,
-    stdin: std::process::ChildStdin,
+    /// `None` once [`Drop`] closed it.
+    stdin: Option<std::process::ChildStdin>,
     responses: std::sync::mpsc::Receiver<std::io::Result<Option<String>>>,
     timeout: std::time::Duration,
 }
@@ -45,7 +46,7 @@ impl BlobBatch {
                 }
             }
         });
-        Ok(Self { child, stdin, responses, timeout })
+        Ok(Self { child, stdin: Some(stdin), responses, timeout })
     }
 
     /// The blob at `rev:path`, `Ok(None)` when it does not exist there (a
@@ -57,8 +58,9 @@ impl BlobBatch {
         if AuditService::ensure_safe_git_rev(rev).is_err() || path.contains('\n') {
             return Ok(None);
         }
-        writeln!(self.stdin, "{}:{}", rev, path)?;
-        self.stdin.flush()?;
+        let stdin = self.stdin.as_mut().ok_or_else(|| std::io::Error::other("git cat-file input closed"))?;
+        writeln!(stdin, "{}:{}", rev, path)?;
+        stdin.flush()?;
         match self.responses.recv_timeout(self.timeout) {
             Ok(response) => response,
             Err(RecvTimeoutError::Timeout) => {
@@ -92,8 +94,25 @@ impl BlobBatch {
     }
 }
 
+/// How long a dropped [`BlobBatch`] waits for git to exit at the end of its
+/// input before it is killed.
+const BLOB_BATCH_EXIT_WAIT: std::time::Duration = std::time::Duration::from_secs(1);
+
 impl Drop for BlobBatch {
+    /// Closes git's input, so a healthy `git cat-file --batch` exits on its
+    /// own; only one still running after [`BLOB_BATCH_EXIT_WAIT`] is killed.
+    /// Killing walks the process table (DEV-808), which a normal end of the
+    /// activity feed does not need (DEV-935).
     fn drop(&mut self) {
+        drop(self.stdin.take());
+        let deadline = std::time::Instant::now() + BLOB_BATCH_EXIT_WAIT;
+        loop {
+            match self.child.try_wait() {
+                Ok(Some(_)) => return,
+                Ok(None) if std::time::Instant::now() < deadline => std::thread::sleep(std::time::Duration::from_millis(5)),
+                _ => break,
+            }
+        }
         crate::utils::git::kill_process_group(&mut self.child);
     }
 }
@@ -1272,5 +1291,19 @@ mod blob_batch_tests {
         let pid = std::fs::read_to_string(&pid_file).expect("pid file");
         let alive = Command::new("kill").arg("-0").arg(pid.trim()).status().expect("kill -0");
         assert!(!alive.success(), "the hanging child {pid} is still running");
+    }
+
+    /// A healthy batch process ends on its own when the feed is done: its
+    /// input is closed and it is not killed, so no process-table walk runs
+    /// (DEV-935).
+    #[test]
+    fn dropped_batch_closes_input_instead_of_killing() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let marker = dir.path().join("eof");
+        let mut command = Command::new("sh");
+        command.arg("-c").arg(format!("cat > /dev/null; echo done > {}", marker.display()));
+        let blobs = BlobBatch::spawn_within(&mut command, Duration::from_millis(300)).expect("spawn");
+        drop(blobs);
+        assert!(marker.exists(), "the batch process was killed before it read the end of its input");
     }
 }
