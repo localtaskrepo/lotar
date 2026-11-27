@@ -23,6 +23,7 @@ mod auto_branch_infer_type_toggle_test;
 mod auto_tags_from_path_toggle_test;
 mod branch_alias_inference_integration_test;
 mod branch_inference_integration_test;
+mod build_script_checkout_test;
 mod changelog_integration_test;
 mod ci_windows_reporting_contract_test;
 mod cli_add_defaults_unit_test;

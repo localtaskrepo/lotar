@@ -9,6 +9,8 @@ fn main() {
     // Printed before any conditional return so a warm target directory still
     // re-evaluates the probe when only this environment variable flips.
     println!("cargo::rerun-if-env-changed=LOTAR_REQUIRE_GIT");
+    // Rerun when another checkout built into this target/ (.cargo/config.toml).
+    println!("cargo::rerun-if-env-changed=LOTAR_CHECKOUT_DIR");
 
     // The library is crates/lotar-lib (DEV-497); REPO_ROOT gives it and its
     // tests the repository root, for docs/ and other files outside the crate.

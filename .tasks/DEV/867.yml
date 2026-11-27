@@ -1,11 +1,11 @@
 title: A merge job taken over after lotar's exit resumes its merge agent without the checks lock
-status: Merging
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-25T07:45:41.052287+00:00
-modified: 2026-11-27T09:42:19.887829+00:00
+modified: 2026-11-27T09:51:24.055079+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -17,6 +17,7 @@ relationships:
   - DEV-579
   - DEV-925
   - DEV-913
+  - DEV-858
 comments:
 - date: 2026-11-25T18:00:31.503924+00:00
   author: automation
@@ -190,6 +191,28 @@ comments:
 - date: 2026-11-27T09:42:19.887829+00:00
   author: automation
   text: Waited 9 min for the machine's check lock, held by the merge agent of DEV-909 (job job-20261127T091733.962Z-14, pid 61697), since 09:17 UTC; the merge agent starts now.
+- date: 2026-11-27T09:51:15.749957+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `59abd77eb` on `main`.
+
+    - Rebase conflict in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`: main (DEV-858's t3-thread route test) and this branch both appended a test at the file's end; kept both, nothing else touched.
+    - Checks on the rebased commit, with `LOTAR_CHECK_LOCK_HELD=1`: `npm ci`, `lint:agent`, `test:agent` (2658 nextest passed), `smoke` (415 passed).
+    - `git merge --ff-only`, then `.tasks` changes amended into the commit; `git push` to `origin/main`.
+    - No rule or config files changed: `lotar trust` not needed.
+  report:
+    commits:
+    - hash: 59abd77eb
+      what: take the check lock before a taken-over merge job resumes its session
+    checks:
+    - command: npm ci
+      result: passed
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Adb0a7e19c4da46432e915e480cfbd0fde092aff11314dfcb741be1bdda65d119
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A28118acf01dea3aac80b4fc195bac1b28817edc83e4f78d9cbce250ea5431ce1
@@ -210,9 +233,6 @@ description: |-
   - [ ] Test: orphaned merge job + lock held from outside → waits, no resume; lock freed → resumes and ends; the lock is free after.
 tags:
 - agent
-- fix-retried
-- retry-fix
-- job-paused
 history:
 - at: 2026-11-25T07:45:42.255522+00:00
   actor: claude
@@ -495,3 +515,22 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T09:51:15.749957+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T09:51:16.047019+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626","DEV-801","DEV-909","DEV-579","DEV-925","DEV-913"]}'
+    new: '{"depends_on":["DEV-797"],"related":["DEV-797","DEV-626","DEV-801","DEV-909","DEV-579","DEV-925","DEV-913","DEV-858"]}'
+- at: 2026-11-27T09:51:24.055079+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: agent, fix-retried, retry-fix, job-paused
+    new: agent

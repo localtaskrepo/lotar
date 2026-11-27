@@ -2,6 +2,8 @@ use std::fs;
 use std::path::PathBuf;
 
 fn main() {
+    // Rerun when another checkout built into this target/ (.cargo/config.toml).
+    println!("cargo::rerun-if-env-changed=LOTAR_CHECKOUT_DIR");
     let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set"));
 
     // A packaged crate (cargo package, crates.io) sits in a folder named

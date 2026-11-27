@@ -1,0 +1,7 @@
+# The checkout's root, for the build scripts' rerun-if-env-changed (DEV-919).
+# Cargo keeps a build script's output when a checkout builds into another
+# checkout's target/ (the package hash and relative rerun-if-changed paths
+# match), so LOTAR_DOCS_DIR and LOTAR_WEB_EMBED_DIR would keep pointing at the
+# other checkout. This value differs per checkout and makes the scripts rerun.
+[env]
+LOTAR_CHECKOUT_DIR = { value = "", relative = true }

@@ -1,11 +1,11 @@
 title: 'A takeover of a taken-over T3 job loses the original request: its retry asks only ''Go on with the ticket''s work in this thread'''
-status: Blocked
+status: Reviewing
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@review'
 created: 2026-11-27T03:13:30.591400+00:00
-modified: 2026-11-27T04:22:57.415492+00:00
+modified: 2026-11-27T10:01:51.012364+00:00
 relationships:
   depends_on:
   - DEV-912
@@ -20,8 +20,41 @@ comments:
     - `adopt`'s `earlier_request` and `GO_ON` (`crates/lotar-agent/src/services/agent_job_service/resumed.rs`) come from DEV-912's commit `ad7f33724`, on `agent/DEV-912` only; DEV-912 is Merging.
     - Building on an unmerged commit would conflict with its merge, so no code yet.
     - Next: once DEV-912 is Done, rebase `agent/DEV-920` onto main, then take the request from the replaced limit retry, else the earlier job's record or log, else `GO_ON`, with the test from "Done when".
+- date: 2026-11-27T10:01:38.988447+00:00
+  author: claude
+  text: |-
+    Fixed: a takeover of a taken-over T3 job asks the first job's request and profile again.
+
+    - Rebased `agent/DEV-920` onto main (DEV-912 landed); commit `2805b097e`.
+    - `crates/lotar-agent/src/services/agent_job_service/resumed.rs`: new `takeover_request` used by `adopt`. Order: the usage-limit retry it replaces (`limit_retries`, now read before it is removed), else the earlier job's `request` in this process's registry, else the earlier job's `run_inputs` log line, else `GO_ON`. Profile stays the thread's (`resumed.agent`).
+    - `AgentQueueEntry::request` is now `pub(crate)` (`agent_queue_service.rs`).
+    - New test `a_job_taken_over_from_a_taken_over_job_asks_the_first_jobs_request` (`crates/lotar-lib/tests/dev503_harness_jobs_test.rs`): takeover → limit pause → takeover → limit pause → takeover completes → takeover → limit pause; every retry is `fix` / "Work on it".
+    - For that test, `LOTAR_AGENT_RESUMED_LOOK_SECONDS` overrides the 30 s look interval; documented in `docs/help/agent.md` with the request order.
+    - Known gap: a takeover of a job that a now-gone process took over, with no limit retry queued, still gets `GO_ON`, because that job writes no `run_inputs` line.
+    - No guidance correction, no durable finding.
+  report:
+    commits:
+    - hash: 2805b097e
+      what: adopt takes the request from the replaced limit retry, else the earlier job's record or log, else GO_ON
+    checks:
+    - command: cargo nextest run --test integration -E 'test(asks_the_first_jobs_request)'
+      result: passed
+      reason: fails without the fix with 'Go on with the ticket's work…'
+    - command: cargo nextest run --test integration -E 'test(taken_over) | test(resumed) | test(usage_limit) | test(dev626) | test(takeover)'
+      result: passed
+      reason: 33 tests
+    - command: cargo nextest run -p lotar-agent -E 'test(queue) | test(resumed)'
+      result: passed
+      reason: 34 tests
+    - command: npm run lint
+      result: passed
+    - command: npm test / npm run smoke
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    next: 'Merge agent: rebase agent/DEV-920 onto main and run the merge checks'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A102957e71acb447fb921535ef72d6677575feaa9e48a008cb057c55367da89de
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A31aeb13728de19838393fbf93a18602c8a4268cc7b411ab47e7d6c05a5a446da
 description: |-
   ## Found (review of DEV-912, 2026-11-26)
   - DEV-912's `adopt` (`crates/lotar-agent/src/services/agent_job_service/resumed.rs`, `earlier_request`) reads the request from the earlier job's `run_inputs` log line. A taken-over job writes none: local `job-20261126T204940.803Z-13` (a takeover) has 0 `run_inputs` lines, `job-20261126T204500.272Z-3` has 1.
@@ -82,3 +115,27 @@ history:
   - field: tags
     old: waits
     new: ''
+- at: 2026-11-27T09:51:26.812368+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: InProgress
+- at: 2026-11-27T09:51:28.274947+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A31aeb13728de19838393fbf93a18602c8a4268cc7b411ab47e7d6c05a5a446da
+- at: 2026-11-27T10:01:38.988447+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T10:01:51.012364+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'

@@ -64,7 +64,7 @@ jobs:
         # docs/help and docs/openapi.json are embedded in the binary; the
         # other non-code paths are files Rust tests read (workflow contracts,
         # API reference, lotar's own automation rules) or packaging.
-        rust=$(any '^(src/|tests/|crates/|Cargo\.(toml|lock)|clippy\.toml|rustfmt\.toml|deny\.toml|Cross\.toml|\.config/nextest\.toml|docs/help/|docs/openapi\.json|docs/developers/api-quick-reference\.md|\.github/workflows/|\.tasks/DEV/automation\.yml|packaging/|Dockerfile)')
+        rust=$(any '^(src/|tests/|crates/|Cargo\.(toml|lock)|\.cargo/config\.toml|clippy\.toml|rustfmt\.toml|deny\.toml|Cross\.toml|\.config/nextest\.toml|docs/help/|docs/openapi\.json|docs/developers/api-quick-reference\.md|\.github/workflows/|\.tasks/DEV/automation\.yml|packaging/|Dockerfile)')
         # The UI unit test job also typechecks, lints and formats every
         # TypeScript and JavaScript file, so web covers their tool configs.
         web=$(any '^(view/|[^/]+\.m[jt]s$|\.oxlintrc\.json|oxlintrc\.standard\.json|\.prettier(rc\.json|ignore)|\.editorconfig|tsconfig[^/]*\.json|scripts/compress-web\.mjs)')

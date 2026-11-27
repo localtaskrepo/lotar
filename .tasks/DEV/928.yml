@@ -1,0 +1,31 @@
+title: 'Test a failed internal-API settle of a done ticket''s failed T3 thread: noted once, retried at the next look'
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-27T09:55:29.362385+00:00
+modified: 2026-11-27T09:55:30.245701+00:00
+relationships:
+  related:
+  - DEV-917
+description: |-
+  Found in the DEV-917 review (2026-11-27).
+
+  - DEV-917 settles a done ticket's thread that ended other than `completed` through `t3_thread_api::settle_thread` (`kept.rs` `settle_ended`).
+  - Its failure note (`The T3 Code thread <link> was not settled: <reason>`, once per process) is tested only on the harnessmux route (`a_kept_thread_that_isnt_settled_is_named_by_its_link`, `organize-error`), not on the internal-API route.
+
+  ## Done when
+  - [ ] A dev503 test lists a done ticket's thread `failed` with `ws-refuse` set: the look notes `was not settled` once, a second look adds no note, and once `ws-refuse` is gone the next look settles it.
+history:
+- at: 2026-11-27T09:55:29.878146+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-917"]}'
+- at: 2026-11-27T09:55:30.245701+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
