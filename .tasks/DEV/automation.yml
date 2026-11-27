@@ -1341,19 +1341,16 @@ automation:
           agent:
             session: continue
             prompt: *merge-prompt
-    # lotar's own rules follow.
-    # Note on "Prerequisites done: continue the waiting ticket" above: a ticket whose job the dependency check held
-    # back gets that job instead, as it was (DEV-530).
     # A ticket that starts to wait (HelpNeeded, Blocked) keeps only its dependencies' build output: cargo clean
-    # --workspace drops target/debug/incremental and the workspace crates' artifacts (3.4 GB to 0.7 GB in DEV-653's
-    # worktree), which the resumed job rebuilds in about a minute (owner 2026-11-18, DEV-653: "Yes, build the waiting-state
-    # rule and run it on a real ticket"; this changes STD-95's "build output stays until Done" for waiting tickets).
-    # It fires on a person's status change and on an agent's hand-back, applied once its job ended. Waits that a rule
-    # or lotar sets fire no rule (rules that hand a ticket to mallox, a T3 thread waiting for an answer, Blocked on open
-    # prerequisites): `agent.worktree.waiting_run` in DEV/config.yml runs the same command for those at the job's end
-    # or the held-back start (DEV-712). The fix, review and merge steps keep their build output: the next
-    # step reuses it (DEV-653's measurements). lotar runs nothing while a job runs for the ticket; a lotar without
-    # `agent worktree run` (before DEV-653) fails it.
+    # --workspace drops target/debug/incremental and the workspace crates' artifacts (3.4 GB to 0.7 GB in lotar
+    # DEV-653's worktree), which the resumed job rebuilds in about a minute (owner 2026-11-18, DEV-653: "Yes, build the
+    # waiting-state rule and run it on a real ticket"; this changes STD-95's "build output stays until Done" for waiting
+    # tickets). It fires on a person's status change and on an agent's hand-back, applied once its job ended. Waits that
+    # a rule or lotar sets fire no rule (rules that hand a ticket to mallox, a T3 thread waiting for an answer, Blocked
+    # on open prerequisites): a Rust repo sets `agent.worktree.waiting_run: [cargo, clean, --workspace]` in its project
+    # config for those (lotar DEV-712, owner 2026-11-18, INBOX-550). The fix, review and merge steps keep their build
+    # output: the next step reuses it. lotar runs nothing while a job runs for the ticket. Without a Cargo.toml, or with
+    # a lotar before `agent worktree run` (DEV-653), the command fails and the rule ignores it.
     - name: "Waiting: drop the workspace build output"
       when:
         any:
@@ -1365,3 +1362,6 @@ automation:
             command: lotar
             args: [agent, worktree, run, "${{ticket.id}}", --, cargo, clean, --workspace]
             ignore_failure: true
+    # lotar's own rules follow.
+    # Note on "Prerequisites done: continue the waiting ticket" above: a ticket whose job the dependency check held
+    # back gets that job instead, as it was (DEV-530).
