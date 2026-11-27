@@ -5,10 +5,11 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T09:45:21.828627+00:00
-modified: 2026-11-27T17:18:51.401469+00:00
+modified: 2026-11-27T17:54:20.976909+00:00
 relationships:
   related:
   - DEV-902
+  - DEV-937
 comments:
 - date: 2026-11-27T17:17:32.335814+00:00
   author: mallox
@@ -48,6 +49,49 @@ comments:
 
     - The branch has one commit, `b58948765`, and it changes only `.tasks/DEV/automation.yml`: the `unblocked` action gets `set: status: InProgress`, with a comment quoting your answer from 2026-11-27.
     - The review job stops when a branch changes only `.tasks`, so I reran no checks.
+- date: 2026-11-27T17:53:28.487616+00:00
+  author: automation
+  text: |-
+    lotar's merge needs the merge agent: the main checkout has uncommitted changes, so lotar didn't push:
+    ```
+    M .tasks/DEV/938.yml
+    ```.
+
+    - Rebase onto `main` changed nothing (`b589487657e6`)
+    - Waited 20 min for the machine's check lock, held by lotar's merge checks of DEV-937 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-937 (pid 22146), since 17:18 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-926` onto `main` (`c55947bb4c2f`): `950630c23049`
+    - Waited 12 s for the machine's check lock, held by lotar's merge checks of LOCA-518 in /Users/mallox/.t3/worktrees/local/agent-LOCA-518-b8993c12bc0f96d7 (pid 83691), since 17:41 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `950630c23049`
+    - Amended the pending `.tasks` changes into the merged commit: `3648d80202b5`
+    - The merge changed rules, agent profiles or `agent.merge`: ran `lotar trust`
+  report:
+    commits:
+    - hash: 657c7031f
+      what: 'DEV-937 Disk gate ignores purgeable space: jobs held at the floor while macOS would free its Time Machine snapshots'
+    - hash: 9b096d32a
+      what: DEV-924 Release v0.16.1
+    - hash: c55947bb4
+      what: STD-236 Waiting cleanup rule moves into the standards part of automation.yml
+    - hash: 950630c23
+      what: DEV-926 DEV's Prerequisites rule keeps the ticket Blocked, so the daily automation run tells it again
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: The merge agent takes over in a new session
+- date: 2026-11-27T17:54:20.976909+00:00
+  author: automation
+  text: Waited 51 s for the machine's check lock, held by lotar's merge checks of STD-236 in /Users/mallox/Development/.lotar-worktrees/standards/STD-236 (pid 35533), since 17:45 UTC; the merge agent starts now.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2b00eb58668bb2b8a95dcc6ea50e3cd36e4bc99f856f8ff125e4c5e74ff79950
 description: |-
@@ -107,3 +151,17 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T17:53:28.487616+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T17:53:28.810961+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-902"]}'
+    new: '{"related":["DEV-902","DEV-937"]}'
+- at: 2026-11-27T17:54:20.976909+00:00
+  actor: automation
+  changes:
+  - field: comment_added

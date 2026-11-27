@@ -1,0 +1,150 @@
+title: 'QA red on main since DEV-901: Windows build fails on std::os::unix in hosted.rs; hosted test needs a git identity'
+status: InProgress
+priority: Medium
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-27T17:43:12.460828+00:00
+modified: 2026-11-27T17:53:42.398699+00:00
+relationships:
+  blocks:
+  - DEV-924
+  related:
+  - DEV-416
+  - DEV-901
+  - DEV-902
+  - DEV-924
+  - DEV-812
+  - DEV-911
+comments:
+- date: 2026-11-27T17:50:57.185843+00:00
+  author: claude
+  text: |-
+    Fixed both QA failures in `c1ae45be8`; the Windows build of `lotar-agent` checks clean.
+
+    - Windows: `hosted.rs` now imports and uses `UnixListener`/`UnixStream` only under `cfg(unix)` (`listen`, `accept`, `serve`). On Windows, `Bridge::open` returns "a job on an agent host needs Unix sockets".
+    - Git identity: lotar's `git_command` drops every `GIT_CONFIG*` variable, so the fixture's `GIT_CONFIG_GLOBAL` never reached lotar's own commits. The identity came from the Mac's `~/.gitconfig`, and the CI runner has none. The fixture now writes `.gitconfig` into its temp root and sets `HOME` to that root.
+    - Reproduced first: with an empty `HOME`, 6 of the 23 hosted tests failed with "empty ident name". After the fix, 23/23 pass.
+    - 74 changed lines, so no `small-diff` tag.
+  report:
+    commits:
+    - hash: c1ae45be8
+      what: gate hosted.rs's Unix sockets by cfg(unix); fixture identity in HOME
+    checks:
+    - command: HOME=<empty dir> cargo nextest run -p lotar-agent --lib hosted::tests
+      result: passed
+      reason: 23/23, 6 failed before the fix
+    - command: cargo clippy -p lotar-agent --target x86_64-pc-windows-gnu
+      result: passed
+    - command: cargo clippy -p lotar-agent --all-targets
+      result: passed
+    - command: npm run lint
+      result: passed
+    - command: cargo check --workspace --target x86_64-pc-windows-gnu
+      result: not_run
+      reason: ring needs mingw gcc, not installed here; lotar-agent alone checks clean
+    - command: gh run list --workflow "Quality Assurance" --commit <main head>
+      result: not_run
+      reason: runs after the merge
+    next: Review, merge, then confirm QA is green on main
+- date: 2026-11-27T17:53:27.152471+00:00
+  author: claude
+  text: |-
+    Review: blocking. The Windows binary now builds, but the Windows QA job's next step still fails, so "QA green on main" isn't met.
+
+    - Read: `c1ae45be8` (only commit on `agent/DEV-938`), the ticket, `.github/workflows/ci.yml` Windows job, `git log -5 main` for `hosted.rs` and `agent_hosts.rs`.
+    - Passed: `cargo check -p lotar-agent --target x86_64-pc-windows-gnu --all-features` is clean. `HOME=<empty dir> cargo nextest run -p lotar-agent hosted::` 23/23 pass. The `HOME` fixture fix matches what DEV-812/DEV-416 did.
+    - **Blocking:** the Windows job in `ci.yml:612` runs `cargo check --profile ci --all-targets --all-features`, so unit tests are compiled for Windows too. `cargo check -p lotar-agent --target x86_64-pc-windows-gnu --all-targets --all-features` fails with 7 errors (`cannot find unix in os`, `Permissions::from_mode`):
+      - `crates/lotar-agent/src/services/agent_job_service/hosted.rs:673` and `:688`, in the `#[cfg(test)] mod tests` this commit touches
+      - `crates/lotar-agent/src/services/agent_hosts.rs:753`, `:757`, `:782`, `:790`, `:794`, in the `fake_ssh` test helpers from DEV-901/DEV-911
+      - The earlier "Build binary" failure hid these. Once it builds, CI reaches this step and fails there.
+    - Fix: gate these Unix-only tests with `#[cfg(all(test, unix))]` on `hosted.rs`'s `mod tests` and on `agent_hosts.rs`'s unix-dependent tests. Then rerun the `--all-targets` Windows check above, which works here without MinGW.
+    - Non-blocking: `agent_job_service.rs:7718`, unused `std::io::Write` on Windows tests (a warning only; CI sets no `-D warnings`).
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac50f41520889ee1a7d8d331a8ea8dcd6d8e5dec048db1040a8c585eb509f44ae
+description: |-
+  Found: every Quality Assurance run on main since `227942904` (DEV-901) fails; the last green one is `2cbbf322a` (DEV-902). It blocks the v0.16.1 tag (DEV-924).
+
+  - Windows (`Windows Binary Sanity`, `Release target build (Windows arm64)`): `error[E0433]: cannot find unix in os` at `crates/lotar-agent/src/services/agent_job_service/hosted.rs:25` (`use std::os::unix::net::{UnixListener, UnixStream};` not gated by `cfg(unix)`).
+  - Linux `Rust Quality Checks` (run `46041622870`): `hosted::tests::a_headless_agent_runs_over_ssh_in_the_worktree_there_with_the_profile_env` panics at `hosted.rs:665`: `git commit: fatal: empty ident name ... not allowed`. The test fixture needs a git identity, as DEV-416 fixed for another test.
+
+  Check: `gh run list --workflow "Quality Assurance" --commit <sha>` succeeds for main's head.
+  Done when: QA is green on main.
+tags:
+- health
+- review-returned
+custom_fields:
+  finding: ci:quality-assurance
+history:
+- at: 2026-11-27T17:43:13.003873+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{}'
+    new: '{"related":["DEV-416","DEV-901","DEV-902","DEV-924"]}'
+- at: 2026-11-27T17:43:13.666608+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-27T17:43:18.353813+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T17:43:18.999604+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac50f41520889ee1a7d8d331a8ea8dcd6d8e5dec048db1040a8c585eb509f44ae
+- at: 2026-11-27T17:43:22.663419+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-416","DEV-901","DEV-902","DEV-924"]}'
+    new: '{"blocks":["DEV-924"],"related":["DEV-416","DEV-901","DEV-902","DEV-924"]}'
+- at: 2026-11-27T17:50:57.185843+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T17:51:05.725294+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T17:53:27.152471+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T17:53:27.454121+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-924"],"related":["DEV-416","DEV-901","DEV-902","DEV-924"]}'
+    new: '{"blocks":["DEV-924"],"related":["DEV-416","DEV-901","DEV-902","DEV-924","DEV-812","DEV-911"]}'
+- at: 2026-11-27T17:53:27.846694+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, review-blocked
+- at: 2026-11-27T17:53:40.407282+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: health, review-blocked
+    new: health, review-returned
+- at: 2026-11-27T17:53:42.398699+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress

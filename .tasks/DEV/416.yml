@@ -5,11 +5,12 @@ type: Bug
 reporter: claude
 assignee: claude
 created: 2026-11-13T06:51:49.624410+00:00
-modified: 2026-11-14T00:20:37.150662+00:00
+modified: 2026-11-27T17:43:12.973843+00:00
 relationships:
   related:
   - DEV-408
   - DEV-415
+  - DEV-938
 comments:
 - date: 2026-11-13T07:09:58.549618+00:00
   author: claude
@@ -44,3 +45,9 @@ history:
   changes:
   - field: releases
     new: '#4'
+- at: 2026-11-27T17:43:12.973843+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-408","DEV-415"]}'
+    new: '{"related":["DEV-408","DEV-415","DEV-938"]}'

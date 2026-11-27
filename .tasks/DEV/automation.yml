@@ -1052,6 +1052,10 @@ automation:
           - not: { tags: { any: [proposal, owner] } }
       on:
         unblocked:
+          # Out of Blocked: lotar automation run fires unblocked on every run while the ticket still matches, also while
+          # its job waits for a slot (owner 2026-11-27, DEV-926: "Yes, set InProgress").
+          set:
+            status: InProgress
           remove: &waits
             tags: [waits]
           agent:

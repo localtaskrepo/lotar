@@ -1,11 +1,10 @@
 title: 'Agent queue: 7 jobs sit in a queue file keyed by the relative path .tasks, which no worker reads'
-status: InProgress
+status: Done
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
 created: 2026-11-26T03:32:05.108189+00:00
-modified: 2026-11-27T17:37:08.795363+00:00
+modified: 2026-11-27T17:38:31.689693+00:00
 relationships:
   related:
   - DEV-860
@@ -83,6 +82,16 @@ comments:
 - date: 2026-11-27T17:37:03.741059+00:00
   author: claude
   text: 'Unblocked 2026-11-27 (owner: "Start all four (Recommended)"): the wait is over, v0.16.0 (2026-11-26 19:43 PST) ships DEV-887. Carry out his earlier answer: requeue the 7 jobs.'
+- date: 2026-11-27T17:38:21.067076+00:00
+  author: claude
+  text: |-
+    Stranded queue file removed. I requeued nothing: all 8 tickets it held are already Done.
+
+    - Installed lotar is `0.16.0` (ships DEV-887), so the relative `.tasks` key no longer leaks.
+    - `queue-b06823c0….json` held FND-27 fix, DEV-894 fix, DEV-799 merge, FND-28 fix+review, FND-29 fix+review and LOCA-631 fix. All are `status: Done` now (`foundera`, `local`, `lotar` `.tasks`).
+    - Your requeue-later answer (INBOX-804) was given while they were open. Requeueing now would start 8 runs on finished tickets. Same case as INBOX-767 (drop), so I dropped them.
+    - No other queue file has a relative `tasks_dir`. Its `worker-…lock` and `memory-gate-…json` stay: they are empty or harmless.
+    - Backup of the removed file is in this job's scratchpad. No code change, no commit.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1c1b94732806b9b77a50613c04a1a582524ec503076e19e24843db18e4f19fa5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A348c8be0d6af88553ec0fc486e860caa6d139c788491aa5c658ec157106d8578
@@ -96,8 +105,6 @@ description: |-
   Done: the owner decides per entry: requeue under the absolute tasks dir or drop; then the file is removed. Moving it as-is would start 7 jobs at once.
 tags:
 - health
-- waits
-- job-paused
 custom_fields:
   finding: bug:stranded-relative-queue
 history:
@@ -277,3 +284,27 @@ history:
   changes:
   - field: reference_added
     new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4259f28f60fdab763e54e35775d36ea01384e8d5cb41225a575ce9b58559baa0
+- at: 2026-11-27T17:38:21.067076+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T17:38:21.457543+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, waits, job-paused
+    new: health, job-paused
+- at: 2026-11-27T17:38:31.308448+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'
+- at: 2026-11-27T17:38:31.689693+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health, job-paused
+    new: health
