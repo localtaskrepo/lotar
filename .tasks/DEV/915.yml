@@ -1,11 +1,11 @@
 title: combined_stats lost its doc comment to held_in_memory in agent_queue_service.rs
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T00:04:01.449016+00:00
-modified: 2026-11-27T13:00:05.611223+00:00
+modified: 2026-11-27T13:07:32.132908+00:00
 relationships:
   depends_on:
   - DEV-910
@@ -17,6 +17,7 @@ relationships:
   - DEV-923
   - DEV-801
   - DEV-918
+  - DEV-929
 comments:
 - date: 2026-11-27T02:39:23.118727+00:00
   author: claude
@@ -75,6 +76,26 @@ comments:
 - date: 2026-11-27T13:00:05.306868+00:00
   author: automation
   text: Waited 7 min for the machine's check lock, held by lotar's merge checks of DEV-918 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-918 (pid 61697), since 12:16 UTC; the merge agent starts now.
+- date: 2026-11-27T13:07:24.155343+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `fcec33dc9` is on `main` and `origin/main`.
+
+    - Main had moved on again (DEV-923, DEV-929), so I rebased `agent/DEV-915` onto `a7cefa181`, which gave `6c9233676`. The diff is still the same 8 comment lines.
+    - `npm ci` passed. Then `lint:agent`, `test:agent` and `smoke` all passed on `6c9233676`. Smoke ran 415 of 415 tests.
+    - `git merge --ff-only` worked. I amended the pending `.tasks` changes into the commit, which made it `fcec33dc9`, and pushed it.
+    - No rules or config files changed, so `lotar trust` wasn't needed.
+  report:
+    commits:
+    - hash: fcec33dc9
+      what: combined_stats gets its doc comment back (pending .tasks changes amended in)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A680674b4bb9f3226a0545c290f9674bbc58c2d66158ba18bc621157fff9695be
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae11ac081715db83175eedd84fb9269b452365c2a14da9719298192f6e059691e
@@ -213,3 +234,19 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-910"],"related":["DEV-910","DEV-865","DEV-871","DEV-843","DEV-923","DEV-801"]}'
     new: '{"depends_on":["DEV-910"],"related":["DEV-910","DEV-865","DEV-871","DEV-843","DEV-923","DEV-801","DEV-918"]}'
+- at: 2026-11-27T13:07:24.155343+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T13:07:24.450591+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-910"],"related":["DEV-910","DEV-865","DEV-871","DEV-843","DEV-923","DEV-801","DEV-918"]}'
+    new: '{"depends_on":["DEV-910"],"related":["DEV-910","DEV-865","DEV-871","DEV-843","DEV-923","DEV-801","DEV-918","DEV-929"]}'
+- at: 2026-11-27T13:07:32.132908+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

@@ -2,9 +2,11 @@ use std::fs;
 use std::path::PathBuf;
 
 fn main() {
-    // Rerun when another checkout built into this target/ (.cargo/config.toml).
-    println!("cargo::rerun-if-env-changed=LOTAR_CHECKOUT_DIR");
     let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set"));
+    // Another checkout that builds into this target/ leaves its output here
+    // (same package hash, same relative paths). An absolute path differs per
+    // checkout, so cargo reruns the script, whatever the cwd (DEV-919, DEV-927).
+    println!("cargo::rerun-if-changed={}", manifest_dir.join("build.rs").display());
 
     // A packaged crate (cargo package, crates.io) sits in a folder named
     // lotar-web-assets-<version> with no repository around it, so it carries

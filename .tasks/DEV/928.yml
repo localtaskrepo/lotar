@@ -1,14 +1,54 @@
 title: 'Test a failed internal-API settle of a done ticket''s failed T3 thread: noted once, retried at the next look'
-status: Todo
+status: Merging
 priority: Low
 type: Chore
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-27T09:55:29.362385+00:00
-modified: 2026-11-27T09:55:30.245701+00:00
+modified: 2026-11-27T13:13:08.128062+00:00
 relationships:
   related:
   - DEV-917
+comments:
+- date: 2026-11-27T13:11:22.942512+00:00
+  author: claude
+  text: |-
+    Added the test: a refused internal-API settle is noted once and retried at the next look.
+
+    - `a_failed_thread_the_internal_api_doesnt_settle_is_noted_once_and_retried` in `crates/lotar-lib/tests/dev503_harness_jobs_test.rs`: a done ticket's thread listed `failed`, with `ws-refuse` set. The first look notes `was not settled` once, the second adds no note, and after `ws-refuse` is removed the third settles it (`ws_settle`, `Settled the T3 Code thread …`).
+    - The looks are throttled (`look_every`), so a second look in a row didn't run and passed without testing anything. The test sets `LOTAR_AGENT_RESUMED_LOOK_SECONDS=0` so every look runs.
+    - No product code changed. Diff: 29 lines, so no `small-diff` tag.
+  report:
+    commits:
+    - hash: 0c80844cd
+      what: dev503 test of a refused internal-API settle
+    checks:
+    - command: cargo nextest run -p lotar-lib -E test(a_failed_thread_the_internal_api|a_done_tickets_ended_threads|a_kept_thread_that_isnt_settled)
+      result: passed
+    - command: cargo clippy -p lotar-lib --tests -D warnings
+      result: passed
+    - command: rustfmt --edition 2024 --check (changed file)
+      result: passed
+    - command: 'mutation: drop the FAILED once-guard in kept.rs'
+      result: passed
+      reason: the test fails on 'a second look adds no note'
+    - command: npm run lint / test:agent / smoke
+      result: not_run
+      reason: the merge runs them (DEV-797)
+    next: Review, then merge
+- date: 2026-11-27T13:13:02.513942+00:00
+  author: claude
+  text: |-
+    Review: passed. The one test commit `0c80844cd` does what "Done when" asks and nothing more.
+
+    - Read: the ticket, DEV-917, `kept.rs` (`settle_ended`, the `FAILED` once-per-process guard), the fake T3 server's `ws-refuse` handling, and the latest commits to both files on `main` (newest is `a6e2d9dae`). None of them change what the test relies on.
+    - The test lists the thread `failed` with `ws-refuse` set. First look: one `was not settled` note. Second look: no new note. Without `ws-refuse`, the third look settles it through `ws_settle`.
+    - The test sets `LOTAR_AGENT_RESUMED_LOOK_SECONDS=0`, so the second look actually runs, as another test in the same file already does. The third look settling the thread shows the refused attempt was retried, not dropped.
+    - Reran: `npm ci` passed. `cargo nextest run -p lotar-lib --test integration` on the new test, `a_kept_thread_that_isnt_settled_is_named_by_its_link` and `a_done_tickets_ended_threads_are_settled_whatever_their_outcome`: 3 passed. `cargo clippy -p lotar-lib --tests` and `rustfmt --check` are clean.
+    - Not rerun: the fix agent's check that removing the guard makes the test fail (this review changes no files).
+    - It changes no product code or UI, adds no stray files and has no second branch. No minor tickets filed.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af0931223529be1e84dfc6bbd530ac8faa9a283fab9779d47ef5d31204c94ca5b
 description: |-
   Found in the DEV-917 review (2026-11-27).
 
@@ -29,3 +69,40 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T13:08:13.255850+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T13:08:13.916919+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af0931223529be1e84dfc6bbd530ac8faa9a283fab9779d47ef5d31204c94ca5b
+- at: 2026-11-27T13:11:22.942512+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T13:11:32.356541+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T13:13:02.513942+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T13:13:08.128062+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

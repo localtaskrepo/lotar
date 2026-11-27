@@ -1,11 +1,11 @@
 title: 'Agent queue: no test covers a queued entry whose ticket was deleted and not re-created'
-status: Merging
+status: Done
 priority: Low
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T04:02:53.831434+00:00
-modified: 2026-11-27T12:46:37.022256+00:00
+modified: 2026-11-27T13:08:09.716545+00:00
 relationships:
   depends_on:
   - DEV-843
@@ -88,6 +88,30 @@ comments:
     - command: npm run -s smoke
       result: passed
     next: The merge agent takes over in a new session
+- date: 2026-11-27T13:07:39.768651+00:00
+  author: automation
+  text: Waited 31 min for the machine's check lock, held by the merge agent of DEV-929 (job job-20261127T115527.205Z-52, pid 61697), since 12:16 UTC; the merge agent starts now.
+- date: 2026-11-27T13:08:02.996346+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `bb1fd40ab` is on `main` and `origin/main`.
+
+    - lotar's merge ran the checks (lint:agent, test:agent, smoke: passed) and fast-forwarded `main`; I redid none of them
+    - The push lotar left waiting already happened: a later merge (DEV-929, DEV-915 on top) pushed `main`; `git log @{u}..` in the main checkout is empty
+    - No rules or config changed in the merged commit, so no `lotar trust` needed
+    - The main checkout still has uncommitted `.tasks` changes (DEV-915, 923, 927, 929); they belong to the other merges, left as they are
+  report:
+    commits:
+    - hash: bb1fd40ab
+      what: DEV-923 test for a queued ticket hard-deleted and not re-created
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: 'None: merged and pushed'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A028b7825cedd9d889f13fe98fc9c83df6c45dc4198d6be79bfc5618f2ad7019f
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Accdd8ab79d235eede73d91173d406053172e2269c95b3065cdac8d58059a6985
@@ -208,3 +232,17 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-843"],"related":["DEV-843","DEV-797","DEV-915"]}'
     new: '{"depends_on":["DEV-843"],"related":["DEV-843","DEV-797","DEV-915","DEV-929"]}'
+- at: 2026-11-27T13:07:39.768651+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T13:08:02.996346+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T13:08:09.716545+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

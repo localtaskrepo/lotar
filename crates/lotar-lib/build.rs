@@ -9,12 +9,14 @@ fn main() {
     // Printed before any conditional return so a warm target directory still
     // re-evaluates the probe when only this environment variable flips.
     println!("cargo::rerun-if-env-changed=LOTAR_REQUIRE_GIT");
-    // Rerun when another checkout built into this target/ (.cargo/config.toml).
-    println!("cargo::rerun-if-env-changed=LOTAR_CHECKOUT_DIR");
 
     // The library is crates/lotar-lib (DEV-497); REPO_ROOT gives it and its
     // tests the repository root, for docs/ and other files outside the crate.
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set"));
+    // Another checkout that builds into this target/ leaves its output here
+    // (same package hash, same relative paths). An absolute path differs per
+    // checkout, so cargo reruns the script, whatever the cwd (DEV-919, DEV-927).
+    println!("cargo::rerun-if-changed={}", manifest_dir.join("build.rs").display());
     let repo_root = manifest_dir.parent().and_then(Path::parent).expect("crates/lotar-lib is two levels below the root").to_path_buf();
     println!("cargo::rustc-env=REPO_ROOT={}", repo_root.display());
     // Inside the workspace the docs come from the repository's docs/. A
