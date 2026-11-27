@@ -1042,9 +1042,11 @@ automation:
     # (owner 2026-11-12, STD-56: "when a ticket the blocks other tickets is done, it should automatically kick of
     # agents for those tickets"). tell_agent queues the message to a running job, else starts @fix as the next turn of
     # the ticket's last T3 thread; agent: fix, because a ticket a merge agent handed back was last assigned to @merge
-    # (lotar DEV-396). Proposals and owner tickets wait for him. A prerequisite in another repo (lotar:DEV-374) can't
-    # notify this one: the daily repos.ts --fix runs this rule in every repo (lotar automation run <name>). No manual
-    # action: a manual run would start every Blocked ticket.
+    # (lotar DEV-396). Proposals and owner tickets wait for him; an approved proposal loses its tag (the next rule). A
+    # prerequisite in another repo (lotar:DEV-374) can't notify this one: the live check (repos.ts --live --report,
+    # every 5 minutes) runs this rule for a Blocked ticket whose prerequisites are all done once it sat an hour (its
+    # stalled check, STD-388), and the daily repos.ts --report runs it in every repo (lotar automation run <name>). No
+    # manual action: a manual run would start every Blocked ticket.
     - name: "Prerequisites done: continue the waiting ticket"
       when:
         all:
@@ -1080,6 +1082,22 @@ automation:
                 still run. Comment the outcome: what you changed, the commit hash, the checks that ran.
               Never delete work that isn't saved elsewhere, and never decide what only the owner decides: then
               comment one question, set the status to HelpNeeded, assign the ticket to mallox and stop.
+    # An approved proposal is work like any other: LOCA-518 kept tag proposal after his "build" (INBOX-478) and sat
+    # Blocked 9 days, since the rule above and the live check skip proposals (STD-388). His answer (or triage's for
+    # him) that leaves the ticket open and off him approves it; his own words reach the agent, which drops the tag
+    # when they approve.
+    - name: "Proposals: the owner's answer approves it"
+      when:
+        all:
+          - comment: { author: [mallox, triage] }
+          - not: { comment: { answer: { exists: false } } }
+          - current: { tags: { any: [proposal] } }
+          - not: { current: { status: [Done, WontDo] } }
+          - not: { current: { assignee: mallox } }
+      on:
+        commented:
+          remove:
+            tags: [proposal]
     # The owner's comment on any ticket reaches its agent (owner 2026-11-12, STD-56: "a comment on any tickets kicks of
     # or queues for an agent, then we should do that as well. Let's do it right from the start"): queued to a running
     # job, else @fix starts with it as the next turn of the ticket's last T3 thread. Only his comments, and the inbox
@@ -1122,6 +1140,8 @@ automation:
                 worktree's branch, signed, never with --no-verify, message "${{ticket.id}} ${{ticket.title}}"; don't
                 merge or push: the merge agent does that when your job ends. Don't end your turn while tests still
                 run. Comment the outcome: what you changed, the commit hash, the checks that ran.
+              - It approves a proposal (tag proposal): lotar task edit ${{ticket.id}} --untag proposal, then do the
+                work as above; a proposal with the tag waits for him.
               - It shows the done criteria are met and nothing is left to do (a triage comment, for example): comment
                 the evidence in one line, then lotar status ${{ticket.id}} Done and lotar assignee ${{ticket.id}}
                 --clear; setting it back would keep it open and the inbox would report it again.
