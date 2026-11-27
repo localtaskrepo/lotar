@@ -1,11 +1,11 @@
 title: Test stub template-team-agent.sh waits for its go file with no bound (DEV-796 branch)
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T00:07:42.828735+00:00
-modified: 2026-11-27T11:24:03.042795+00:00
+modified: 2026-11-27T11:43:26.216399+00:00
 relationships:
   depends_on:
   - DEV-861
@@ -13,6 +13,8 @@ relationships:
   - DEV-796
   - DEV-861
   - DEV-801
+  - DEV-902
+  - DEV-911
 comments:
 - date: 2026-11-27T02:55:57.150615+00:00
   author: claude
@@ -59,6 +61,48 @@ comments:
     - Reran: `npm ci` passed; `cargo nextest run -p lotar-lib --test integration shipped_agent_team_template_reworks_a_blocked_review_and_merges` passed (4.3 s), no stub left running after it
     - Note: the two orphaned `template-team-agent.sh` from the ticket description (pids `50411`, `32153`, started 2026-11-26 12:37/12:38, ppid 1) still run; they predate the fix, which can't end them. `kill 50411 32153` clears them
     - No tickets filed
+- date: 2026-11-27T11:43:25.034602+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-916` is in `main`.
+
+    - Rebased `agent/DEV-916` onto `main` (`8ee9891662fb`): `306937940f2a`
+    - Waited 43 min for the machine's check lock, held by lotar's merge checks of DEV-902 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-902 (pid 61697), since 10:10 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-916` onto `main` (`2279429049db`): `3730800ca1f3`
+    - Waited 7 min for the machine's check lock, held by lotar's merge checks of DEV-801 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-801 (pid 61697), since 11:08 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - `main` moved on during the checks: rebasing again
+    - Rebased `agent/DEV-916` onto `main` (`0ec35832b5dd`): `bbd0b026bf36`
+    - Waited 7 min for the machine's check lock, held by lotar's merge checks of DEV-911 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-911 (pid 61697), since 11:17 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `bbd0b026bf36`
+    - Amended the pending `.tasks` changes into the merged commit: `dad3376d8781`
+    - Pushed 4 commits to `origin/main`
+  report:
+    commits:
+    - hash: 2cbbf322a
+      what: 'DEV-902 agent-team: Prerequisites rule keeps the ticket Blocked, so lotar automation run tells it again on every run'
+    - hash: '227942904'
+      what: DEV-901 Run agent jobs on a second machine over ssh (dyson)
+    - hash: 0ec35832b
+      what: DEV-801 Flaky tests
+    - hash: dad3376d8
+      what: DEV-916 Test stub template-team-agent.sh waits for its go file with no bound (DEV-796 branch)
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A367ce76bdd74d6b2c9958f1b72bf14db3c8b03cfb9dbb9380e87009f17bca911
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Abe3c3ad780c978dbb055b88f6bd4e3e2272ca95b7a80f2bb8800e3125b731dcd
@@ -165,3 +209,19 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-861"],"related":["DEV-796","DEV-861"]}'
     new: '{"depends_on":["DEV-861"],"related":["DEV-796","DEV-861","DEV-801"]}'
+- at: 2026-11-27T11:43:25.034602+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T11:43:25.376768+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-861"],"related":["DEV-796","DEV-861","DEV-801"]}'
+    new: '{"depends_on":["DEV-861"],"related":["DEV-796","DEV-861","DEV-801","DEV-902","DEV-911"]}'
+- at: 2026-11-27T11:43:26.216399+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

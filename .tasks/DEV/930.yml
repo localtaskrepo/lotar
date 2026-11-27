@@ -1,11 +1,11 @@
 title: Smoke 'Instructions button' keeps DEV-801's failure diagnostic for a flake DEV-875 already fixed
-status: Reviewing
+status: Merging
 priority: Medium
 type: Chore
 reporter: claude
-assignee: '@review'
+assignee: '@merge'
 created: 2026-11-27T10:20:52.236519+00:00
-modified: 2026-11-27T11:41:43.004854+00:00
+modified: 2026-11-27T11:42:52.952944+00:00
 relationships:
   depends_on:
   - DEV-801
@@ -14,6 +14,7 @@ relationships:
   - DEV-875
   - DEV-832
   - DEV-888
+  - DEV-913
 comments:
 - date: 2026-11-27T10:24:10.666877+00:00
   author: claude
@@ -48,6 +49,18 @@ comments:
       result: not_run
       reason: the merge runs the full suites
     next: Merge runs the full smoke suite; if 'Instructions button' fails there, reopen with that failure
+- date: 2026-11-27T11:42:43.658424+00:00
+  author: claude
+  text: |-
+    Review: passed. `3e21157a6` removes DEV-801's diagnostic and nothing else; DEV-801 comment 24 credits DEV-875.
+
+    - Reviewed `main..HEAD`: one commit, on main `0ec35832b`, no rework branch, no stray files
+    - `smoke/tests/ui.agent-jobs.smoke.spec.ts` now matches `0ec35832b^` exactly (`git diff 0ec35832b^ HEAD -- <file>` is empty), so the test is back to how DEV-875 `cb61901d7`, DEV-888 `8f5ff2780` and DEV-913 `706b1dfb7` left it
+    - Claim holds: DEV-801 comment 23 shows `npm run -s smoke` passed three times in its merge with the diagnostic in place, so it never fired after DEV-875
+    - Credit: DEV-801 comment 24 names DEV-875 (`cb61901d7`) and DEV-888 for comment 11's flake, which covers "Done"
+    - Reran `npm ci`, `npm run -s build:smoke`, `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts`: 17/17 passed; `npx prettier --check` on the file passed
+    - Not run: full `npm run -s smoke` (the merge runs it)
+    - No UI change, so no screenshots needed; no tickets filed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab7f77e63bce99126e80231f5f3b0c27ac0fa98c35f4bdc688935963707dea1a2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6c71231383698f113295c8bdacd74cacb1854eb4a1a061481db1c888220d518a
@@ -134,3 +147,22 @@ history:
   - field: assignee
     old: '@fix'
     new: '@review'
+- at: 2026-11-27T11:42:43.658424+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T11:42:43.969384+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-801"],"related":["DEV-801","DEV-875","DEV-832","DEV-888"]}'
+    new: '{"depends_on":["DEV-801"],"related":["DEV-801","DEV-875","DEV-832","DEV-888","DEV-913"]}'
+- at: 2026-11-27T11:42:52.952944+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

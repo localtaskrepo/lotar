@@ -1,11 +1,11 @@
 title: 'Agent hosts: a waiting dyson thread a new job didn''t take over keeps waiting there, and its MCP forward stays open'
-status: Reviewing
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-27T10:16:41.486933+00:00
-modified: 2026-11-27T11:38:27.344761+00:00
+modified: 2026-11-27T11:55:26.544676+00:00
 relationships:
   depends_on:
   - DEV-901
@@ -66,6 +66,97 @@ comments:
     - Matches the ticket: the commits come back before the stop (the test checks the order in `ssh.log`). A failed stop goes to the job log and a ticket comment, and the bridge still closes. The job-id check lets a new job or takeover that came first win. The `stop_thread` call matches the cancelled host job's (`:4299`). Docs agree.
     - Reran: `npm ci` ok; `cargo nextest run -p lotar-agent --lib agent_job_service` 137 passed; `cargo nextest run --test integration dev626` 13 passed; `cargo clippy -p lotar-agent --all-targets -- -D warnings` clean. The worktree is unchanged afterwards. Full suites not run: the merge runs them (DEV-797).
     - No UI changes, no stray files, no second branch. No tickets filed.
+- date: 2026-11-27T11:47:17.488551+00:00
+  author: claude
+  text: |-
+    Reworked: a dropped question now stops the waiting thread too, and a cancelled waiting job no longer leaves its forward open.
+
+    - Review read HEAD `7d47c9d2f`; both findings fixed in `cda006455` (amended).
+    - **Blocking (the look forgot the thread):** `close_dropped_waits_on_host` now ends the wait the same way a new job does, through the shared `end_wait_on_host` (`crates/lotar-agent/src/services/agent_job_service.rs`). The commits come back, the bridge closes, then the thread stops on the host. A failed stop goes to the job log and a ticket comment. A later job finds no entry and nothing left to stop.
+    - The look now does this after its takeovers (`resumed.rs`, `look_at_threads` first). So a thread the owner answered is taken over, not stopped.
+    - **Cancelled before the question was recorded:** `finish_on_host` treats a waiting end of a cancelled job as `Stopped`. Its thread stops and its commits come back right away, as for any cancelled host job. It no longer parks an entry with `question: None`.
+    - Tests (`hosted.rs`): `a_ticket_closed_while_its_thread_waits_ends_the_wait` and `a_ticket_reassigned_while_its_thread_waits_ends_the_wait_before_a_later_job`. Each checks the stop reaches the fake T3 server and the bridge closes. It also checks the commits come back and a later `collect_waiting_on_host` runs no ssh.
+    - `docs/help/agent.md` updated to match.
+    - No `small-diff` tag on the ticket, so nothing to untag (diff is 268+/19- lines).
+  report:
+    commits:
+    - hash: cda006455
+      what: stop the waiting host thread on a new job, a dropped question or a cancel; close its MCP forward (amends 7d47c9d2f)
+    checks:
+    - command: cargo nextest run -p lotar-agent --lib agent_job_service
+      result: passed
+      reason: 138 tests, incl. 4 fake-ssh tests in hosted.rs
+    - command: cargo nextest run --test integration dev626
+      result: passed
+      reason: 13 tests
+    - command: npm run lint
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it (DEV-797)
+    next: Review again
+- date: 2026-11-27T11:49:14.511033+00:00
+  author: claude
+  text: |-
+    Review: blocking. When you answer in the waiting thread on dyson, the look that takes it over stops that same thread right away.
+
+    - Reviewed HEAD `cda006455` (same as `agent/DEV-929`) against main `dad3376d8`: `agent_job_service.rs`, `hosted.rs`, `resumed.rs`, `docs/help/agent.md`.
+    - **Blocking:** `look` (`resumed.rs:68`) runs `close_dropped_waits_on_host` right after `look_at_threads`. Its comment says "an answered thread is taken over, not stopped", but the takeover doesn't take the `WAITING_ON_HOST` entry before that runs:
+      - `adopt` first sets the assignee to `@<agent>` (`resumed.rs:389`), then spawns the job (`resumed.rs:476`).
+      - The entry is taken only inside that thread, after `start_job`: `resume_session_to_end` → `resumed_on_host` (`agent_job_service.rs:2605`).
+      - Meanwhile the look's own thread goes on to `close_dropped_waits_on_host` (`agent_job_service.rs:4386`). It sees the assignee is no longer the question's, removes the entry, and stops the thread on dyson that was just answered. The taken-over job then runs with no MCP connection, its thread already stopped. Answering in the thread is the main way to answer, so this breaks it, not just an edge case.
+    - **Fix:** have `close_dropped_waits_on_host` skip a ticket with an active job in this process (`adopt` registers `active_by_ticket` before it spawns, `resumed.rs:407`). Or have `adopt` take the entry before it changes the ticket and pass the `Hosted` to its job. Add a test: entry with a question, ticket reassigned to the agent and marked active the way `adopt` does it, then `close_dropped_waits_on_host` leaves the entry and runs no stop.
+    - Everything else matches "Done when": the commits come back before the stop, a failed stop is logged and commented with the bridge still closed, a closed or reassigned ticket ends the wait, a new job or takeover that takes the entry first wins (`job_id` check), and a cancelled waiting job now stops.
+    - Reran: `npm ci` passed. `cargo nextest run -p lotar-agent --lib -E 'test(/agent_job_service/)'`: 138 passed. `npm run lint` passed. Worktree left clean.
+    - No UI changes. No tickets filed.
+- date: 2026-11-27T11:52:55.276465+00:00
+  author: claude
+  text: |-
+    **Rework 2**: the review read HEAD `cda006455`, so I fixed the finding.
+
+    - **The look stopped a thread its takeover had just answered.** Now `close_dropped_waits_on_host` skips a ticket that has an active job (`has_active_job_in`). `adopt` registers its job before it spawns it, so the takeover's job keeps the thread and the MCP connection and takes the entry itself.
+    - New test `a_thread_taken_over_keeps_its_wait_while_its_job_runs`: the ticket is reassigned to the agent and a job is active. The look leaves the entry and the sockets alone and doesn't stop the thread.
+    - I fixed the comment in `resumed.rs` and the agent-hosts line in `docs/help/agent.md` ("unless a job holds the ticket").
+  report:
+    commits:
+    - hash: 8b6ab2d51
+      what: 'DEV-929 Agent hosts: a waiting dyson thread a new job didn''t take over keeps waiting there, and its MCP forward stays open'
+    checks:
+    - command: npm run lint
+      result: passed
+    - command: cargo nextest run -p lotar-agent --lib agent_job_service
+      result: passed
+      reason: 139 tests
+    - command: cargo nextest run --test integration dev626
+      result: passed
+      reason: 13 tests
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it (DEV-797)
+    next: Review again
+- date: 2026-11-27T11:55:18.958254+00:00
+  author: claude
+  text: |-
+    Review: passed. A new job, a closed ticket or a dropped question now stops the waiting thread on dyson and closes its MCP forward. An answered thread that a job takes over keeps both.
+
+    - Reviewed HEAD `8b6ab2d51` (same as `agent/DEV-929`) against main `dad3376d8`: `agent_job_service.rs`, `hosted.rs`, `resumed.rs`, `docs/help/agent.md`.
+    - Last round's finding is fixed: `close_dropped_waits_on_host` skips a ticket that `has_active_job_in` (also other processes). `adopt` registers `active_by_ticket` (`resumed.rs:407`) before it spawns the job, so the look in the same pass leaves the answered thread alone. Covered by `a_thread_taken_over_keeps_its_wait_while_its_job_runs`.
+    - Done when:
+      - #1: `collect_waiting_on_host` runs in `run_job` before the host/Mac choice.
+      - #2: `bring_back` calls `close()` first, so the bridge closes even when the fetch fails. A failed stop goes to the job log and a ticket comment.
+      - #3: the commits come back before the stop (the `ssh.log` order check). A failed bring-back leaves the worktree.
+      - #4: done, dropped and reassigned are checked on each 30 s look. The question state is recorded after `finalize_job` and the end rules, so a rule's own move isn't mistaken for a drop.
+      - #5: the entry is removed only when the job id matches.
+      - #6: fake-ssh tests cover all of this.
+    - A cancelled waiting job is now treated as `Stopped` (`finish_on_host`), which the earlier review asked for. Docs agree.
+    - Reran: `npm ci` ok; `cargo nextest run -p lotar-agent --lib agent_job_service` 139 passed; `cargo nextest run --test integration dev626` 13 passed; `cargo clippy -p lotar-agent --all-targets -- -D warnings` clean. Worktree unchanged. Full suites not run: the merge runs them (DEV-797).
+    - No UI changes, no stray files, no second branch. No tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d2e62d982215986aed328bbaa591da39294156cb58b013d72219b1068dbb561
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Af37effbe0d34fe08e5d043fb7402bfa58480661953e75ddf34acf58f3bd8c798
@@ -84,6 +175,7 @@ description: |-
   - [ ] A fake-ssh test covers both: a new job stops the waiting thread; a ticket closed while waiting closes the bridge.
 tags:
 - review-returned
+- review-returned-twice
 history:
 - at: 2026-11-27T10:16:43.304930+00:00
   actor: claude
@@ -202,3 +294,73 @@ history:
   - field: tags
     old: review-blocked
     new: review-returned
+- at: 2026-11-27T11:44:12.991889+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-27T11:47:17.488551+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T11:47:25.633742+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T11:49:14.511033+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T11:49:14.555176+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: review-returned
+    new: review-returned, review-blocked
+- at: 2026-11-27T11:49:23.085007+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: '@review'
+    new: '@fix'
+  - field: tags
+    old: review-returned, review-blocked
+    new: review-returned, review-returned-twice
+- at: 2026-11-27T11:49:25.625617+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: InProgress
+- at: 2026-11-27T11:52:55.276465+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T11:53:03.880894+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T11:55:18.958254+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T11:55:26.544676+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

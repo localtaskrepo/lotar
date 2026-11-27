@@ -5,13 +5,14 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T23:14:46.615229+00:00
-modified: 2026-11-27T11:17:14.495628+00:00
+modified: 2026-11-27T11:43:25.376383+00:00
 relationships:
   depends_on:
   - DEV-901
   related:
   - DEV-901
   - DEV-931
+  - DEV-916
 comments:
 - date: 2026-11-26T23:56:13.506951+00:00
   author: automation
@@ -189,3 +190,9 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T11:43:25.376383+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-931"]}'
+    new: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-931","DEV-916"]}'

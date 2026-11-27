@@ -372,25 +372,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                         expect((await loaded).ok()).toBe(true);
 
                         const settings = page.getByRole('table', { name: 'Settings' });
-                        try {
-                            await settings.waitFor({ state: 'visible', timeout: 15_000 });
-                        } catch (error) {
-                            // Seen once under the full suite's load (DEV-801), never alone: say whether the panel
-                            // read no record, was closed again, or went with a log that mounted anew.
-                            const panels = page.locator('.run-inputs__panel');
-                            const state = {
-                                toggles: await page
-                                    .locator('.job-log__instructions, .run-inputs__toggle')
-                                    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-expanded'))),
-                                panels: await panels.evaluateAll((nodes) =>
-                                    nodes.map((node) => ({
-                                        shown: (node as HTMLElement).offsetParent !== null,
-                                        text: node.textContent.trim().slice(0, 200),
-                                    })),
-                                ),
-                            };
-                            throw new Error(`No Settings table: ${JSON.stringify(state)}`, { cause: error });
-                        }
+                        await settings.waitFor({ state: 'visible', timeout: 15_000 });
                         // The button sits in the log's header, the panel full width below it (DEV-769).
                         expect(await page.locator('.job-log__header .run-inputs__panel').count()).toBe(0);
                         const headerBox = await header.boundingBox();
