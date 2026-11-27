@@ -1,23 +1,37 @@
 title: Smoke 'Instructions button' keeps DEV-801's failure diagnostic for a flake DEV-875 already fixed
-status: Todo
+status: Blocked
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T10:20:52.236519+00:00
-modified: 2026-11-27T10:20:53.786480+00:00
+modified: 2026-11-27T10:24:18.784406+00:00
 relationships:
+  depends_on:
+  - DEV-801
   related:
   - DEV-801
   - DEV-875
   - DEV-832
   - DEV-888
+comments:
+- date: 2026-11-27T10:24:10.666877+00:00
+  author: claude
+  text: |-
+    Waits for DEV-801: the diagnostic exists only on its unmerged branch, which @merge is landing now.
+
+    - `smoke/tests/ui.agent-jobs.smoke.spec.ts` on main `8ee989166` has no try/catch around `settings.waitFor`; it's in `agent/DEV-801` `8577170c4` only (`git diff main...agent/DEV-801`)
+    - Editing DEV-801's worktree during its merge would race the merge agent, so I left it alone
+    - Once DEV-801 is on main: drop the try/catch and its comment, run `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts`, credit DEV-875 for DEV-801 comment 11
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab7f77e63bce99126e80231f5f3b0c27ac0fa98c35f4bdc688935963707dea1a2
 description: |-
   Found: in the review of DEV-801, `smoke/tests/ui.agent-jobs.smoke.spec.ts` ('shows the prompt and settings a finished job ran with behind its Instructions button') gets a try/catch around `settings.waitFor` that dumps toggle and panel state, with the comment "Seen once under the full suite's load (DEV-801), never alone". The flake it targets (DEV-801 comment 11, DEV-832 merge 2026-11-25) predates DEV-875 (`cb61901d7`, test waits for the loaded log's header) and DEV-888 (the panel stays open across the remount), which found and fixed its cause.
   Check: `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts` and the full `npm run -s smoke` once the diagnostic is gone.
   Done: the diagnostic and its comment are removed (or, if the test fails again in a full suite after DEV-875, kept with a comment naming that failure); DEV-801's outcome credits DEV-875 for comment 11.
 tags:
 - health
+- waits
 custom_fields:
   finding: review:dev801-smoke-diagnostic
 history:
@@ -32,3 +46,36 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T10:23:35.522819+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T10:23:36.330240+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab7f77e63bce99126e80231f5f3b0c27ac0fa98c35f4bdc688935963707dea1a2
+- at: 2026-11-27T10:24:09.977339+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-801","DEV-875","DEV-832","DEV-888"]}'
+    new: '{"depends_on":["DEV-801"],"related":["DEV-801","DEV-875","DEV-832","DEV-888"]}'
+- at: 2026-11-27T10:24:10.614172+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: health
+    new: health, waits
+- at: 2026-11-27T10:24:10.666877+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T10:24:18.784406+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

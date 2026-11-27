@@ -1,24 +1,102 @@
 title: 'Agent hosts: a waiting dyson thread a new job didn''t take over keeps waiting there, and its MCP forward stays open'
-status: Todo
+status: Blocked
 priority: Medium
 type: Bug
 reporter: claude
 assignee: '@fix'
 created: 2026-11-27T10:16:41.486933+00:00
-modified: 2026-11-27T10:16:43.304930+00:00
+modified: 2026-11-27T10:22:47.466073+00:00
 relationships:
+  depends_on:
+  - DEV-901
   related:
   - DEV-901
+comments:
+- date: 2026-11-27T10:22:38.218814+00:00
+  author: claude
+  text: |-
+    Waits for DEV-901: the code this ticket fixes isn't on main yet.
+
+    - `WAITING_ON_HOST`, `collect_waiting_on_host` and `Hosted::bring_back` exist only on `agent/DEV-901` (`49a3fa827`), status Merging; `git grep` on `main` (`8ee989166`) finds none of them.
+    - Added a checkbox "Done when" to the description, depends-on DEV-901, tag `waits`. No code changed, no commits.
+    - Next: once DEV-901 is on main, rebase `agent/DEV-929` onto it and do the fix plus fake-ssh test.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d2e62d982215986aed328bbaa591da39294156cb58b013d72219b1068dbb561
 description: |-
   Found in the DEV-901 review (2026-11-27, branch `agent/DEV-901` at `49a3fa827`).
 
   - `collect_waiting_on_host` (`crates/lotar-agent/src/services/agent_job_service.rs`, in `run_job`): a new job of a ticket whose thread waits on dyson brings the commits back and, when the worktree is clean, removes it (`Hosted::bring_back`). The waiting T3 thread on dyson isn't stopped. When that job runs on the Mac with a handoff, an answer in the old thread runs it on dyson without its worktree or MCP server.
   - `WAITING_ON_HOST` keeps a waiting job's MCP bridge (an `ssh -R` process and the local socket) open until another job of the ticket or a takeover comes. A ticket the owner closes in the meantime keeps the forward open until lotar exits.
 
-  Done when: a new job that takes over a waiting host thread's worktree stops that thread through T3 (as a cancelled host job does). A waiting host job's bridge closes when its ticket is done or its question is dropped. A fake-ssh test covers both.
+  ## Done when
+  - [ ] A new job of a ticket whose thread waits on a host: after `collect_waiting_on_host` brings the commits back, the waiting T3 thread on the host is stopped through T3 (`t3_thread_api::stop_thread`, the same call a cancelled host job uses), whether the new job then runs on the Mac or a host.
+  - [ ] Stopping fails (T3 or ssh error): the new job still runs; the error goes to the job log and a ticket comment, and the bridge is still closed.
+  - [ ] The commits come back before the thread is stopped; a bring-back that fails leaves the worktree and doesn't remove it (as today).
+  - [ ] A waiting host job's bridge (`ssh -R` process and local socket) closes and its `WAITING_ON_HOST` entry goes when its ticket reaches a done status (Done, WontDo, or any status the project marks done) or its question is dropped (ticket no longer waiting / reassigned away from the question's assignee), without waiting for another job or lotar's exit.
+  - [ ] A new job or takeover that comes first still wins: it takes the entry, and the later close finds nothing to do.
+  - [ ] A fake-ssh test covers both: a new job stops the waiting thread; a ticket closed while waiting closes the bridge.
+tags:
+- waits
 history:
 - at: 2026-11-27T10:16:43.304930+00:00
   actor: claude
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T10:21:53.738516+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T10:21:54.425837+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A7d2e62d982215986aed328bbaa591da39294156cb58b013d72219b1068dbb561
+- at: 2026-11-27T10:22:36.813283+00:00
+  actor: claude
+  changes:
+  - field: description
+    old: |-
+      Found in the DEV-901 review (2026-11-27, branch `agent/DEV-901` at `49a3fa827`).
+
+      - `collect_waiting_on_host` (`crates/lotar-agent/src/services/agent_job_service.rs`, in `run_job`): a new job of a ticket whose thread waits on dyson brings the commits back and, when the worktree is clean, removes it (`Hosted::bring_back`). The waiting T3 thread on dyson isn't stopped. When that job runs on the Mac with a handoff, an answer in the old thread runs it on dyson without its worktree or MCP server.
+      - `WAITING_ON_HOST` keeps a waiting job's MCP bridge (an `ssh -R` process and the local socket) open until another job of the ticket or a takeover comes. A ticket the owner closes in the meantime keeps the forward open until lotar exits.
+
+      Done when: a new job that takes over a waiting host thread's worktree stops that thread through T3 (as a cancelled host job does). A waiting host job's bridge closes when its ticket is done or its question is dropped. A fake-ssh test covers both.
+    new: |-
+      Found in the DEV-901 review (2026-11-27, branch `agent/DEV-901` at `49a3fa827`).
+
+      - `collect_waiting_on_host` (`crates/lotar-agent/src/services/agent_job_service.rs`, in `run_job`): a new job of a ticket whose thread waits on dyson brings the commits back and, when the worktree is clean, removes it (`Hosted::bring_back`). The waiting T3 thread on dyson isn't stopped. When that job runs on the Mac with a handoff, an answer in the old thread runs it on dyson without its worktree or MCP server.
+      - `WAITING_ON_HOST` keeps a waiting job's MCP bridge (an `ssh -R` process and the local socket) open until another job of the ticket or a takeover comes. A ticket the owner closes in the meantime keeps the forward open until lotar exits.
+
+      ## Done when
+      - [ ] A new job of a ticket whose thread waits on a host: after `collect_waiting_on_host` brings the commits back, the waiting T3 thread on the host is stopped through T3 (`t3_thread_api::stop_thread`, the same call a cancelled host job uses), whether the new job then runs on the Mac or a host.
+      - [ ] Stopping fails (T3 or ssh error): the new job still runs; the error goes to the job log and a ticket comment, and the bridge is still closed.
+      - [ ] The commits come back before the thread is stopped; a bring-back that fails leaves the worktree and doesn't remove it (as today).
+      - [ ] A waiting host job's bridge (`ssh -R` process and local socket) closes and its `WAITING_ON_HOST` entry goes when its ticket reaches a done status (Done, WontDo, or any status the project marks done) or its question is dropped (ticket no longer waiting / reassigned away from the question's assignee), without waiting for another job or lotar's exit.
+      - [ ] A new job or takeover that comes first still wins: it takes the entry, and the later close finds nothing to do.
+      - [ ] A fake-ssh test covers both: a new job stops the waiting thread; a ticket closed while waiting closes the bridge.
+- at: 2026-11-27T10:22:37.403784+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-901"]}'
+    new: '{"depends_on":["DEV-901"],"related":["DEV-901"]}'
+- at: 2026-11-27T10:22:38.153385+00:00
+  actor: claude
+  changes:
+  - field: tags
+    old: ''
+    new: waits
+- at: 2026-11-27T10:22:38.218814+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T10:22:47.466073+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Blocked

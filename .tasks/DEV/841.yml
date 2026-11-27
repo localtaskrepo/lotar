@@ -1,11 +1,11 @@
 title: lotar agent worktree cleanup doesn't sweep a project's own build_root
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-24T17:20:58.415465+00:00
-modified: 2026-11-27T09:50:52.788981+00:00
+modified: 2026-11-27T10:21:47.710299+00:00
 relationships:
   depends_on:
   - DEV-778
@@ -13,6 +13,7 @@ relationships:
   - DEV-778
   - DEV-905
   - DEV-919
+  - DEV-917
 comments:
 - date: 2026-11-24T19:17:54.385564+00:00
   author: automation
@@ -69,6 +70,30 @@ comments:
     - Reran: `npm ci` passed. `cargo build --workspace`, then `cargo nextest run --test integration -E 'test(/agent_safety_test::.*(build|cleanup)/)'`: 21 of 21 passed. `cargo clippy -p lotar-agent -p lotar-lib --all-targets`: no warnings. `rustfmt --check` on the changed files: clean.
     - Not run: the full suites and smoke (the merge runs them). No UI changes, so no screenshots.
     - No minor findings, no tickets filed.
+- date: 2026-11-27T10:21:46.707460+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-841` is in `main`.
+
+    - Rebased `agent/DEV-841` onto `main` (`4de9925ef3ec`): `1bf80986434b`
+    - Waited 5 s for the machine's check lock, held by lotar's merge checks of DEV-917 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-917 (pid 61697), since 09:56 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `1bf80986434b`
+    - Amended the pending `.tasks` changes into the merged commit: `8ee9891662fb`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: 8ee989166
+      what: DEV-841 lotar agent worktree cleanup doesn't sweep a project's own build_root
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A44d0364e44e95130a1b473670bcf8e9bd10004deb2ba5f7d03d6fddab04b573d
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac4c18a97c8b2f8f8d4f765fd3ee7b97c0634731fb1521c1f15e6bd4f0a361127
@@ -90,8 +115,6 @@ description: |-
   - [ ] What `sweep_build_root` keeps stays as DEV-778 has it (folders of listed worktrees, nothing deleted when git can't list worktrees)
   - [ ] `--dry-run` deletes nothing
   - [ ] Test: a project-only `agent_worktree_build_root` with an orphan `<root>/<repo>/<ticket>` folder and no worktree: `lotar agent worktree cleanup` deletes it; a folder of a listed worktree stays
-tags:
-- job-paused
 history:
 - at: 2026-11-24T17:20:58.705536+00:00
   actor: claude
@@ -238,3 +261,22 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T10:21:46.707460+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T10:21:47.012561+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-778"],"related":["DEV-778","DEV-905","DEV-919"]}'
+    new: '{"depends_on":["DEV-778"],"related":["DEV-778","DEV-905","DEV-919","DEV-917"]}'
+- at: 2026-11-27T10:21:47.710299+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done
+  - field: tags
+    old: job-paused
+    new: ''

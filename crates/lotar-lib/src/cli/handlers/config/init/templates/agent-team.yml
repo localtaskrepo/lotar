@@ -410,6 +410,11 @@ automation:
         status: Blocked
       on:
         unblocked:
+          # Out of Blocked now: `lotar automation run` fires `unblocked` on
+          # every run while the ticket still matches, also while its job
+          # waits for a free slot.
+          set:
+            status: InProgress
           remove:
             tags: [waits]
           tell_agent:

@@ -3130,6 +3130,92 @@ exit 0
         assert!(told.contains("Use the second option"), "{told}");
     }
 
+    /// DEV-902: agent-team's "Prerequisites done" rule moves the ticket out of
+    /// Blocked, so a second `lotar automation run` doesn't tell the agent again
+    /// while the first job still waits for a slot.
+    #[cfg(unix)]
+    #[test]
+    fn shipped_agent_team_template_continues_a_waiting_ticket_once() {
+        crate::common::require_git();
+        let _guard = lock_agent_tests();
+        enable_server_mode();
+        let fixtures = TestFixtures::new();
+        init_git_repository(fixtures.get_temp_path());
+        // The job tell_agent queues waits in the queue file: no worker takes it.
+        let _queue = crate::common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", fixtures.get_temp_path().join("queue").to_str().unwrap());
+        let _no_worker = crate::common::env_mutex::EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let script = write_stub_agent_script(
+            fixtures.get_temp_path(),
+            "team-wait.sh",
+            "#!/bin/sh\necho '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\"}'\n",
+        );
+        install_template_workflow(
+            &fixtures,
+            "WAIT",
+            "agent-team",
+            &[("implement", script.as_path()), ("implement-retry", script.as_path()), ("review", script.as_path()), ("merge", script.as_path())],
+        );
+        let validate = common::lotar_cmd()
+            .expect("lotar cmd")
+            .current_dir(fixtures.get_temp_path())
+            .env("LOTAR_TEST_SILENT", "1")
+            .args(["config", "validate", "--project=WAIT"])
+            .output()
+            .expect("run config validate");
+        assert!(validate.status.success(), "config validate: {}{}", String::from_utf8_lossy(&validate.stdout), String::from_utf8_lossy(&validate.stderr));
+
+        let mut storage = fixtures.create_storage();
+        let docs = TaskService::create(
+            &mut storage,
+            TaskCreate { title: "Docs".to_string(), project: Some("WAIT".to_string()), status: Some("Done".into()), ..Default::default() },
+        )
+        .expect("create prerequisite");
+        let waiting = TaskService::create(
+            &mut storage,
+            TaskCreate { title: "Waiting".to_string(), project: Some("WAIT".to_string()), status: Some("Blocked".into()), ..Default::default() },
+        )
+        .expect("create task");
+        TaskService::update_with_context(
+            &mut storage,
+            &waiting.id,
+            TaskUpdate {
+                tags: Some(vec!["waits".to_string()]),
+                relationships: Some(lotar::types::TaskRelationships { depends_on: vec![docs.id.clone()], ..Default::default() }),
+                ..Default::default()
+            },
+            TaskUpdateContext::automation_disabled(),
+        )
+        .expect("wait for docs");
+
+        let run = || {
+            let output = common::lotar_cmd()
+                .expect("lotar cmd")
+                .current_dir(fixtures.get_temp_path())
+                .args(["automation", "run", "Prerequisites done: continue the waiting ticket"])
+                .output()
+                .expect("run lotar automation run");
+            assert!(output.status.success(), "automation run failed: {}", String::from_utf8_lossy(&output.stderr));
+            format!("{}{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr))
+        };
+        let first = run();
+        assert!(!first.contains("none match"), "{first}");
+        let task = TaskService::get(&storage, &waiting.id, None).expect("get task");
+        assert_eq!(task.status.to_string(), "InProgress", "out of Blocked while the job waits: {first}");
+        assert!(!task.tags.iter().any(|tag| tag == "waits"), "{:?}", task.tags);
+        let comments = task.comments.len();
+
+        let second = run();
+        assert!(second.contains("none match"), "{second}");
+
+        let queued: Vec<_> =
+            AgentQueueService::list_pending(&fixtures.tasks_root).expect("read the queue").into_iter().filter(|e| e.ticket_id == waiting.id).collect();
+        assert_eq!(queued.len(), 1, "one job for the ticket: {:?}", queued.iter().map(|e| (&e.agent, &e.prompt)).collect::<Vec<_>>());
+        assert_eq!(queued[0].agent, "implement");
+        let task = TaskService::get(&storage, &waiting.id, None).expect("get task");
+        assert_eq!(task.status.to_string(), "InProgress");
+        assert_eq!(task.comments.len(), comments, "the second run told nothing: {:?}", task.comments.iter().map(|c| &c.text).collect::<Vec<_>>());
+    }
+
     /// Backward compatibility: old YAML keys (job_start, complete, error, cancel) still work.
     #[cfg(unix)]
     #[test]
