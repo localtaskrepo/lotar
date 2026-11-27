@@ -1,0 +1,30 @@
+title: 'Hosted claude/codex takeover: no test drives resume_session_to_end on a host'
+status: Todo
+priority: Low
+type: Chore
+reporter: claude
+assignee: '@fix'
+created: 2026-11-27T13:36:18.043765+00:00
+modified: 2026-11-27T13:36:19.278614+00:00
+relationships:
+  related:
+  - DEV-931
+description: |-
+  Found in the review of DEV-931 (`0d04ac1fd`).
+
+  ## Found
+  - `a_headless_job_taken_over_after_a_restart_runs_on_the_host_and_brings_its_commits_back` (`crates/lotar-agent/src/services/agent_job_service/hosted.rs`) calls `resumed_on_host`, `host_agent_table` and `finish_on_host` itself.
+  - `resume_session_to_end` (`crates/lotar-agent/src/services/agent_job_service.rs:2567`) is what wires them together for a headless runner. Going back to the Mac's `job_agent_table` there, or dropping its `finish_on_host`, fails no test.
+  - Its two failure branches are untested too: the session can't be resumed (release, `bring_back(.., true)`, run again) and cancel during takeover (`finish_on_host(.., Stopped, ..)`).
+
+  ## Done when
+  - [ ] A test takes over a headless job whose record names a host (fake `LOTAR_SSH`, fake ACP agent as in `dev503_harness_jobs_test.rs`) and checks that the agent ran through the host's ssh command and that its commits came back to the Mac worktree.
+  - [ ] A test covers the "could not be resumed" branch on a host: the commits and leftovers come back and the job is queued again.
+tags:
+- agent
+history:
+- at: 2026-11-27T13:36:19.278614+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

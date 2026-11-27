@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T19:31:53.927572+00:00
-modified: 2026-11-27T09:33:23.046505+00:00
+modified: 2026-11-27T13:36:28.882272+00:00
 relationships:
   blocks:
   - DEV-918
@@ -24,6 +24,7 @@ relationships:
   - DEV-912
   - DEV-843
   - DEV-913
+  - DEV-934
 comments:
 - date: 2026-11-26T21:07:08.577168+00:00
   author: automation
@@ -526,3 +527,9 @@ history:
   - field: tags
     old: agent, ui, job-paused, review-returned
     new: agent, ui
+- at: 2026-11-27T13:36:28.882272+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"blocks":["DEV-918"],"related":["DEV-849","DEV-850","DEV-782","DEV-867","DEV-901","DEV-918","DEV-786","DEV-797","DEV-810","DEV-888","DEV-910","DEV-912","DEV-843","DEV-913"]}'
+    new: '{"blocks":["DEV-918"],"related":["DEV-849","DEV-850","DEV-782","DEV-867","DEV-901","DEV-918","DEV-786","DEV-797","DEV-810","DEV-888","DEV-910","DEV-912","DEV-843","DEV-913","DEV-934"]}'

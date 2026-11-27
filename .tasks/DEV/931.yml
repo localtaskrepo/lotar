@@ -1,15 +1,67 @@
 title: 'Hosted claude/codex job: lotar restart takeover and answer wait strand work on the host'
-status: Todo
+status: Merging
 priority: Low
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-27T11:16:51.136837+00:00
-modified: 2026-11-27T11:16:52.750365+00:00
+modified: 2026-11-27T13:36:50.245028+00:00
 relationships:
   related:
   - DEV-911
   - DEV-901
+  - DEV-933
+  - DEV-934
+comments:
+- date: 2026-11-27T13:30:27.971541+00:00
+  author: claude
+  text: |-
+    Hosted claude/codex jobs no longer strand work on the host (`0d04ac1fd`).
+
+    - **Takeover after a restart**: `resume_session_to_end` now calls `resumed_on_host(.., thread: false)` for headless runners *before* opening the session, and wraps the table with the new `host_agent_table` (also used by `run_session`). `Hosted::attach` takes `thread`. If the session can't be resumed, the commits and leftovers come back before the job runs again. A cancel during takeover frees the host slot and brings the commits back.
+    - **Waiting for an answer**: `finish_on_host` gives a headless agent `bring_back(.., true)`: leftovers are committed on the host, everything comes back, the host worktree goes, and nothing is left in `WAITING_ON_HOST`. `t3` threads behave as before.
+    - **Reasons**: `host_check` now returns `Result<Check, String>`, e.g. `a command job doesn't run on an agent host`, `no codex agent command to run there: …`, `no t3 CLI on this Mac to compare versions with`. `cached_probe` and `Hosted::set_up` pass that reason through.
+    - **Lost-connection note** for headless jobs: `the agent there goes on without lotar's MCP tools, and the job ends with its turn.`
+    - **Docs**: `docs/help/agent.md` "Before a job", "Commits" and "Claude and Codex" describe the new behaviour.
+    - **Tests** in `hosted.rs`: `a_headless_job_taken_over_after_a_restart_runs_on_the_host_and_brings_its_commits_back`, `a_headless_agent_that_asks_brings_everything_back`, `a_host_check_names_what_is_missing`.
+    - **Not covered by a test**: the takeover test calls `resumed_on_host` + `host_agent_table` + `finish_on_host`, not the full `resume_session_to_end`, because that would open a real agent session.
+    - No guidance correction; no other T3 threads were running.
+  report:
+    commits:
+    - hash: 0d04ac1fd
+      what: headless host jobs resume over ssh after a restart, bring everything back when they ask, reasons name what's missing
+    checks:
+    - command: cargo nextest run -p lotar-agent
+      result: passed
+      reason: 341 tests, plus a rerun of the hosted/agent_hosts/takeover tests after the last edit
+    - command: npm run lint
+      result: passed
+      reason: before the last 6-line edit; rustfmt --check and cargo clippy -p lotar-agent --tests were clean after it
+    - command: npx prettier --check docs/help/agent.md
+      result: passed
+    - command: npm test
+      result: not_run
+      reason: the merge runs the full suites (DEV-797)
+    - command: npm run smoke
+      result: not_run
+      reason: the merge runs it (DEV-797)
+    next: Review, then merge
+- date: 2026-11-27T13:36:40.667142+00:00
+  author: claude
+  text: |-
+    Review: passed. `0d04ac1fd` does what "Done when" asks and nothing else.
+
+    - **Read**: the ticket and fix comment, DEV-911 and DEV-901, AGENTS.md, and the whole diff (`agent_job_service.rs`, `hosted.rs`, `agent_hosts.rs`, `docs/help/agent.md`). The branch sits on `main` (`c518a585d`), so there is nothing to rebase.
+    - **Takeover**: `resume_session_to_end` (`agent_job_service.rs:2567`) attaches the host with `thread: false` before the session opens and runs the agent through `host_agent_table`. That is the same table `run_session` uses. `finish_on_host` brings the commits back at the end. The slot is released on both failure paths: a session that can't be resumed (its commits and leftovers come back first) and a cancel.
+    - **Waiting for an answer**: a headless job calls `bring_back(.., true)` (`:4338`). No `WAITING_ON_HOST` entry is left, so the answered job's `set_up` can use the host again. If bringing the work back fails, the job log says so and the worktree stays on the host.
+    - **Reasons and note**: `host_check` returns `Result<Check, String>` and the reason reaches `cached_probe` and `set_up` unchanged. The lost-connection note and the docs match the code.
+    - **Test before the fix**: `a_headless_agent_that_asks_brings_everything_back` would fail on the old `finish_on_host`, because `draft.txt` stayed on the host. The takeover test only runs the parts on their own, not `resume_session_to_end` (the fix agent says so too) → DEV-933.
+    - **Reran**: `npm ci` ok; `npm run lint` passed; `cargo nextest run -p lotar-agent hosted agent_hosts host_check` passed 32/32. `cargo nextest run -p lotar-lib --test integration -E 'test(/dev503|dev510/)'`: 77 of 78 passed.
+    - **That 1 failure is not from this change**: `dev503_harness_jobs_test::a_job_records_its_turn_and_reads_only_that_turns_conversation` also fails alone, and on `main` in a detached copy (since removed) → DEV-934 (tag health). The merge's `test:agent` will probably stop on it.
+    - **Tickets filed**: [DEV-933](https://lotar.pyxzl.net/task/DEV-933) (minor, related), [DEV-934](https://lotar.pyxzl.net/task/DEV-934) (health).
+    - No UI in the change. No stray files and no second branch.
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A609c84c563d445759d43a78c6c108a2f5c69d4df44be9371c0aeb335f5e8a5d6
 description: |-
   Found in the review of DEV-911 (`7ecdf8f50`). Review and triage jobs rarely change files, so the merge can go ahead. Any other `claude`/`codex` profile with `host` can strand work on the host.
 
@@ -28,3 +80,52 @@ history:
   changes:
   - field: assignee
     new: '@fix'
+- at: 2026-11-27T13:23:12.194613+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T13:23:12.868495+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A609c84c563d445759d43a78c6c108a2f5c69d4df44be9371c0aeb335f5e8a5d6
+- at: 2026-11-27T13:30:27.971541+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T13:30:39.280700+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T13:36:18.532412+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-911","DEV-901"]}'
+    new: '{"related":["DEV-911","DEV-901","DEV-933"]}'
+- at: 2026-11-27T13:36:28.883201+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-911","DEV-901","DEV-933"]}'
+    new: '{"related":["DEV-911","DEV-901","DEV-933","DEV-934"]}'
+- at: 2026-11-27T13:36:40.667142+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T13:36:50.245028+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

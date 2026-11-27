@@ -1,14 +1,15 @@
 title: A build run with --manifest-path from another checkout still reuses that checkout's LOTAR_DOCS_DIR
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T09:51:24.772911+00:00
-modified: 2026-11-27T13:14:39.604369+00:00
+modified: 2026-11-27T13:22:34.868368+00:00
 relationships:
   related:
   - DEV-919
+  - DEV-918
 comments:
 - date: 2026-11-27T13:11:55.055639+00:00
   author: claude
@@ -63,6 +64,30 @@ comments:
     - command: npm run smoke
       result: not_run
       reason: merge runs full suites
+- date: 2026-11-27T13:22:33.743816+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-927` is in `main`.
+
+    - Rebase onto `main` changed nothing (`f61dcb8bbaf6`)
+    - Waited 7 s for the machine's check lock, held by lotar's merge checks of DEV-918 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-918 (pid 61697), since 13:00 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `f61dcb8bbaf6`
+    - Amended the pending `.tasks` changes into the merged commit: `c518a585df05`
+    - Pushed 1 commit to `origin/main`
+  report:
+    commits:
+    - hash: c518a585d
+      what: DEV-927 A build run with --manifest-path from another checkout still reuses that checkout's LOTAR_DOCS_DIR
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ae8bfa107895de32b19a3d591cc09be5809515d27745945fa3457607ba6bb230d
 description: 'Found in DEV-919''s review (2026-11-27). Cargo reads `.cargo/config.toml` from the current directory, not the manifest''s, so `cargo build --manifest-path <copy>/Cargo.toml` run from checkout A sets `LOTAR_CHECKOUT_DIR` to A while building the copy; A''s next build then keeps the copy''s `LOTAR_DOCS_DIR`. Check: in a scratch workspace with the DEV-919 config, `cd a && cargo run --manifest-path ../b/Cargo.toml --target-dir t && cargo run --target-dir t` prints b''s path twice. Done when: the build scripts rerun per checkout without relying on cwd, for example by also emitting `rerun-if-changed` on an absolute path under CARGO_MANIFEST_DIR, with a test.'
@@ -117,3 +142,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T13:22:33.743816+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T13:22:34.062740+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-919"]}'
+    new: '{"related":["DEV-919","DEV-918"]}'
+- at: 2026-11-27T13:22:34.868368+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

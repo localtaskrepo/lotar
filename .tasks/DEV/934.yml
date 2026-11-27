@@ -1,0 +1,92 @@
+title: dev503 a_job_records_its_turn_and_reads_only_that_turns_conversation fails on main
+status: Done
+priority: Medium
+type: Bug
+reporter: claude
+created: 2026-11-27T13:36:28.492345+00:00
+modified: 2026-11-27T13:39:28.303865+00:00
+relationships:
+  related:
+  - DEV-909
+  - DEV-931
+  - DEV-918
+comments:
+- date: 2026-11-27T13:39:13.756705+00:00
+  author: claude
+  text: |-
+    No bug: the test ran a stale `lotar` binary; it passes once the workspace is built. No file change.
+
+    - The first job runs through the CLI (`lotar_cmd()` → `target/debug/lotar`). That binary was from Nov 26 05:38 the day before, so older than DEV-909 (`1ee3ef1f4`, Nov 27 01:32), which added the `agent_job_transcript` entry. So the CLI job recorded no turn and the refs were `[]`.
+    - `cargo nextest run -p lotar-lib` doesn't rebuild the root `lotar` binary. `.github/skills/testing-strategy/SKILL.md:52` already says so: don't narrow with `-p lotar-lib`, filter with `-E`.
+    - After `cargo nextest run --workspace -E ...` rebuilt `target/debug/lotar`, the test passed alone 4 of 4 times. All 78 dev503/dev510 tests passed too.
+    - The merge's `test:agent` (`scripts/rust-test-runner.mjs --agent`) builds the workspace, so it isn't affected.
+  report:
+    checks:
+    - command: cargo nextest run --workspace -E 'test(=dev503_harness_jobs_test::a_job_records_its_turn_and_reads_only_that_turns_conversation)'
+      result: passed
+    - command: ticket command with -p lotar-lib, after the workspace build, 3 runs
+      result: passed
+    - command: cargo nextest run -p lotar-lib --test integration -E 'test(/dev503_|dev510_/)'
+      result: passed
+      reason: 78 of 78
+- date: 2026-11-27T13:39:18.596689+00:00
+  author: claude
+  text: 'Correction: the stale `target/debug/lotar` was from Nov 26 12:42, not 05:38. The rebuilt one is from Nov 27 05:38.'
+references:
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad67af9df3de24e23cfa6a288a524f02a92cc1e51cb66b7ae259e21c004761bec
+description: |-
+  Found in the review of DEV-931; it is not caused by that change.
+
+  ## Found
+  - `cargo nextest run -p lotar-lib --test integration -E 'test(=dev503_harness_jobs_test::a_job_records_its_turn_and_reads_only_that_turns_conversation)'` fails 3 of 3 times when run alone, on `agent/DEV-931` and on `main` at `c518a585d` (a detached copy).
+  - `crates/lotar-lib/tests/dev503_harness_jobs_test.rs:226`: the first job's transcript refs are `[]`, the test expects `[1]`.
+  - It also fails with `LOTAR_TASKS_DIR` and `LOTAR_WORKSPACE_ROOT` unset. The run was inside an agent job (macOS, 2026-11-27).
+  - The other 77 dev503/dev510 tests pass. The merge's `test:agent` will likely fail on it.
+  - Possibly related: DEV-918 (transcript reader `candidates()`, now merging), DEV-909 (added the test).
+
+  ## Done when
+  - [ ] The cause is found: the code or the test.
+  - [ ] The test passes alone and in the suite on `main`.
+tags:
+- health
+custom_fields:
+  finding: tests:dev503_harness_jobs_test
+history:
+- at: 2026-11-27T13:36:29.650522+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-909","DEV-931"]}'
+    new: '{"related":["DEV-909","DEV-931","DEV-918"]}'
+- at: 2026-11-27T13:36:30.075764+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'
+- at: 2026-11-27T13:36:58.731122+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T13:36:59.407835+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ad67af9df3de24e23cfa6a288a524f02a92cc1e51cb66b7ae259e21c004761bec
+- at: 2026-11-27T13:39:13.756705+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T13:39:18.596689+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T13:39:28.303865+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+  - field: assignee
+    old: '@fix'

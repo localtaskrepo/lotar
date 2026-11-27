@@ -166,9 +166,9 @@ fn candidates(sessions_dir: &Path, name: &str) -> Vec<PathBuf> {
             let kept_name = file.strip_suffix(SUFFIX)?;
             let (base, stamp) = kept_name.rsplit_once('.')?;
             let is_stamp = stamp.len() == 16 && stamp.as_bytes()[8] == b'T' && stamp.ends_with('Z');
-            // A kept name is cut to fit 64 characters with its stamp.
-            (is_stamp && !base.is_empty() && name.starts_with(base) && harnessmux::registry::validate_name(kept_name).is_ok())
-                .then(|| (stamp.to_string(), entry.path()))
+            // A kept name is the session's, cut to `KEPT_BASE_CHARS` when longer; a shorter base is another session's.
+            let ours = base == name || (base.chars().count() == crate::services::agent_runner::KEPT_BASE_CHARS && name.starts_with(base));
+            (is_stamp && ours && harnessmux::registry::validate_name(kept_name).is_ok()).then(|| (stamp.to_string(), entry.path()))
         })
         .filter(|(_, path)| path.is_file())
         .collect();
@@ -484,6 +484,27 @@ mod tests {
         .unwrap();
         let window = Window::new("2026-11-26T10:00:00Z", Some("2026-11-26T10:00:10Z"));
         let transcript = read(dir.path(), &[reference("s3", 1)], &window, 0, 100).unwrap();
+        assert_eq!(transcript.events[0].message.as_deref(), Some("Review DEV-1"));
+    }
+
+    #[test]
+    fn a_kept_copy_of_a_prefix_named_session_is_not_the_jobs() {
+        let dir = tempfile::tempdir().unwrap();
+        two_turns(dir.path(), "lotar-x-DEV-1-fix.20261126T110003Z");
+        let window = Window::new("2026-11-26T10:00:00Z", Some("2026-11-26T10:00:10Z"));
+        let transcript = read(dir.path(), &[reference("lotar-x-DEV-1-fix-ui", 1)], &window, 0, 100).unwrap();
+        assert_eq!(transcript.state, "expired");
+    }
+
+    #[test]
+    fn a_kept_copy_of_a_long_name_answers_with_its_cut_base() {
+        let dir = tempfile::tempdir().unwrap();
+        let name = format!("lotar-x-DEV-1-{}", "f".repeat(50));
+        let base: String = name.chars().take(crate::services::agent_runner::KEPT_BASE_CHARS).collect();
+        assert_eq!(base.len(), 47);
+        two_turns(dir.path(), &format!("{base}.20261126T110003Z"));
+        let window = Window::new("2026-11-26T10:00:00Z", Some("2026-11-26T10:00:10Z"));
+        let transcript = read(dir.path(), &[reference(&name, 1)], &window, 0, 100).unwrap();
         assert_eq!(transcript.events[0].message.as_deref(), Some("Review DEV-1"));
     }
 

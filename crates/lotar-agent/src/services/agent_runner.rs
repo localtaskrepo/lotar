@@ -138,6 +138,9 @@ pub fn earlier_sessions(project: &std::path::Path, ticket_id: &str, current: &st
     sessions
 }
 
+/// The characters of a session name a kept copy keeps: `<base>.<stamp>` fits harnessmux's 64.
+pub const KEPT_BASE_CHARS: usize = 64 - "YYYYmmddTHHMMSSZ".len() - 1;
+
 /// Keeps a session that a new one of the same name is about to replace (DEV-611): its record and event log move to
 /// `<name>.<last used>`, closed, so the next job's prompt can still point at that round. Returns the kept record and
 /// its event log.
@@ -145,7 +148,7 @@ pub fn keep_session(name: &str) -> Result<(harnessmux::SessionRecord, std::path:
     let registry = registry();
     let mut record = registry.load(name).map_err(|err| err.to_string())?;
     let stamp = time::parse_rfc3339(&record.last_used).unwrap_or_else(|_| Timestamp::now()).strftime("%Y%m%dT%H%M%SZ").to_string();
-    let base: String = name.chars().take(64 - stamp.len() - 1).collect();
+    let base: String = name.chars().take(KEPT_BASE_CHARS).collect();
     let kept = format!("{base}.{stamp}");
     let events = registry.events_path(&kept);
     let old_events = registry.events_path(name);
