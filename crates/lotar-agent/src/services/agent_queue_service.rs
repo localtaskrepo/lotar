@@ -369,7 +369,7 @@ impl AgentQueueEntry {
         AgentJobService::starts_as_merge_job(tasks_dir, &self.ticket_id, (!self.agent.is_empty()).then_some(self.agent.as_str()))
     }
 
-    fn request(&self) -> AgentJobCreateRequest {
+    pub(crate) fn request(&self) -> AgentJobCreateRequest {
         AgentJobCreateRequest {
             ticket_id: self.ticket_id.clone(),
             prompt: self.prompt.clone(),

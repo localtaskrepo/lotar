@@ -1,11 +1,11 @@
 title: Smoke 'Instructions button' keeps DEV-801's failure diagnostic for a flake DEV-875 already fixed
-status: Merging
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T10:20:52.236519+00:00
-modified: 2026-11-27T11:42:52.952944+00:00
+modified: 2026-11-27T11:56:06.175489+00:00
 relationships:
   depends_on:
   - DEV-801
@@ -15,6 +15,7 @@ relationships:
   - DEV-832
   - DEV-888
   - DEV-913
+  - DEV-911
 comments:
 - date: 2026-11-27T10:24:10.666877+00:00
   author: claude
@@ -61,6 +62,33 @@ comments:
     - Reran `npm ci`, `npm run -s build:smoke`, `npm run -s test:smoke:quick:agent -- smoke/tests/ui.agent-jobs.smoke.spec.ts`: 17/17 passed; `npx prettier --check` on the file passed
     - Not run: full `npm run -s smoke` (the merge runs it)
     - No UI change, so no screenshots needed; no tickets filed
+- date: 2026-11-27T11:56:04.946125+00:00
+  author: automation
+  text: |-
+    Merged without an agent: `agent/DEV-930` is in `main`.
+
+    - Rebased `agent/DEV-930` onto `main` (`dad3376d8781`): `5ac0b92f2856`
+    - Waited 7 min for the machine's check lock, held by lotar's merge checks of DEV-911 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-911 (pid 61697), since 11:35 UTC
+    - The check `npm run -s lint:agent` passed
+    - The check `npm run -s test:agent` passed
+    - The check `npm run -s smoke` passed
+    - Fast-forwarded `main` to `5ac0b92f2856`
+    - Amended the pending `.tasks` changes into the merged commit: `e1e10870ea19`
+    - Pushed 1 commit to `origin/main`
+    - The finding check `node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar` no longer lists `[review:dev801-smoke-diagnostic]`
+  report:
+    commits:
+    - hash: e1e10870e
+      what: DEV-930 Smoke 'Instructions button' keeps DEV-801's failure diagnostic for a flake DEV-875 already fixed
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    - command: node ~/Development/standards/scripts/repos.ts localtaskrepo/lotar
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ab7f77e63bce99126e80231f5f3b0c27ac0fa98c35f4bdc688935963707dea1a2
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A6c71231383698f113295c8bdacd74cacb1854eb4a1a061481db1c888220d518a
@@ -166,3 +194,19 @@ history:
   - field: assignee
     old: '@review'
     new: '@merge'
+- at: 2026-11-27T11:56:04.946125+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T11:56:05.304538+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-801"],"related":["DEV-801","DEV-875","DEV-832","DEV-888","DEV-913"]}'
+    new: '{"depends_on":["DEV-801"],"related":["DEV-801","DEV-875","DEV-832","DEV-888","DEV-913","DEV-911"]}'
+- at: 2026-11-27T11:56:06.175489+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

@@ -5,7 +5,7 @@ type: Feature
 reporter: claude
 assignee: '@merge'
 created: 2026-11-26T23:14:46.615229+00:00
-modified: 2026-11-27T11:43:25.376383+00:00
+modified: 2026-11-27T12:01:58.798648+00:00
 relationships:
   depends_on:
   - DEV-901
@@ -13,6 +13,8 @@ relationships:
   - DEV-901
   - DEV-931
   - DEV-916
+  - DEV-930
+  - DEV-801
 comments:
 - date: 2026-11-26T23:56:13.506951+00:00
   author: automation
@@ -66,6 +68,18 @@ comments:
     - **Host setup**: no `t3 project add` and no settings files. `mcp.lotar` gives the session the ssh socket bridge. The "Agent host" note covers both cases.
     - **Reran**: `npm ci` passed. `cargo nextest run -p lotar-agent -p lotar-core -E 'test(/hosted|agent_hosts|headless|guard|probe|an_unknown_host/)'`: 29 passed. `npm run lint` passed.
     - **Minor, filed as DEV-931**: a lotar restart mid-job resumes a hosted claude/codex session with the Mac's table (`agent_job_service.rs:2568`, `resumed_on_host` is t3 only, `attach` has `thread: true`), so the host's commits don't come back. A job waiting for an answer leaves uncommitted changes on the host. Review and triage rarely write files, so the merge can go ahead.
+- date: 2026-11-27T12:01:58.498091+00:00
+  author: automation
+  text: "lotar's merge needs the merge agent: `git merge --ff-only agent/DEV-911` in the main checkout refused: hint: Diverging branches can't be fast-forwarded, you need to either:\nhint:\nhint: \tgit merge --no-ff\nhint:\nhint: or:\nhint:\nhint: \tgit rebase\nhint:\nhint: Disable this message with \"git config set advice.diverging false\"\nfatal: Not possible to fast-forward, aborting..\n\n- Rebase onto `main` changed nothing (`7ecdf8f506e9`)\n- Waited 12 min for the machine's check lock, held by lotar's merge checks of DEV-801 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-801 (pid 61697), since 11:08 UTC\n- The check `npm run -s lint:agent` passed\n- The check `npm run -s test:agent` passed\n- The check `npm run -s smoke` passed\n- `main` moved on during the checks: rebasing again\n- Rebased `agent/DEV-911` onto `main` (`0ec35832b5dd`): `b8c6c6d3aba7`\n- Waited 7 min for the machine's check lock, held by lotar's merge checks of DEV-916 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-916 (pid 61697), since 11:29 UTC\n- The check `npm run -s lint:agent` passed\n- The check `npm run -s test:agent` passed\n- The check `npm run -s smoke` passed\n- `main` moved on during the checks: rebasing again\n- Rebased `agent/DEV-911` onto `main` (`dad3376d8781`): `0006ec48e14d`\n- Waited 7 min for the machine's check lock, held by lotar's merge checks of DEV-930 in /Users/mallox/Development/@localtaskrepo/.lotar-worktrees/lotar/DEV-930 (pid 61697), since 11:42 UTC\n- The check `npm run -s lint:agent` passed\n- The check `npm run -s test:agent` passed\n- The check `npm run -s smoke` passed"
+  report:
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
+    next: The merge agent takes over in a new session
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A516d0b27722fd34b3ce0f2f549950eacbd305944dc80892f651586002d0fbb2f
 description: |-
@@ -196,3 +210,19 @@ history:
   - field: relationships
     old: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-931"]}'
     new: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-931","DEV-916"]}'
+- at: 2026-11-27T11:56:05.304044+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-931","DEV-916"]}'
+    new: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-931","DEV-916","DEV-930"]}'
+- at: 2026-11-27T12:01:58.498091+00:00
+  actor: automation
+  changes:
+  - field: comment_added
+- at: 2026-11-27T12:01:58.798648+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-931","DEV-916","DEV-930"]}'
+    new: '{"depends_on":["DEV-901"],"related":["DEV-901","DEV-931","DEV-916","DEV-930","DEV-801"]}'

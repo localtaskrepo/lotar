@@ -1,0 +1,25 @@
+title: 'A takeover of a job another process took over still asks ''Go on with the ticket''s work'': a taken-over job writes no run_inputs line'
+status: Todo
+priority: Low
+type: Bug
+reporter: claude
+assignee: '@fix'
+created: 2026-11-27T11:58:59.845101+00:00
+modified: 2026-11-27T11:59:00.851350+00:00
+relationships:
+  related:
+  - DEV-920
+description: |-
+  ## Found (review of DEV-920, 2026-11-27)
+  - DEV-920's `takeover_request` (`crates/lotar-agent/src/services/agent_job_service/resumed.rs`) reads the earlier job's request from the limit retry, then this process's `JOB_REGISTRY`, then the earlier job's `run_inputs` log line.
+  - A taken-over job (`adopt`) still writes no `run_inputs` line, and its `agent_active_jobs` record (which holds `request`) is gone once it ends. So when the process that took it over has exited (queue worker gone idle, `lotar serve` restarted) and no limit retry is queued, the next takeover falls back to `GO_ON`. The fix agent noted this as a known gap; `docs/help/agent.md` says "also when that one was taken over in the same process".
+
+  ## Done when
+  - [ ] A test: a job taken over in another process (empty registry), ended without a limit retry, is taken over again and gets the first job's prompt and profile.
+  - [ ] A taken-over job keeps its request where a later process can read it (for example a `run_inputs` line in its log), and the doc line drops "in the same process".
+history:
+- at: 2026-11-27T11:59:00.851350+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    new: '@fix'

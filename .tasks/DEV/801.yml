@@ -5,7 +5,7 @@ type: Chore
 reporter: claude
 assignee: '@merge'
 created: 2026-11-22T19:22:12.213895+00:00
-modified: 2026-11-27T11:41:31.907240+00:00
+modified: 2026-11-27T12:01:58.797653+00:00
 relationships:
   depends_on:
   - DEV-797
@@ -44,6 +44,7 @@ relationships:
   - DEV-913
   - DEV-841
   - DEV-916
+  - DEV-911
 comments:
 - date: 2026-11-22T22:40:05.875209+00:00
   author: claude
@@ -693,3 +694,9 @@ history:
   actor: claude
   changes:
   - field: comment_added
+- at: 2026-11-27T12:01:58.797653+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"depends_on":["DEV-797"],"blocks":["DEV-930"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906","DEV-908","DEV-840","DEV-890","DEV-921","DEV-922","DEV-861","DEV-930","DEV-875","DEV-888","DEV-913","DEV-841","DEV-916"]}'
+    new: '{"depends_on":["DEV-797"],"blocks":["DEV-930"],"related":["standards:STD-299","DEV-779","DEV-785","DEV-787","DEV-788","DEV-792","DEV-799","DEV-782","DEV-790","DEV-791","DEV-809","DEV-777","DEV-802","DEV-767","DEV-825","DEV-832","DEV-883","DEV-896","DEV-867","DEV-906","DEV-908","DEV-840","DEV-890","DEV-921","DEV-922","DEV-861","DEV-930","DEV-875","DEV-888","DEV-913","DEV-841","DEV-916","DEV-911"]}'

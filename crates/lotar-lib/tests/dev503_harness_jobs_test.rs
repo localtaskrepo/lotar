@@ -1781,6 +1781,67 @@ fn a_taken_over_t3_job_that_hits_a_usage_limit_pauses_and_its_retry_continues_th
     assert_eq!(sends[0]["threadId"], "thread-0", "the retry's turn goes to the taken-over thread");
 }
 
+/// DEV-920 (local LOCA-631): a job taken over from a taken-over job asked only "Go on with the ticket's work in this
+/// thread": a taken-over job writes no prompt to its log, and the usage-limit retry it replaced, which held the
+/// request, went unused. It now asks what the thread's first job asked, on its profile, from that retry, else from
+/// the earlier job's record.
+#[test]
+fn a_job_taken_over_from_a_taken_over_job_asks_the_first_jobs_request() {
+    let (fixtures, _env) = t3_harness_with(&[("fix", "", "    continue_within_minutes: 0\n")]);
+    let root = fixtures.get_temp_path();
+    let tasks_dir = fixtures.tasks_root.clone();
+    let _queue = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DIR", root.join("queue").to_str().unwrap());
+    let _no_worker = EnvVarGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+    let _wait = EnvVarGuard::set("LOTAR_AGENT_USAGE_LIMIT_WAIT_SECONDS", "1");
+    let _look = EnvVarGuard::set("LOTAR_AGENT_RESUMED_LOOK_SECONDS", "0");
+    run_t3(&fixtures, "fix").success();
+    std::fs::write(root.join("list-threads"), "").unwrap();
+    let limit = |on: bool| {
+        for file in ["limit-thread-0", "failed-thread-0"] {
+            if on {
+                std::fs::write(root.join(file), "Claude API rate limit reached. Try again later.").unwrap();
+            } else {
+                let _ = std::fs::remove_file(root.join(file));
+            }
+        }
+    };
+    // T3 Code runs the thread again (a new run each time), lotar takes it over, and the run ends.
+    let take_over = |run: &str, limited: bool| {
+        std::fs::write(root.join("t3-threads/thread-0/latest"), run).unwrap();
+        std::fs::write(root.join("running-thread-0"), "").unwrap();
+        AgentJobService::adopt_resumed_t3_threads(&tasks_dir);
+        let job = lotar::services::agent_active_jobs::for_ticket(&tasks_dir, "TEST-1").unwrap_or_else(|| panic!("{run}: a job takes the thread over"));
+        limit(limited);
+        std::fs::remove_file(root.join("running-thread-0")).unwrap();
+        wait_for_jobs_to_end(&tasks_dir);
+        limit(false);
+        // This process keeps the ended job's session open for its idle TTL, a minute, and a session a process owns
+        // is followed by a job; T3 Code resumes a thread at a limit's reset, hours later.
+        let registry = lotar::services::agent_runner::registry();
+        for record in registry.list(None).unwrap() {
+            let _ = lotar::services::agent_runner::block_on(harnessmux::client::request(&registry, &record.name, &harnessmux::ipc::Request::Close));
+        }
+        job.job_id
+    };
+    let retry = |what: &str| {
+        let pending = AgentQueueService::list_pending(&tasks_dir).unwrap();
+        let retry = pending.iter().find(|entry| entry.ticket_id == "TEST-1").unwrap_or_else(|| panic!("{what}: a retry is queued: {pending:?}"));
+        assert_eq!((retry.agent.as_str(), retry.prompt.as_str()), ("fix", "Work on it"), "{what}: the first job's request and profile");
+    };
+    // The first takeover pauses on a usage limit; its retry holds the request.
+    take_over("r1", true);
+    retry("the first takeover's retry");
+    // At the reset T3 Code resumes the thread: the job that takes it over replaces the retry and asks the same.
+    let second = take_over("r2", true);
+    assert_eq!(AgentJobService::get_job(&second).map(|job| job.status).as_deref(), Some("paused"), "{}", job_logs(&fixtures));
+    retry("the takeover of the paused takeover");
+    // Taken over once more, it completes; the next takeover asks the completed job's request.
+    assert!(AgentQueueService::remove(&tasks_dir, "TEST-1").unwrap());
+    take_over("r3", false);
+    take_over("r4", true);
+    retry("the takeover of a completed takeover");
+}
+
 /// DEV-600: a queue entry held by an earlier job's T3 Code thread waited without a word, retrying every few hundred
 /// milliseconds. Its ticket now gets one comment that says which thread holds it and what lets it go on.
 #[test]

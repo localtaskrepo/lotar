@@ -23,7 +23,12 @@ use std::time::{Duration, Instant};
 
 /// How often a process asks T3 Code for its threads: a worker calls in every
 /// few hundred milliseconds, and each `t3` call takes about half a second.
+/// `LOTAR_AGENT_RESUMED_LOOK_SECONDS` sets another interval.
 const LOOK_EVERY: Duration = Duration::from_secs(30);
+
+fn look_every() -> Duration {
+    std::env::var("LOTAR_AGENT_RESUMED_LOOK_SECONDS").ok().and_then(|value| value.trim().parse().ok()).map_or(LOOK_EVERY, Duration::from_secs)
+}
 
 static LAST_LOOK: LazyLock<Mutex<HashMap<PathBuf, Instant>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
@@ -52,14 +57,14 @@ impl Resumed {
 
 /// Take over or report the threads of the tasks directory's ended `t3` jobs
 /// that T3 Code runs again, and settle the threads lotar kept active whose
-/// time came ([`super::kept`]), at most every [`LOOK_EVERY`]. T3 Code is
+/// time came ([`super::kept`]), at most every [`LOOK_EVERY`] ([`look_every`]). T3 Code is
 /// asked nothing while no ended job has a thread and no project runs `t3`.
 pub(super) fn look(tasks_dir: &Path) {
     {
         let Ok(mut looks) = LAST_LOOK.lock() else {
             return;
         };
-        if looks.get(tasks_dir).is_some_and(|at| at.elapsed() < LOOK_EVERY) {
+        if looks.get(tasks_dir).is_some_and(|at| at.elapsed() < look_every()) {
             return;
         }
         looks.insert(tasks_dir.to_path_buf(), Instant::now());
@@ -242,7 +247,8 @@ fn on_ticket(tasks_dir: &Path, ticket_id: &str, threads: Vec<Resumed>, program: 
             return;
         }
         let carried = limit_retries.as_ref().and_then(|entries| entries.iter().find_map(|entry| entry.carried_outcome.clone()));
-        match adopt(tasks_dir, ticket_id, &first, carried) {
+        let retried = limit_retries.as_ref().and_then(|entries| entries.first()).map(crate::services::agent_queue_service::AgentQueueEntry::request);
+        match adopt(tasks_dir, ticket_id, &first, retried, carried) {
             Ok(job_id) => {
                 for entry in limit_retries.iter().flatten() {
                     let _ = crate::services::agent_queue_service::AgentQueueService::remove(tasks_dir, &entry.ticket_id);
@@ -333,9 +339,32 @@ fn comment(tasks_dir: &Path, ticket_id: &str, text: &str) {
     let _ = TaskService::add_comment_with_context(&mut Storage::new(tasks_dir), ticket_id, text, CommentContext::automation());
 }
 
-/// The request of a taken-over job whose earlier job's log has no user
-/// request (a job taken over itself, a log of an older build).
+/// The request of a taken-over job when nothing holds the earlier one: a job
+/// taken over itself in another process, a log of an older build.
 const GO_ON: &str = "Go on with the ticket's work in this thread, where it stopped.";
+
+/// What the job taking over the thread asks, should it run again (DEV-920):
+/// the request of the usage-limit retry it replaces, else the earlier job's
+/// from this process's record (a job taken over itself writes no prompt to
+/// its log), else from its log's prompt, else [`GO_ON`]. The job keeps the
+/// thread's profile.
+fn takeover_request(
+    resumed: &Resumed,
+    ticket_id: &str,
+    retried: Option<crate::api_types::AgentJobCreateRequest>,
+    workspace_root: &Path,
+    logs_dir: Option<&str>,
+) -> crate::api_types::AgentJobCreateRequest {
+    let recorded = || JOB_REGISTRY.lock().ok().and_then(|registry| registry.jobs.get(&resumed.job_id).and_then(|state| state.request.clone()));
+    let mut request = retried.or_else(recorded).unwrap_or_else(|| crate::api_types::AgentJobCreateRequest {
+        prompt: earlier_request(workspace_root, logs_dir, &resumed.job_id).unwrap_or_else(|| GO_ON.to_string()),
+        ..Default::default()
+    });
+    request.ticket_id = ticket_id.to_string();
+    request.runner = resumed.agent.is_none().then(|| AgentRunnerKind::T3.as_str().to_string());
+    request.agent = resumed.agent.clone();
+    request
+}
 
 /// The user request the job `job_id` started with, from its log's prompt.
 fn earlier_request(workspace_root: &Path, logs_dir: Option<&str>, job_id: &str) -> Option<String> {
@@ -353,6 +382,7 @@ fn adopt(
     tasks_dir: &Path,
     ticket_id: &str,
     resumed: &Resumed,
+    retried: Option<crate::api_types::AgentJobCreateRequest>,
     carried_outcome: Option<crate::services::agent_queue_service::CarriedOutcome>,
 ) -> Result<String, String> {
     let parsed = crate::storage::TaskId::parse(ticket_id).map_err(|err| err.to_string())?;
@@ -388,13 +418,7 @@ fn adopt(
     let agent_logs_dir = crate::services::agent_log_service::effective_logs_dir(tasks_dir, config.agent_logs_dir.as_deref());
     // The job pauses like any other on a usage limit and runs again then
     // (DEV-912): without a request it failed into the failure rules.
-    let request = crate::api_types::AgentJobCreateRequest {
-        ticket_id: ticket_id.to_string(),
-        prompt: earlier_request(&workspace_root, agent_logs_dir.as_deref(), &resumed.job_id).unwrap_or_else(|| GO_ON.to_string()),
-        runner: resumed.agent.is_none().then(|| AgentRunnerKind::T3.as_str().to_string()),
-        agent: resumed.agent.clone(),
-        ..Default::default()
-    };
+    let request = takeover_request(resumed, ticket_id, retried, &workspace_root, agent_logs_dir.as_deref());
     {
         let mut registry = JOB_REGISTRY.lock().map_err(|_| "the job registry is unavailable".to_string())?;
         registry.active_by_ticket.insert(ticket_id.to_string(), job_id.clone());
