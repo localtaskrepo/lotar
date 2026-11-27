@@ -1449,6 +1449,44 @@ done
         assert_eq!(retry.session, Some(crate::config::types::AgentSession::Fresh), "{retry:?}");
     }
 
+    /// DEV-936: a headless job on dyson cancelled while the takeover resumes
+    /// its session gets no turn; its commits come back, its slot frees, and
+    /// what it left uncommitted stays in dyson's worktree, which is kept.
+    #[test]
+    fn a_headless_job_cancelled_during_its_takeover_brings_its_commits_back_and_frees_the_host() {
+        use crate::config::types::AgentRunnerKind;
+        use crate::services::agent_job_service::{AgentJobStatus, JOB_REGISTRY, resume_session_to_end};
+        let fixture = fixture();
+        let job_id = "job-dev936-cancelled";
+        let (tasks_dir, name, profile) = headless_job_to_take_over(&fixture, job_id, &[]);
+        JOB_REGISTRY.lock().expect("registry").jobs.get_mut(job_id).expect("job").record.status = AgentJobStatus::Cancelled;
+
+        resume_session_to_end(
+            job_id,
+            AgentRunnerKind::Claude,
+            "claude",
+            &name,
+            &profile,
+            &tasks_dir,
+            "DEV-1",
+            &config_with_dyson(),
+            "lotar exited",
+            Some("dyson"),
+        );
+
+        let agent_log = std::fs::read_to_string(fixture.root.join("agent.log")).expect("agent log");
+        assert!(agent_log.contains("session/resume") && !agent_log.contains("session/prompt"), "its session resumed, the agent got no turn: {agent_log}");
+        let worktree = fixture.root.join("mac/wt");
+        assert!(worktree.join("work.txt").is_file(), "its commits came back: {:?}", progress(job_id));
+        assert!(run_git(&worktree, &["cat-file", "commit", "HEAD"]).contains("gpgsig"), "signed here");
+        let host_tree = fixture.root.join("host/wt");
+        assert!(!worktree.join("left.txt").exists() && host_tree.join("left.txt").is_file(), "the leftover stays on dyson");
+        assert_eq!(run_git(&host_tree, &["status", "--porcelain"]), "?? left.txt", "uncommitted there");
+        assert!(progress(job_id).iter().any(|note| note.starts_with("Kept the worktree")), "{:?}", progress(job_id));
+        assert_eq!(agent_hosts::job_host(job_id), None, "its slot on dyson is free");
+        assert_eq!(JOB_REGISTRY.lock().expect("registry").jobs.get(job_id).expect("job").record.status, AgentJobStatus::Cancelled);
+    }
+
     /// DEV-931: a headless agent that asks a question has ended its turn:
     /// its leftovers are committed there, all comes back, nothing waits.
     #[test]

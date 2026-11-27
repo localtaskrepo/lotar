@@ -5,7 +5,7 @@ type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T11:58:59.845101+00:00
-modified: 2026-11-27T15:46:15.428668+00:00
+modified: 2026-11-27T15:51:22.795101+00:00
 relationships:
   related:
   - DEV-920
@@ -14,6 +14,7 @@ relationships:
   - DEV-931
   - DEV-933
   - DEV-936
+  - DEV-935
 comments:
 - date: 2026-11-27T13:47:56.642583+00:00
   author: claude
@@ -209,3 +210,9 @@ history:
   - field: relationships
     old: '{"related":["DEV-920","DEV-808","DEV-928","DEV-931","DEV-933"]}'
     new: '{"related":["DEV-920","DEV-808","DEV-928","DEV-931","DEV-933","DEV-936"]}'
+- at: 2026-11-27T15:51:22.795101+00:00
+  actor: claude
+  changes:
+  - field: relationships
+    old: '{"related":["DEV-920","DEV-808","DEV-928","DEV-931","DEV-933","DEV-936"]}'
+    new: '{"related":["DEV-920","DEV-808","DEV-928","DEV-931","DEV-933","DEV-936","DEV-935"]}'
