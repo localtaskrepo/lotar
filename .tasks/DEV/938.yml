@@ -1,11 +1,11 @@
 title: 'QA red on main since DEV-901: Windows build fails on std::os::unix in hosted.rs; hosted test needs a git identity'
-status: InProgress
+status: Merging
 priority: Medium
 type: Bug
 reporter: claude
-assignee: '@fix'
+assignee: '@merge'
 created: 2026-11-27T17:43:12.460828+00:00
-modified: 2026-11-27T17:53:42.398699+00:00
+modified: 2026-11-27T17:59:07.974937+00:00
 relationships:
   blocks:
   - DEV-924
@@ -60,6 +60,55 @@ comments:
       - The earlier "Build binary" failure hid these. Once it builds, CI reaches this step and fails there.
     - Fix: gate these Unix-only tests with `#[cfg(all(test, unix))]` on `hosted.rs`'s `mod tests` and on `agent_hosts.rs`'s unix-dependent tests. Then rerun the `--all-targets` Windows check above, which works here without MinGW.
     - Non-blocking: `agent_job_service.rs:7718`, unused `std::io::Write` on Windows tests (a warning only; CI sets no `-D warnings`).
+- date: 2026-11-27T17:56:09.419473+00:00
+  author: claude
+  text: |-
+    Rework done in `7c7a105a3` (amended): the Windows `--all-targets` check of `lotar-agent` is now clean.
+
+    - Blocking finding: fixed. Windows no longer compiles the Unix-only tests:
+      - `hosted.rs`: `mod tests` is now `#[cfg(all(test, unix))]`
+      - `agent_hosts.rs`: `#[cfg(unix)]` on `fake_ssh` and its two probe tests
+    - Non-blocking finding: fixed. `agent_job_service.rs` tests: `use std::io::Write` is now `#[cfg(unix)]`, so the Windows warning is gone.
+    - The rework adds 6 lines; the whole diff is 80 lines.
+  report:
+    commits:
+    - hash: 7c7a105a3
+      what: gate hosted.rs's Unix sockets and the Unix-only tests by cfg(unix); fixture identity in HOME
+    checks:
+    - command: cargo check -p lotar-agent --target x86_64-pc-windows-gnu --all-targets --all-features
+      result: passed
+      reason: 0 errors, 0 warnings (7 errors before)
+    - command: cargo clippy -p lotar-agent --target x86_64-pc-windows-gnu --all-targets --all-features
+      result: passed
+    - command: HOME=<empty dir> cargo nextest run -p lotar-agent --lib -E 'test(/hosted::|agent_hosts::/)'
+      result: passed
+      reason: 35/35
+    - command: npm run lint
+      result: passed
+    - command: cargo check --workspace --target x86_64-pc-windows-gnu --all-targets
+      result: not_run
+      reason: lotar and lotar-lib need ring, which needs MinGW gcc (not installed); lotar-core, lotar-tasks, lotar-web-assets check clean
+    - command: gh run list --workflow "Quality Assurance" --commit <main head>
+      result: not_run
+      reason: runs after the merge
+    next: Review again, merge, then confirm QA is green on main
+- date: 2026-11-27T17:59:01.653497+00:00
+  author: claude
+  text: |-
+    Review: passed. `7c7a105a3` gates the Unix-only code and tests for Windows and gives the hosted test fixture a git identity through `HOME`.
+
+    - Read: the diff of `7c7a105a3` against main (main's only newer commit, `5998c5424`, changes only `.tasks`), the ticket and both review rounds, the Windows job at `.github/workflows/ci.yml:607`, and the recent main commits to `hosted.rs` and `agent_hosts.rs`.
+    - Reran, all clean:
+      - `cargo check -p lotar-agent --target x86_64-pc-windows-gnu --all-targets --all-features`: no errors, no warnings
+      - Windows `cargo clippy -p lotar-agent --all-targets --all-features`, and the same for the Mac
+      - `cargo check --workspace --exclude lotar --exclude lotar-lib --target x86_64-pc-windows-gnu --all-targets --all-features`: only `unused dependency libc` in `lotar-core`, which was already there before this change
+      - `HOME=<empty> cargo nextest run -p lotar-agent hosted:: agent_hosts::`: 35/35 pass with no git identity, as on the CI runner
+      - `rustfmt --check` on the changed files
+    - The previous blocking finding is fixed: `hosted.rs` `mod tests` is `#[cfg(all(test, unix))]`, and `agent_hosts.rs` `fake_ssh` plus its 2 probe tests are `#[cfg(unix)]`.
+    - Not run:
+      - Windows check of `lotar`/`lotar-lib`: `ring` needs `x86_64-w64-mingw32-gcc`, which isn't installed here. I searched the changes since the last green commit `2cbbf322a` for Unix-only APIs in those crates: the only hits are gated by `#[cfg(unix)]` or `#[cfg(target_os = "macos")]`.
+      - The ticket's `gh run list --workflow "Quality Assurance"` check: it can only run on main after the merge.
+    - No minor findings, no tickets filed.
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3Ac50f41520889ee1a7d8d331a8ea8dcd6d8e5dec048db1040a8c585eb509f44ae
 description: |-
@@ -148,3 +197,29 @@ history:
   - field: status
     old: Reviewing
     new: InProgress
+- at: 2026-11-27T17:56:09.419473+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T17:56:17.925044+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: InProgress
+    new: Reviewing
+  - field: assignee
+    old: '@fix'
+    new: '@review'
+- at: 2026-11-27T17:59:01.653497+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T17:59:07.974937+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Reviewing
+    new: Merging
+  - field: assignee
+    old: '@review'
+    new: '@merge'

@@ -1,11 +1,10 @@
 title: Windows CI saves sccache only at the end, so a cancelled run leaves the next push a stale cache
-status: Blocked
+status: Done
 priority: Medium
 type: Chore
 reporter: claude
-assignee: claude
 created: 2026-11-14T23:29:51.339105+00:00
-modified: 2026-11-15T22:03:36.951066+00:00
+modified: 2026-11-27T18:01:26.713455+00:00
 relationships:
   related:
   - DEV-496
@@ -68,6 +67,13 @@ comments:
     - `gh run list --workflow ci.yml --branch main`: no cancelled run on main since the fix. Newest are `43658334002` (`f1cd408b`) and `43656712504` (`c9c74057`), both success.
     - Unblocks when a main run's Windows job is cancelled after 'Save sccache' (step 17) and the next run's 'sccache stats' shows hits. Then tick the last box and close as Done.
     - Nothing to commit; boxes 1 to 4 are met on `origin/main` (`4fdb29c5`).
+- date: 2026-11-27T18:01:25.163245+00:00
+  author: claude
+  text: |-
+    Last box met: the run after a cancelled one restored the saved Windows cache with 100% hits. Closing as Done.
+
+    - Cancelled main run `45974658761` (`1ee3ef1f`): Windows job reached 'sccache stats' and 'Save sccache' (after nextest) before the cancel.
+    - Next run `45975780190`: Windows 'sccache stats' shows 12 of 12 Rust hits, 0 misses (`gh run view --job <id> --log`).
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa64db4c9-e4f9-46e4-80c7-b1a046e9f9af
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Aa0f70add-61af-4232-af9e-35f5d38100a1
@@ -243,3 +249,18 @@ history:
   - field: relationships
     old: '{"related":["DEV-496"]}'
     new: '{"related":["DEV-496","DEV-513"]}'
+- at: 2026-11-27T18:01:25.163245+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T18:01:25.239456+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: Done
+- at: 2026-11-27T18:01:26.713455+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude

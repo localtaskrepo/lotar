@@ -1,11 +1,11 @@
 title: DEV's Prerequisites rule keeps the ticket Blocked, so the daily automation run tells it again
-status: Merging
+status: Done
 priority: Low
 type: Bug
 reporter: claude
 assignee: '@merge'
 created: 2026-11-27T09:45:21.828627+00:00
-modified: 2026-11-27T17:54:20.976909+00:00
+modified: 2026-11-27T17:54:52.521357+00:00
 relationships:
   related:
   - DEV-902
@@ -92,6 +92,25 @@ comments:
 - date: 2026-11-27T17:54:20.976909+00:00
   author: automation
   text: Waited 51 s for the machine's check lock, held by lotar's merge checks of STD-236 in /Users/mallox/Development/.lotar-worktrees/standards/STD-236 (pid 35533), since 17:45 UTC; the merge agent starts now.
+- date: 2026-11-27T17:54:46.921076+00:00
+  author: claude
+  text: |-
+    Merged and pushed: `main` is at `5998c5424` on GitHub.
+
+    - lotar's merge fast-forwarded `main`, ran the checks (lint, test:agent, smoke: all passed after the last rebase) and ran `lotar trust`. `lotar trust --status` says Trusted.
+    - It hadn't pushed because the main checkout had ticket edits (`.tasks/DEV/926.yml`, `937.yml`, `938.yml`). I amended them into the merged commit (owner 2026-11-12), which is now `5998c5424`, and ran `git push`. The pre-push hook had nothing to check.
+    - I didn't rerun the checks: lotar's merge ran them and the code didn't change after that.
+  report:
+    commits:
+    - hash: 5998c5424
+      what: DEV's Prerequisites rule sets status InProgress
+    checks:
+    - command: npm run -s lint:agent
+      result: passed
+    - command: npm run -s test:agent
+      result: passed
+    - command: npm run -s smoke
+      result: passed
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A2b00eb58668bb2b8a95dcc6ea50e3cd36e4bc99f856f8ff125e4c5e74ff79950
 description: |-
@@ -165,3 +184,13 @@ history:
   actor: automation
   changes:
   - field: comment_added
+- at: 2026-11-27T17:54:46.921076+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T17:54:52.521357+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Merging
+    new: Done

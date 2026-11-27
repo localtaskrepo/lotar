@@ -747,6 +747,7 @@ mod tests {
         assert!(!wake("nyx", &host(None), at("2026-11-26T10:00")), "a host without wake");
     }
 
+    #[cfg(unix)]
     /// The fake ssh: `t3 --version` prints `remote`; without one, or for
     /// another command, it doesn't connect (exit 255).
     fn fake_ssh(dir: &Path, remote: Option<&str>) -> LocalT3 {
@@ -765,6 +766,7 @@ mod tests {
         LocalT3 { program: t3, env: Vec::new() }
     }
 
+    #[cfg(unix)]
     #[test]
     fn the_probe_compares_t3_versions_and_sees_a_host_that_is_down() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -776,6 +778,7 @@ mod tests {
         assert_eq!(probe(&host(None), &local), Probe::Down("dyson doesn't answer over ssh: connect: down".to_string()));
     }
 
+    #[cfg(unix)]
     /// DEV-911: a claude/codex job needs its programs there, not T3 Code.
     #[test]
     fn the_probe_of_a_headless_agent_looks_for_its_programs() {

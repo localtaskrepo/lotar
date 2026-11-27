@@ -21,8 +21,8 @@
 use crate::config::types::AgentHostConfig;
 use crate::services::agent_hosts::{self, Check, Probe, Ssh, quote, stop_child};
 use std::collections::BTreeMap;
-use std::io::{Read as _, Write as _};
-use std::os::unix::net::{UnixListener, UnixStream};
+#[cfg(unix)]
+use std::os::unix::net::UnixListener;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -523,8 +523,7 @@ impl Bridge {
         let short: String = job_id.chars().filter(char::is_ascii_alphanumeric).rev().take(24).collect::<String>().chars().rev().collect();
         let local = std::env::temp_dir().join(format!("lotar-mcp-{short}.sock"));
         let _ = std::fs::remove_file(&local);
-        let listener = UnixListener::bind(&local).map_err(|err| format!("could not listen on {}: {err}", local.display()))?;
-        listener.set_nonblocking(true).map_err(|err| err.to_string())?;
+        let listener = listen(&local)?;
         let remote = format!("/tmp/lotar-mcp-{short}.sock");
         ssh.run(&format!("rm -f {}", quote(&remote)))?;
         let mut child = Command::new(Ssh::program())
@@ -557,21 +556,7 @@ impl Bridge {
         let server = (program, env);
         let stop = Arc::new(AtomicBool::new(false));
         let servers = Arc::new(Mutex::new(Vec::new()));
-        let (accepting, kept) = (Arc::clone(&stop), Arc::clone(&servers));
-        std::thread::spawn(move || {
-            while !accepting.load(Ordering::SeqCst) {
-                match listener.accept() {
-                    Ok((stream, _)) => {
-                        if let Some(child) = serve(stream, &server)
-                            && let Ok(mut kept) = kept.lock()
-                        {
-                            kept.push(child);
-                        }
-                    }
-                    Err(_) => std::thread::sleep(Duration::from_millis(200)),
-                }
-            }
-        });
+        accept(listener, server, Arc::clone(&stop), Arc::clone(&servers));
         let child = Arc::new(Mutex::new(child));
         let lost = Arc::new(Mutex::new(None));
         let (watching, watched, noted, target) = (Arc::clone(&stop), Arc::clone(&child), Arc::clone(&lost), ssh.target.clone());
@@ -612,8 +597,49 @@ impl Bridge {
     }
 }
 
+/// The listener for the host's socket. A job on an agent host needs Unix
+/// sockets: none on Windows (DEV-938).
+#[cfg(unix)]
+fn listen(local: &Path) -> Result<UnixListener, String> {
+    let listener = UnixListener::bind(local).map_err(|err| format!("could not listen on {}: {err}", local.display()))?;
+    listener.set_nonblocking(true).map_err(|err| err.to_string())?;
+    Ok(listener)
+}
+
+#[cfg(not(unix))]
+struct UnixListener;
+
+#[cfg(not(unix))]
+fn listen(_local: &Path) -> Result<UnixListener, String> {
+    Err("a job on an agent host needs Unix sockets, which this system lacks".to_string())
+}
+
+/// Start lotar's MCP server for each connection until `stop`.
+#[cfg(unix)]
+fn accept(listener: UnixListener, server: (PathBuf, BTreeMap<String, String>), accepting: Arc<AtomicBool>, kept: Arc<Mutex<Vec<Child>>>) {
+    std::thread::spawn(move || {
+        while !accepting.load(Ordering::SeqCst) {
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    if let Some(child) = serve(stream, &server)
+                        && let Ok(mut kept) = kept.lock()
+                    {
+                        kept.push(child);
+                    }
+                }
+                Err(_) => std::thread::sleep(Duration::from_millis(200)),
+            }
+        }
+    });
+}
+
+#[cfg(not(unix))]
+fn accept(_: UnixListener, _: (PathBuf, BTreeMap<String, String>), _: Arc<AtomicBool>, _: Arc<Mutex<Vec<Child>>>) {}
+
 /// Run lotar's MCP server for one connection.
-fn serve(stream: UnixStream, (program, env): &(PathBuf, BTreeMap<String, String>)) -> Option<Child> {
+#[cfg(unix)]
+fn serve(stream: std::os::unix::net::UnixStream, (program, env): &(PathBuf, BTreeMap<String, String>)) -> Option<Child> {
+    use std::io::{Read as _, Write as _};
     let _ = stream.set_nonblocking(false);
     let mut child = Command::new(program).arg("mcp").envs(env).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().ok()?;
     let (mut stdin, mut stdout) = (child.stdin.take()?, child.stdout.take()?);
@@ -639,10 +665,11 @@ fn serve(stream: UnixStream, (program, env): &(PathBuf, BTreeMap<String, String>
     Some(child)
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     use crate::services::agent_hosts::LocalT3;
+    use std::io::{Read as _, Write as _};
     use std::os::unix::fs::PermissionsExt as _;
 
     /// A Mac checkout and a "host" in one temp folder: the fake ssh runs each
@@ -733,11 +760,14 @@ T3CODE_HOME="{root}/host-t3" PATH="{root}/host-bin:$PATH" exec sh -c "$cmd"
             &root.join("bin/gpg"),
             "#!/bin/sh\ncat > /dev/null\necho '[GNUPG:] SIG_CREATED ' >&2\nprintf -- '-----BEGIN PGP SIGNATURE-----\\n\\nfake\\n-----END PGP SIGNATURE-----\\n'\n",
         );
-        std::fs::write(root.join("gitconfig"), "[user]\n\tname = Mac\n\temail = mac@example.com\n[init]\n\tdefaultBranch = main\n").expect("gitconfig");
+        // In HOME: lotar's own git calls drop GIT_CONFIG_* (DEV-938), and a
+        // CI runner has no identity of its own.
+        std::fs::write(root.join(".gitconfig"), "[user]\n\tname = Mac\n\temail = mac@example.com\n[init]\n\tdefaultBranch = main\n").expect("gitconfig");
         // SAFETY: nextest runs each test in its own process.
         unsafe {
             std::env::set_var("LOTAR_SSH", root.join("bin/ssh"));
-            std::env::set_var("GIT_CONFIG_GLOBAL", root.join("gitconfig"));
+            std::env::set_var("HOME", &root);
+            std::env::remove_var("XDG_CONFIG_HOME");
             std::env::set_var("GIT_CONFIG_NOSYSTEM", "1");
         }
         let repo = root.join("mac/repo");

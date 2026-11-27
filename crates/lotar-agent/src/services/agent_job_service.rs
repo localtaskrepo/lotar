@@ -7715,6 +7715,7 @@ mod tests {
     use crate::config::types::{AgentInstructionsConfig, AgentProfileConfig, GlobalConfig};
     use crate::services::agent_context_service::AgentContextService;
     use std::fs;
+    #[cfg(unix)]
     use std::io::Write;
     use tempfile::tempdir;
 
