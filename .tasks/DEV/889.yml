@@ -1,10 +1,11 @@
 title: 'Agent queue: 7 jobs sit in a queue file keyed by the relative path .tasks, which no worker reads'
-status: Blocked
+status: InProgress
 priority: Medium
 type: Bug
 reporter: claude
+assignee: '@fix'
 created: 2026-11-26T03:32:05.108189+00:00
-modified: 2026-11-27T00:10:45.980379+00:00
+modified: 2026-11-27T17:37:08.795363+00:00
 relationships:
   related:
   - DEV-860
@@ -79,10 +80,14 @@ comments:
     - `lotar --version`: `0.15.7`; newest tag `v0.15.7`; `git tag --contains 0cf94860d`: none.
     - `queue-b06823c0….json`: 8 pending, last written 12:00 local, so no new leaks since the last round.
     - Next: once a release with `0cf94860d` is installed, requeue the 8 under each repo's absolute tasks dir, delete the file, Done.
+- date: 2026-11-27T17:37:03.741059+00:00
+  author: claude
+  text: 'Unblocked 2026-11-27 (owner: "Start all four (Recommended)"): the wait is over, v0.16.0 (2026-11-26 19:43 PST) ships DEV-887. Carry out his earlier answer: requeue the 7 jobs.'
 references:
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A1c1b94732806b9b77a50613c04a1a582524ec503076e19e24843db18e4f19fa5
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A348c8be0d6af88553ec0fc486e860caa6d139c788491aa5c658ec157106d8578
 - link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A248ebff83276229a3f6cc5725bb91047266afbdba32b66f9a38417f9292d4edf
+- link: https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4259f28f60fdab763e54e35775d36ea01384e8d5cb41225a575ce9b58559baa0
 description: |-
   Found (DEV-860 review): `~/Library/Caches/lotar/agent-queue/queue-b06823c05bdb7cda4004b1281c7001744d021ba39e3f81993eb5805f188f6f3e.json` (tasks_dir `.tasks`, last written 2026-11-25 22:14Z) holds DEV-850, DEV-849, DEV-848, DEV-827, STD-336, DEV-872 and STD-359. Since DEV-822 the resolver makes the path absolute, so nothing reads that file again.
 
@@ -243,3 +248,32 @@ history:
   - field: tags
     old: health, owner, waits, job-paused
     new: health, waits, job-paused
+- at: 2026-11-27T17:37:03.741059+00:00
+  actor: claude
+  changes:
+  - field: comment_added
+- at: 2026-11-27T17:37:04.091165+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Blocked
+    new: Todo
+  - field: assignee
+    new: claude
+- at: 2026-11-27T17:37:04.160912+00:00
+  actor: claude
+  changes:
+  - field: assignee
+    old: claude
+    new: '@fix'
+- at: 2026-11-27T17:37:07.185222+00:00
+  actor: claude
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+- at: 2026-11-27T17:37:08.795363+00:00
+  actor: claude
+  changes:
+  - field: reference_added
+    new: link:https://app.t3.codes/threads/d834978d-9e75-43fb-ba01-45747238fc44/mcp%3Alaunch%3A4259f28f60fdab763e54e35775d36ea01384e8d5cb41225a575ce9b58559baa0
